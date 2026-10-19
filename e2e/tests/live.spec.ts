@@ -5,12 +5,13 @@ import { PLAYERS as P } from '../fixtures/players.js';
 import { SLEEPER_LEAGUE_NAME } from '../fixtures/sleeper.js';
 import { UPSTREAM_PORT } from '../support/env.js';
 import { expect, test } from './fixtures.js';
-import { openDashboard, openTab } from './helpers.js';
+import { openDashboard } from './helpers.js';
 import { seedFfpcLeague } from './seed.js';
 
-// The live feed compares snapshots of the week's stat lines. The fixture games
-// are all final, so the automatic 30-second check is idle; these tests look
-// with "Check now" and add plays to the fake stats feed in between.
+// The live feed, beside the matchups on the main page, compares snapshots of
+// the week's stat lines. No fixture game is live, so the automatic 30-second
+// check is idle; these tests look with "Check now" and add plays to the fake
+// stats feed in between.
 const upstream = (path: string) => fetch(`http://127.0.0.1:${UPSTREAM_PORT}${path}`, { method: 'POST' });
 const feed = (page: Page) => page.getByRole('region', { name: 'Live scoring' });
 
@@ -32,14 +33,12 @@ test.describe('Live feed', () => {
   });
 
   test('is quiet when nothing is on', async ({ page }) => {
-    await openTab(page, 'Live');
     await expect(feed(page)).toContainText('No week 6 games are on right now.');
     await expect(feed(page)).toContainText('No scoring yet this week.');
   });
 
   test('shows a play once, scored by each league’s own rules', async ({ page, request }) => {
     await mayeThrowsATouchdown(request);
-    await openTab(page, 'Live');
     await feed(page).getByRole('button', { name: 'Check now' }).click();
 
     const event = feed(page).getByRole('listitem').filter({ hasText: 'Drake Maye' }).first();
@@ -54,18 +53,17 @@ test.describe('Live feed', () => {
     await expect(feed(page).getByRole('listitem').filter({ hasText: 'Drake Maye' })).toHaveCount(1);
   });
 
-  test('filters to one league, and the Matchups tab shows the latest scoring', async ({ page, request }) => {
+  test('sits beside the matchups, and filters to your starters or one league', async ({ page, request }) => {
     await mayeThrowsATouchdown(request);
     await request.post('/api/live/poll');
     await page.reload();
+    await expect(page.getByRole('region', { name: 'Matchups' })).toBeVisible(); // same page
+    await expect(feed(page)).toContainText('Drake Maye');
 
-    const latest = page.getByRole('region', { name: 'Latest scoring' });
-    await expect(latest).toContainText('Drake Maye');
-    await latest.getByRole('button', { name: 'See all' }).click();
-
-    await feed(page).getByRole('group', { name: 'Show' }).getByRole('button', { name: 'My starters' }).click();
+    const show = feed(page).getByLabel('Show');
+    await show.selectOption({ label: 'My starters' });
     await expect(feed(page)).toContainText('Drake Maye'); // he starts in ESPN
-    await feed(page).getByRole('group', { name: 'Show' }).getByRole('button', { name: FFPC_TEAM }).click();
+    await show.selectOption({ label: FFPC_TEAM });
     await expect(feed(page)).toContainText('Drake Maye');
   });
 });

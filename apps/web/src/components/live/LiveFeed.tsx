@@ -56,6 +56,8 @@ export function EventRow({ e }: { e: LiveEvent }) {
 
 type Filter = 'all' | 'mine' | string; // a league key
 
+// The live scoring feed, as a column beside the matchups: newest first,
+// filterable, and checked every 30 seconds by the server while games are on.
 export function LiveFeed() {
   const { data, error, isPending } = useLive();
   const queryClient = useQueryClient();
@@ -71,88 +73,66 @@ export function LiveFeed() {
     return [...seen.entries()];
   }, [data]);
 
-  if (isPending) return <p className="text-slate-400">Loading the live feed…</p>;
-  if (error) return <p role="alert" className="rounded-lg bg-rose-950/60 p-4 text-sm text-rose-200">Couldn't load the live feed: {error.message}</p>;
-
-  const events = data.events.filter((e) =>
+  const events = (data?.events ?? []).filter((e) =>
     filter === 'all' ? true : filter === 'mine' ? e.leagues.some((l) => l.role === 'starter') : e.leagues.some((l) => l.leagueKey === filter),
   );
 
   return (
-    <section aria-label="Live scoring" className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <p className="flex items-center gap-2 text-sm text-slate-300">
-          {data.live ? (
-            <>
-              <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-              Week {data.week} games are on: checking every 30 seconds{data.lastCheckedAt && ` (last ${ago(data.lastCheckedAt)})`}.
-            </>
-          ) : (
-            `No week ${data.week} games are on right now. The feed fills in while games are played.`
-          )}
-        </p>
+    <section aria-labelledby="live-title" className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
+      <header className="flex items-center justify-between gap-2">
+        <h2 id="live-title" className="flex items-center gap-2 font-semibold">
+          {data?.live && <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />}
+          Live scoring
+        </h2>
         <button
           type="button"
           onClick={() => check.mutate()}
           disabled={check.isPending}
-          className="rounded-md border border-slate-700 px-3 py-1 text-sm font-medium text-slate-200 hover:bg-slate-800"
+          className="rounded-md border border-slate-700 px-2.5 py-1 text-xs font-medium text-slate-200 hover:bg-slate-800"
         >
           {check.isPending ? 'Checking…' : 'Check now'}
         </button>
       </header>
 
-      {leagues.length > 0 && (
-        <div role="group" aria-label="Show" className="flex flex-wrap gap-1">
-          {[['all', 'Everything'], ['mine', 'My starters'], ...leagues].map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={filter === value}
-              onClick={() => setFilter(value!)}
-              className={`rounded-md px-3 py-1 text-sm font-medium ${filter === value ? 'bg-slate-100 text-slate-900' : 'text-slate-300 hover:bg-slate-800'}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {events.length === 0 ? (
-        <p className="py-6 text-center text-sm text-slate-400">
-          {data.events.length === 0 ? 'No scoring yet this week.' : 'Nothing for this filter yet.'}
-        </p>
+      {isPending ? (
+        <p className="text-sm text-slate-400">Loading…</p>
+      ) : error ? (
+        <p role="alert" className="text-sm text-rose-300">Couldn't load the live feed: {error.message}</p>
       ) : (
-        <ol className="divide-y divide-slate-800">
-          {events.map((e) => (
-            <EventRow key={e.id} e={e} />
-          ))}
-        </ol>
-      )}
-      <p className="text-xs text-slate-400">
-        Each change is scored by every league's own rules. Green counts for you, red counts against you, gray is on your bench.
-      </p>
-    </section>
-  );
-}
+        <>
+          <p className="text-xs text-slate-400">
+            {data.live
+              ? `Week ${data.week} games are on: checking every 30 seconds${data.lastCheckedAt ? ` (last ${ago(data.lastCheckedAt)})` : ''}.`
+              : `No week ${data.week} games are on right now. The feed fills in while games are played.`}
+          </p>
 
-/** The latest few events, for the Matchups tab. */
-export function LatestScoring({ onSeeAll }: { onSeeAll: () => void }) {
-  const { data } = useLive();
-  const latest = data?.events.slice(0, 3) ?? [];
-  if (latest.length === 0) return null;
-  return (
-    <section aria-label="Latest scoring" className="mb-4 rounded-xl border border-slate-800 bg-slate-900 px-5 py-2">
-      <div className="flex items-center justify-between pt-2">
-        <h2 className="text-sm font-semibold text-slate-200">Latest scoring</h2>
-        <button type="button" onClick={onSeeAll} className="text-sm text-slate-400 hover:text-slate-200">
-          See all
-        </button>
-      </div>
-      <ol className="divide-y divide-slate-800">
-        {latest.map((e) => (
-          <EventRow key={e.id} e={e} />
-        ))}
-      </ol>
+          {leagues.length > 0 && (
+            <label className="flex items-center gap-2 text-sm text-slate-300">
+              Show
+              <select value={filter} onChange={(e) => setFilter(e.target.value)} className="min-w-0 flex-1 rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100">
+                <option value="all">Everything</option>
+                <option value="mine">My starters</option>
+                {leagues.map(([key, name]) => (
+                  <option key={key} value={key}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {events.length === 0 ? (
+            <p className="py-4 text-center text-sm text-slate-400">{data.events.length === 0 ? 'No scoring yet this week.' : 'Nothing for this filter yet.'}</p>
+          ) : (
+            <ol className="divide-y divide-slate-800">
+              {events.map((e) => (
+                <EventRow key={e.id} e={e} />
+              ))}
+            </ol>
+          )}
+          <p className="text-xs text-slate-400">Scored by each league's own rules. Green counts for you, red against you, gray is your bench.</p>
+        </>
+      )}
     </section>
   );
 }

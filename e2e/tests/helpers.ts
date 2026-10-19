@@ -32,7 +32,7 @@ export const paste = (field: Locator, text: string) =>
     el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
   }, text);
 
-export const openTab = (page: Page, name: 'Matchups' | 'Live' | 'Waivers' | 'Players' | 'History') =>
+export const openTab = (page: Page, name: 'Matchups' | 'Waivers' | 'Players' | 'History') =>
   page
     .getByRole('navigation')
     // The name can carry a note after the label, e.g. "Waivers (1 league needs your claims)".

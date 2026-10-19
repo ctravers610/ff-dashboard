@@ -3,8 +3,8 @@ import { signOut, useDashboard, useWaivers, type Me } from './api';
 import { AddLeagueDialog } from './components/AddLeagueDialog';
 import { AlertList } from './components/AlertList';
 import { Hero } from './components/Hero';
-import { ChartIcon, FootballIcon, PulseIcon, RefreshIcon, ScoreboardIcon, SwapIcon, UsersIcon } from './components/icons';
-import { LatestScoring, LiveFeed } from './components/live/LiveFeed';
+import { ChartIcon, FootballIcon, RefreshIcon, ScoreboardIcon, SwapIcon, UsersIcon } from './components/icons';
+import { LiveFeed } from './components/live/LiveFeed';
 import { ManualLeagueEditor } from './components/ManualLeagueEditor';
 import { MatchupTable } from './components/MatchupTable';
 import { PlayersView } from './components/PlayersView';
@@ -16,10 +16,9 @@ const HistoryView = lazy(() =>
   import('./components/history/HistoryView').then((m) => ({ default: m.HistoryView })),
 );
 
-type View = 'matchups' | 'live' | 'waivers' | 'players' | 'history';
+type View = 'matchups' | 'waivers' | 'players' | 'history';
 const VIEWS: { id: View; label: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
   { id: 'matchups', label: 'Matchups', Icon: ScoreboardIcon },
-  { id: 'live', label: 'Live', Icon: PulseIcon },
   { id: 'waivers', label: 'Waivers', Icon: SwapIcon },
   { id: 'players', label: 'Players', Icon: UsersIcon },
   { id: 'history', label: 'History', Icon: ChartIcon },
@@ -39,7 +38,7 @@ export default function App({ user }: { user: Me['user'] }) {
 
   return (
     // Bottom padding on phones leaves room for the tab bar.
-    <div className="mx-auto max-w-5xl px-4 pb-24 pt-4 sm:pb-10 sm:pt-6">
+    <div className="mx-auto max-w-7xl px-4 pb-24 pt-4 sm:pb-10 sm:pt-6">
       <header className="mb-4 flex items-center justify-between gap-3">
         <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
           <FootballIcon className="text-xl text-emerald-400" />
@@ -121,24 +120,27 @@ export default function App({ user }: { user: Me['user'] }) {
 
       {view === 'matchups' ? (
         data && (
-          <main>
-            {data.leagues.length > 0 && <Hero data={data} />}
-            <LatestScoring onSeeAll={() => setView('live')} />
-            <AlertList leagues={data.leagues} />
-            {data.leagues.length > 0 && <MatchupTable leagues={data.leagues} onEdit={setEditing} />}
-            <button
-              type="button"
-              onClick={() => setAdding(true)}
-              className="mt-3 w-full rounded-xl border border-dashed border-slate-700 py-3 text-sm font-medium text-slate-400 hover:border-slate-500 hover:text-slate-200"
-            >
-              + Add league
-            </button>
-          </main>
+          // The live feed on the left, matchups on the right; stacked on a phone,
+          // matchups first (they come first in the page, too).
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start">
+            <main className="lg:order-2">
+              {data.leagues.length > 0 && <Hero data={data} />}
+              <AlertList leagues={data.leagues} />
+              {data.leagues.length > 0 && <MatchupTable leagues={data.leagues} onEdit={setEditing} />}
+              <button
+                type="button"
+                onClick={() => setAdding(true)}
+                className="mt-3 w-full rounded-xl border border-dashed border-slate-700 py-3 text-sm font-medium text-slate-400 hover:border-slate-500 hover:text-slate-200"
+              >
+                + Add league
+              </button>
+            </main>
+            {/* Stays in view while the matchups scroll, and scrolls on its own. */}
+            <aside className="lg:sticky lg:top-4 lg:order-1 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+              <LiveFeed />
+            </aside>
+          </div>
         )
-      ) : view === 'live' ? (
-        <main>
-          <LiveFeed />
-        </main>
       ) : view === 'waivers' ? (
         <main>
           <WaiversView />

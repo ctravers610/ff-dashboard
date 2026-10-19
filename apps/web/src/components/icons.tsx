@@ -79,9 +79,3 @@ export const SwapIcon = (p: SVGProps<SVGSVGElement>) => (
     <path d="M7 4L3 8l4 4M3 8h13M17 20l4-4-4-4M21 16H8" />
   </Icon>
 );
-
-export const PulseIcon = (p: SVGProps<SVGSVGElement>) => (
-  <Icon {...p}>
-    <path d="M3 12h4l2-6 4 12 2-6h6" />
-  </Icon>
-);
