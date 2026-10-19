@@ -1,7 +1,7 @@
 // Hand-entered leagues (FFPC), stored in Postgres.
 
 import type { ManualLeague, ManualLeagueInput } from '@ffd/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../../config.js';
@@ -43,7 +43,10 @@ export function manualLeagueStore(db: Db) {
           teamName: input.teamName,
           rosterText: input.rosterText,
           matchup: input.matchup ?? null,
-          updatedAt: new Date(),
+          // The database's clock, like the defaultNow() that set it on create. The
+          // app's clock can differ from it by a few ms or more (another machine, or a
+          // Docker VM's drifting clock), which could make updatedAt go backwards.
+          updatedAt: sql`now()`,
         })
         .where(eq(manualLeagues.id, id))
         .returning();
