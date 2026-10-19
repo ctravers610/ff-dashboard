@@ -2,8 +2,8 @@
 // available players, and suggested add/drop moves for the week a claim made now
 // would play in. FFPC leagues come from a pasted copy of FFPC's add/drop page.
 
-import { nextRun, type WaiverClaims, type WaiverLeague, type WaiversResponse } from '@ffd/shared';
-import { reminderKey } from '../reminders/plan.js';
+import type { WaiverLeague, WaiversResponse } from '@ffd/shared';
+import { claimStatus } from '../reminders/plan.js';
 import { reminderRepo } from '../reminders/store.js';
 import { sleeperClient } from '../adapters/sleeper/client.js';
 import { toPlayer } from '../adapters/sleeper/mapper.js';
@@ -64,17 +64,8 @@ export async function getWaivers(): Promise<WaiversResponse> {
 async function withClaims(leagues: WaiverLeague[], espnPending: Map<string, number>, now = new Date()): Promise<WaiverLeague[]> {
   const state = await reminderRepo.upcoming(now).catch(() => new Map());
   return leagues.map((league) => {
-    const next = nextRun(league.runs, now);
-    if (!next) return { ...league, claims: null };
     const pending = league.platform === 'espn' ? (espnPending.get(league.leagueId) ?? null) : null;
-    const yours = state.get(reminderKey(league.platform, league.leagueId, next.at))?.claimsSetAt;
-    const claims: WaiverClaims = {
-      runAt: next.at.toISOString(),
-      set: Boolean(pending) || Boolean(yours),
-      source: pending ? 'espn' : yours ? 'you' : null,
-      pending,
-    };
-    return { ...league, claims };
+    return { ...league, claims: claimStatus(league, state, pending, now) };
   });
 }
 

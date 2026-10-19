@@ -106,7 +106,15 @@ How it works: the sign-in uses the OAuth authorization-code flow with a one-time
 
 Each league's waiver schedule is learned from when its past claims were processed (neither Sleeper nor ESPN states it reliably in its settings); FFPC's comes from its add/drop page. Every 5 minutes the server checks for reminders that are due and sends each one once, as a Web Push notification: encrypted for the browser, signed with the VAPID key pair from `.env`, and delivered by the browser's push service, so the dashboard doesn't need to be open.
 
-Turn them on in the Waivers tab. Push needs a secure origin with a trusted certificate: the deployed site, or `http://localhost` (browsers treat plain localhost as secure). The local `https://localhost:5173` uses a self-signed certificate, which Chrome won't register a service worker on.
+Turn them on in the Waivers tab. Push needs a secure origin with a certificate the browser trusts, which the deployed site has. Locally, the dev server uses a certificate from `certs/` if there is one, so make one your machine trusts with [mkcert](https://github.com/FiloSottile/mkcert) (once):
+
+```bash
+winget install FiloSottile.mkcert
+mkcert -install
+mkcert -cert-file certs/localhost.pem -key-file certs/localhost-key.pem localhost 127.0.0.1 ::1
+```
+
+`mkcert -install` adds a root certificate that only exists on your machine to its trust store. Without `certs/`, the dev server falls back to a self-signed certificate: everything else works, but Chrome won't register the service worker push needs.
 
 ### ESPN cookies
 

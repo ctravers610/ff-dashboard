@@ -1,7 +1,7 @@
 // When to remind you about a waiver run, and what to say. Pure functions, so
 // the timing rules are easy to test without a clock or a database.
 
-import { easternParts, easternTime, friendlyRun, friendlyRunWithTime, isOvernight, nextRun, type WaiverLeague, type WaiverRun } from '@ffd/shared';
+import { easternParts, easternTime, friendlyRun, friendlyRunWithTime, isOvernight, nextRun, type WaiverClaims, type WaiverLeague, type WaiverRun } from '@ffd/shared';
 
 /**
  * Overnight runs (before 6 AM) remind at 9 PM Eastern the evening before,
@@ -20,6 +20,29 @@ export interface ReminderState {
 }
 
 export const reminderKey = (platform: string, leagueId: string, runAt: Date) => `${platform}:${leagueId}:${runAt.toISOString()}`;
+
+/**
+ * Your claims for a league's next run: set if ESPN shows claims pending or you
+ * marked them set, and flagged once the reminder time has come while they aren't.
+ */
+export function claimStatus(
+  league: Pick<WaiverLeague, 'platform' | 'leagueId' | 'runs'>,
+  state: Map<string, ReminderState>,
+  espnPending: number | null,
+  now: Date,
+): WaiverClaims | null {
+  const next = nextRun(league.runs, now);
+  if (!next) return null;
+  const yours = state.get(reminderKey(league.platform, league.leagueId, next.at))?.claimsSetAt;
+  const set = Boolean(espnPending) || Boolean(yours);
+  return {
+    runAt: next.at.toISOString(),
+    set,
+    source: espnPending ? 'espn' : yours ? 'you' : null,
+    pending: espnPending,
+    reminderDue: !set && now >= remindAt(next.run, next.at),
+  };
+}
 
 export interface DueReminder {
   league: WaiverLeague;

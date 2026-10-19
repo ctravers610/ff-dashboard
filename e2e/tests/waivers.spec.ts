@@ -75,6 +75,31 @@ test.describe('Waivers', () => {
     await expect(leagueSection(page, SLEEPER_LEAGUE_NAME).getByRole('button', { name: 'Claims set' })).toBeVisible();
   });
 
+  test('a league whose reminder time has come is flagged in red until its claims are set', async ({ page }) => {
+    // Pretend it's after 9 PM the night before the Sleeper run: the real response,
+    // with Sleeper's reminder due whenever its claims aren't set.
+    await page.route('**/api/waivers', async (route) => {
+      const body = await (await route.fetch()).json();
+      for (const l of body.leagues) if (l.platform === 'sleeper' && l.claims) l.claims.reminderDue = !l.claims.set;
+      await route.fulfill({ json: body });
+    });
+    await page.reload();
+
+    const nav = page.getByRole('navigation', { name: 'Sections' });
+    // Waivers load in the background on every tab; allow for that after the reload.
+    await expect(nav.getByRole('button', { name: 'Waivers (1 league needs your claims)' })).toBeVisible({ timeout: 15_000 });
+    await openTab(page, 'Waivers');
+    const pill = page.getByRole('group', { name: 'League' }).getByRole('button', { name: new RegExp(`^${SLEEPER_LEAGUE_NAME}`) });
+    await expect(pill).toHaveAccessibleName(/\(claims not set\)$/);
+    const section = leagueSection(page, SLEEPER_LEAGUE_NAME);
+    await expect(section.getByRole('status')).toContainText("Your claims for this run aren't set yet.");
+
+    await section.getByRole('button', { name: 'Claims set' }).click();
+    await expect(section.getByRole('status')).toHaveCount(0);
+    await expect(pill).not.toHaveAccessibleName(/claims not set/);
+    await expect(nav.getByRole('button', { name: 'Waivers', exact: true })).toBeVisible(); // badge gone
+  });
+
   test('a reminder’s link opens the Waivers tab on its league', async ({ page }) => {
     await page.goto(`/?view=waivers&league=${encodeURIComponent('espn:900001')}`);
     await expect(leagueSection(page, ESPN_LEAGUE_NAME)).toBeVisible();

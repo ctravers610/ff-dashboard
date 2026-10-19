@@ -1,6 +1,6 @@
 import type { WaiverLeague } from '@ffd/shared';
 import { describe, expect, it } from 'vitest';
-import { dueReminders, reminderKey, reminderMessage, remindAt, type ReminderState } from './plan.js';
+import { claimStatus, dueReminders, reminderKey, reminderMessage, remindAt, type ReminderState } from './plan.js';
 
 const iso = (d: Date) => d.toISOString();
 
@@ -53,7 +53,7 @@ describe('dueReminders', () => {
   });
 
   it('skips a league whose claims are already in (ESPN shows your pending claims)', () => {
-    const claims = { runAt: iso(runAt), set: true, source: 'espn' as const, pending: 2 };
+    const claims = { runAt: iso(runAt), set: true, source: 'espn' as const, pending: 2, reminderDue: false };
     expect(dueReminders([league({ platform: 'espn', claims })], none, during)).toEqual([]);
   });
 
@@ -86,5 +86,36 @@ describe('reminderMessage', () => {
     const message = reminderMessage({ league: league({ platform: 'ffpc', name: 'Club 223' }), run: { day: 3, time: '23:00' }, runAt: new Date('2026-10-22T03:00:00Z') });
     expect(message.title).toBe('Club 223: waivers in 2 hours');
     expect(message.body).toBe('Claims process Wed 11:00 PM ET. No suggested moves.');
+  });
+});
+
+describe('claimStatus', () => {
+  const runAt = new Date('2026-10-21T07:00:00Z'); // Wed 3 AM EDT: reminder at Tue 9 PM
+  const base = { platform: 'sleeper' as const, leagueId: 'L1', runs: [{ day: 3, time: '03:00' }] };
+  const none = new Map<string, ReminderState>();
+
+  it('flags a league once its reminder time has come and claims aren’t set', () => {
+    expect(claimStatus(base, none, null, new Date('2026-10-20T23:00:00Z'))).toMatchObject({ set: false, reminderDue: false }); // Tue 7 PM
+    expect(claimStatus(base, none, null, new Date('2026-10-21T01:30:00Z'))).toMatchObject({
+      runAt: iso(runAt),
+      set: false,
+      source: null,
+      reminderDue: true,
+    });
+  });
+
+  it('clears the flag when you mark claims set, or ESPN shows claims pending', () => {
+    const marked = new Map([[reminderKey('sleeper', 'L1', runAt), { claimsSetAt: new Date(), remindedAt: null }]]);
+    expect(claimStatus(base, marked, null, new Date('2026-10-21T01:30:00Z'))).toMatchObject({ set: true, source: 'you', reminderDue: false });
+    expect(claimStatus({ ...base, platform: 'espn' }, none, 3, new Date('2026-10-21T01:30:00Z'))).toMatchObject({
+      set: true,
+      source: 'espn',
+      pending: 3,
+      reminderDue: false,
+    });
+  });
+
+  it('is null without a known schedule', () => {
+    expect(claimStatus({ ...base, runs: [] }, none, null, new Date())).toBeNull();
   });
 });

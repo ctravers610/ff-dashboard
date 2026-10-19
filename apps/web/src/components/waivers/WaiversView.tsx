@@ -69,6 +69,11 @@ function Claims({ league }: { league: WaiverLeague }) {
   }
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
+      {claims.reminderDue && (
+        <p role="status" className="w-full rounded-md bg-rose-950/70 px-3 py-2 font-medium text-rose-200 ring-1 ring-rose-700">
+          Your claims for this run aren't set yet. Make your claims on {PLATFORM_LABEL[league.platform]}, then mark them set here.
+        </p>
+      )}
       {claims.set ? (
         <>
           <span className="text-emerald-300">Claims set for this run, so no reminder.</span>
@@ -105,20 +110,38 @@ function Schedule({ league, next }: { league: WaiverLeague; next: Date | null })
   );
 }
 
-function Segmented<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
+interface Option<T> {
+  value: T;
+  label: string;
+  alert?: string; // marks the option in red, with this as its screen-reader explanation
+}
+
+function Segmented<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: Option<T>[]; onChange: (v: T) => void }) {
   return (
     <div role="group" aria-label={label} className="flex flex-wrap gap-1">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          aria-pressed={value === o.value}
-          onClick={() => onChange(o.value)}
-          className={`rounded-md px-3 py-1 text-sm font-medium transition ${value === o.value ? 'bg-slate-100 text-slate-900' : 'text-slate-300 hover:bg-slate-800'}`}
-        >
-          {o.label}
-        </button>
-      ))}
+      {options.map((o) => {
+        const selected = value === o.value;
+        const style = o.alert
+          ? selected
+            ? 'bg-rose-200 text-rose-950 ring-2 ring-rose-500'
+            : 'bg-rose-950/70 text-rose-200 ring-1 ring-rose-700 hover:bg-rose-900'
+          : selected
+            ? 'bg-slate-100 text-slate-900'
+            : 'text-slate-300 hover:bg-slate-800';
+        return (
+          <button
+            key={o.value}
+            type="button"
+            aria-pressed={selected}
+            onClick={() => onChange(o.value)}
+            className={`rounded-md px-3 py-1 text-sm font-medium transition ${style}`}
+          >
+            {o.alert && <span aria-hidden="true" className="mr-1.5 inline-block h-2 w-2 rounded-full bg-rose-500 align-middle" />}
+            {o.label}
+            {o.alert && <span className="sr-only"> ({o.alert})</span>}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -283,7 +306,11 @@ export function WaiversView() {
           label="League"
           value={league ? `${league.platform}:${league.leagueId}` : ''}
           onChange={setSelected}
-          options={ordered.map(({ league: l, label }) => ({ value: `${l.platform}:${l.leagueId}`, label: label ? `${l.name} · ${label}` : l.name }))}
+          options={ordered.map(({ league: l, label }) => ({
+            value: `${l.platform}:${l.leagueId}`,
+            label: label ? `${l.name} · ${label}` : l.name,
+            alert: l.claims?.reminderDue ? 'claims not set' : undefined,
+          }))}
         />
       )}
 

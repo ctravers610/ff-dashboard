@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, type ComponentType, type SVGProps } from 'react';
-import { signOut, useDashboard, type Me } from './api';
+import { signOut, useDashboard, useWaivers, type Me } from './api';
 import { AlertList } from './components/AlertList';
 import { Hero } from './components/Hero';
 import { ChartIcon, FootballIcon, RefreshIcon, ScoreboardIcon, SwapIcon, UsersIcon } from './components/icons';
@@ -24,6 +24,8 @@ const VIEWS: { id: View; label: string; Icon: ComponentType<SVGProps<SVGSVGEleme
 
 export default function App({ user }: { user: Me['user'] }) {
   const { data, error, isPending, isFetching, refetch } = useDashboard();
+  // Loaded on every tab, so the Waivers button can flag leagues whose reminder has come.
+  const needClaims = useWaivers().data?.leagues.filter((l) => l.claims?.reminderDue).length ?? 0;
   // Reminder notifications open /?view=waivers, so honor a view in the address.
   const [view, setView] = useState<View>(() => {
     const requested = new URLSearchParams(window.location.search).get('view');
@@ -55,8 +57,20 @@ export default function App({ user }: { user: Me['user'] }) {
                 view === id ? 'text-emerald-400 sm:bg-slate-800 sm:text-slate-100' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <Icon className="text-lg sm:text-base" />
+              <span className={`relative ${id === 'waivers' && needClaims > 0 ? 'sm:mr-1.5' : ''}`}>
+                <Icon className="text-lg sm:text-base" />
+                {id === 'waivers' && needClaims > 0 && (
+                  <span aria-hidden="true" className="absolute -right-2.5 -top-1.5 min-w-4 rounded-full bg-rose-600 px-1 text-center text-[10px] font-bold leading-4 text-white">
+                    {needClaims}
+                  </span>
+                )}
+              </span>
               {label}
+              {id === 'waivers' && needClaims > 0 && (
+                <span className="sr-only">
+                  ({needClaims} league{needClaims > 1 ? 's' : ''} need{needClaims > 1 ? '' : 's'} your claims)
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -92,7 +106,8 @@ export default function App({ user }: { user: Me['user'] }) {
         </div>
       )}
 
-      {data?.errors.map((e) => (
+      {/* The Waivers and History tabs report their own data problems. */}
+      {(view === 'matchups' || view === 'players') && data?.errors.map((e) => (
         <div key={e.source} className="mb-3 rounded-lg bg-amber-950/60 p-3 text-sm text-amber-200">
           <span className="font-medium">{e.source}:</span> {e.message}
         </div>

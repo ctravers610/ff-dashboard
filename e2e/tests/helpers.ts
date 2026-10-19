@@ -35,5 +35,6 @@ export const paste = (field: Locator, text: string) =>
 export const openTab = (page: Page, name: 'Matchups' | 'Waivers' | 'Players' | 'History') =>
   page
     .getByRole('navigation')
-    .getByRole('button', { name: new RegExp(`^${name}$`, 'i') })
+    // The name can carry a note after the label, e.g. "Waivers (1 league needs your claims)".
+    .getByRole('button', { name: new RegExp(`^${name}( \\(|$)`, 'i') })
     .click();

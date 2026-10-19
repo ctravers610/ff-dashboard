@@ -272,6 +272,9 @@ export interface WaiverClaims {
   set: boolean;
   source: 'espn' | 'you' | null; // who says they're set
   pending: number | null; // ESPN only: how many claims you have in
+  // The reminder time has come and your claims still aren't set: the app
+  // highlights this league until you deal with it (or the run happens).
+  reminderDue: boolean;
 }
 
 export interface WaiversResponse {
