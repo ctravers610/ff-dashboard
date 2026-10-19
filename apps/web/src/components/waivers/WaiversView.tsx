@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState, type ReactNode } from 'react';
 import { api, useWaivers } from '../../api';
 import { PLATFORM_LABEL } from '../../format';
+import { SideList, WithSideList } from '../SideList';
 import { FfpcWaiverPaste } from './FfpcWaiverPaste';
 import { Reminders } from './Reminders';
 
@@ -63,51 +64,23 @@ function ClaimsMark({ league }: { league: WaiverLeague }) {
   return null;
 }
 
-// Every league, the one whose waivers run soonest first: a list beside the
-// league on wide screens, a dropdown above it on phones.
+// Every league, the one whose waivers run soonest first.
 function LeaguePicker({ entries, value, onChange }: { entries: Entry[]; value: string; onChange: (key: string) => void }) {
   return (
-    <>
-      <label className="flex items-center gap-2 text-sm text-slate-300 lg:hidden">
-        League
-        <select value={value} onChange={(e) => onChange(e.target.value)} className="min-w-0 flex-1 rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-slate-100">
-          {entries.map(({ league, label }) => (
-            <option key={keyOf(league)} value={keyOf(league)}>
-              {league.name}
-              {label ? ` · ${label}` : ''}
-              {league.claims?.reminderDue ? ' · claims not set' : ''}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <div role="group" aria-label="League" className="hidden flex-col gap-1 lg:flex">
-        {entries.map(({ league, next, label }) => {
-          const selected = keyOf(league) === value;
-          const alert = league.claims?.reminderDue;
-          return (
-            <button
-              key={keyOf(league)}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => onChange(keyOf(league))}
-              className={`flex flex-col gap-0.5 rounded-lg border px-3 py-2.5 text-left transition ${
-                selected ? 'border-slate-500 bg-slate-800' : alert ? 'border-rose-800 hover:bg-slate-900' : 'border-transparent hover:bg-slate-900'
-              }`}
-            >
-              <span className="flex items-center justify-between gap-2">
-                <span className="truncate font-medium">{league.name}</span>
-                <ClaimsMark league={league} />
-              </span>
-              <span className="text-xs text-slate-400">
-                {PLATFORM_LABEL[league.platform]} · {label ? `${label}, ${countdown(next!)}` : 'schedule unknown'}
-              </span>
-              {budget(league.rules) && <span className="text-xs text-slate-400">{budget(league.rules)}</span>}
-            </button>
-          );
-        })}
-      </div>
-    </>
+    <SideList
+      label="League"
+      value={value}
+      onChange={onChange}
+      items={entries.map(({ league, next, label }) => ({
+        key: keyOf(league),
+        title: league.name,
+        mark: <ClaimsMark league={league} />,
+        alert: league.claims?.reminderDue,
+        meta: `${PLATFORM_LABEL[league.platform]} · ${label ? `${label}, ${countdown(next!)}` : 'schedule unknown'}`,
+        extra: budget(league.rules) ? <span className="text-xs text-slate-400">{budget(league.rules)}</span> : undefined,
+        optionLabel: `${league.name}${label ? ` · ${label}` : ''}${league.claims?.reminderDue ? ' · claims not set' : ''}`,
+      }))}
+    />
   );
 }
 
@@ -397,11 +370,9 @@ export function WaiversView() {
         </div>
       ))}
 
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[17rem_minmax(0,1fr)] lg:items-start">
-        {entries.length > 1 && <LeaguePicker entries={entries} value={league ? keyOf(league) : ''} onChange={setSelected} />}
-
+      <WithSideList list={entries.length > 1 && <LeaguePicker entries={entries} value={league ? keyOf(league) : ''} onChange={setSelected} />}>
         {league && (
-          <section aria-label={`Waivers for ${league.name}`} className="flex flex-col gap-4 lg:col-start-2">
+          <section aria-label={`Waivers for ${league.name}`} className="flex flex-col gap-4">
             <Header league={league} next={current?.next ?? null} />
             {(league.platform !== 'ffpc' || league.pastedAt) && (
               <>
@@ -415,7 +386,7 @@ export function WaiversView() {
             )}
           </section>
         )}
-      </div>
+      </WithSideList>
     </div>
   );
 }

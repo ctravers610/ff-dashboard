@@ -7,7 +7,7 @@ import { WeeklyTable } from './WeeklyTable';
 
 export type HistoryMode = 'chart' | 'table';
 
-export function LeagueHistoryCard({ history, mode }: { history: LeagueHistory; mode: HistoryMode }) {
+export function LeagueHistoryCard({ history, mode, onMode }: { history: LeagueHistory; mode: HistoryMode; onMode: (m: HistoryMode) => void }) {
   const { name, platform, weeks, record, avgPoints } = history;
   const finished = record.wins + record.losses + record.ties;
   const headingId = useId();
@@ -18,9 +18,22 @@ export function LeagueHistoryCard({ history, mode }: { history: LeagueHistory; m
         <h2 id={headingId} className="truncate text-lg font-semibold">
           {name}
         </h2>
-        <span className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium bg-violet-950 text-violet-300">
-          {PLATFORM_LABEL[platform]}
-        </span>
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="text-sm text-slate-400">{PLATFORM_LABEL[platform]}</span>
+          <div className="flex gap-1" role="group" aria-label="View">
+            {(['chart', 'table'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={mode === m}
+                onClick={() => onMode(m)}
+                className={`rounded-md px-2.5 py-1 text-sm font-medium capitalize ${mode === m ? 'bg-slate-100 text-slate-900' : 'text-slate-300 hover:bg-slate-800'}`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
       </header>
 
       <div className="flex flex-wrap items-end gap-x-8 gap-y-2">

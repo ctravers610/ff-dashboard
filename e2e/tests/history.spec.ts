@@ -3,12 +3,12 @@ import type { Page } from '@playwright/test';
 import { ESPN_LEAGUE_NAME, ESPN_PAST } from '../fixtures/espn.js';
 import { FFPC_LEAGUE, FFPC_TEAM } from '../fixtures/ffpc.js';
 import { SLEEPER_LEAGUE_NAME, SLEEPER_PAST } from '../fixtures/sleeper.js';
-import { leagueCard, openDashboard, openTab, pts } from './helpers.js';
+import { leagueCard, openDashboard, openTab, pts, showLeague, sideListEntry } from './helpers.js';
 import { seedFfpcLeague, waitForHistory } from './seed.js';
 
 // Weeks 1-5 of the Sleeper and ESPN leagues are rebuilt from their own history the
 // first time the dashboard loads; week 6 is recorded live. All of it goes through
-// the real database.
+// the real database. The tab shows one league at a time, picked from a list.
 const avg = (xs: number[]) => (xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(1);
 
 const resultWord = (mine: number, theirs: number) => (mine > theirs ? 'win' : 'loss');
@@ -34,7 +34,7 @@ test.describe('History tab', () => {
 
   test('rebuilds finished Sleeper weeks and records the live one', async ({ page }) => {
     await openHistory(page);
-    const card = leagueCard(page, SLEEPER_LEAGUE_NAME);
+    const card = await showLeague(page, SLEEPER_LEAGUE_NAME);
 
     expect(await chipTitles(card)).toEqual(expectedTitles(SLEEPER_PAST)); // W L W W L, then the live week
     await expect(card).toContainText('3-2');
@@ -43,7 +43,7 @@ test.describe('History tab', () => {
 
   test('rebuilds finished ESPN weeks, finding my side whether I was home or away', async ({ page }) => {
     await openHistory(page);
-    const card = leagueCard(page, ESPN_LEAGUE_NAME);
+    const card = await showLeague(page, ESPN_LEAGUE_NAME);
 
     expect(await chipTitles(card)).toEqual(expectedTitles(ESPN_PAST)); // L W L W W, then the live week
     await expect(card).toContainText('3-2');
@@ -52,7 +52,7 @@ test.describe('History tab', () => {
 
   test('an FFPC league has only the week that was pasted, and it is an all-play week', async ({ page }) => {
     await openHistory(page);
-    const card = leagueCard(page, FFPC_TEAM);
+    const card = await showLeague(page, FFPC_TEAM);
 
     expect(await chipTitles(card)).toEqual(['Week 6: in progress']);
     await expect(card).toContainText('Record'); // no finished weeks yet, so the record is blank
@@ -62,7 +62,7 @@ test.describe('History tab', () => {
 
   test('draws the chart with an accessible description and a hover tooltip', async ({ page }) => {
     await openHistory(page);
-    const card = leagueCard(page, SLEEPER_LEAGUE_NAME);
+    const card = await showLeague(page, SLEEPER_LEAGUE_NAME);
 
     await expect(card.getByRole('img', { name: /your points each week/ })).toBeVisible();
     await card.locator('.recharts-bar-rectangle').nth(1).hover(); // week 2, a loss
@@ -75,8 +75,8 @@ test.describe('History tab', () => {
 
   test('the table view has every value without hovering', async ({ page }) => {
     await openHistory(page);
-    await page.getByRole('button', { name: 'table', exact: true }).click();
-    const card = leagueCard(page, SLEEPER_LEAGUE_NAME);
+    const card = await showLeague(page, SLEEPER_LEAGUE_NAME);
+    await card.getByRole('button', { name: 'table', exact: true }).click();
 
     const rows = card.getByRole('row');
     await expect(rows).toHaveCount(7); // header + 6 weeks
@@ -86,29 +86,30 @@ test.describe('History tab', () => {
     await expect(week2).toContainText('Blitz Brigade');
     await expect(week2).toContainText(pts(SLEEPER_PAST[1]![1]));
 
-    // The FFPC all-play week shows a rank instead of an opponent.
-    await expect(leagueCard(page, FFPC_TEAM).getByRole('row').nth(1)).toContainText('All-play: 3rd of 6 (top 3 win)');
+    // The FFPC all-play week shows a rank instead of an opponent (the table view stays on).
+    await expect((await showLeague(page, FFPC_TEAM)).getByRole('row').nth(1)).toContainText('All-play: 3rd of 6 (top 3 win)');
   });
 
   test('can switch back from the table to the chart', async ({ page }) => {
     await openHistory(page);
-    await page.getByRole('button', { name: 'table', exact: true }).click();
-    await expect(page.getByRole('table').first()).toBeVisible();
-    await page.getByRole('button', { name: 'chart', exact: true }).click();
-    await expect(page.getByRole('table')).toHaveCount(0);
-    await expect(leagueCard(page, SLEEPER_LEAGUE_NAME).getByRole('img', { name: /your points/ })).toBeVisible();
+    const card = await showLeague(page, SLEEPER_LEAGUE_NAME);
+    await card.getByRole('button', { name: 'table', exact: true }).click();
+    await expect(card.getByRole('table')).toBeVisible();
+    await card.getByRole('button', { name: 'chart', exact: true }).click();
+    await expect(card.getByRole('table')).toHaveCount(0);
+    await expect(card.getByRole('img', { name: /your points/ })).toBeVisible();
   });
 
   test('deleting an FFPC league removes it from history', async ({ page, request }) => {
     const { id } = await findSeededLeague(request);
     await openHistory(page);
-    await expect(leagueCard(page, FFPC_TEAM)).toHaveCount(1);
+    await expect(sideListEntry(page, FFPC_TEAM)).toHaveCount(1);
 
     expect((await request.delete(`/api/manual-leagues/${id}`)).status()).toBe(204);
     await page.reload();
     await openTab(page, 'History');
-    await expect(leagueCard(page, SLEEPER_LEAGUE_NAME)).toBeVisible();
-    await expect(leagueCard(page, FFPC_TEAM)).toHaveCount(0);
+    await expect(sideListEntry(page, SLEEPER_LEAGUE_NAME)).toBeVisible();
+    await expect(sideListEntry(page, FFPC_TEAM)).toHaveCount(0);
   });
 });
 

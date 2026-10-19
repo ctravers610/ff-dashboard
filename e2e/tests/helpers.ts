@@ -38,3 +38,13 @@ export const openTab = (page: Page, name: 'Matchups' | 'Waivers' | 'Players' | '
     // The name can carry a note after the label, e.g. "Waivers (1 league needs your claims)".
     .getByRole('button', { name: new RegExp(`^${name}( \\(|$)`, 'i') })
     .click();
+
+/** Picks a league in a tab's side list (Waivers, History); returns its History card. */
+export async function showLeague(page: Page, name: string): Promise<Locator> {
+  await page.getByRole('group', { name: 'League' }).getByRole('button', { name: new RegExp(`^${name}`) }).click();
+  return leagueCard(page, name);
+}
+
+/** A league's row in a tab's side list. */
+export const sideListEntry = (page: Page, name: string) =>
+  page.getByRole('group', { name: 'League' }).getByRole('button', { name: new RegExp(`^${name}`) });
