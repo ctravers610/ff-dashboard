@@ -2,7 +2,9 @@
 // converts its own API responses into these shapes, so the web app never
 // needs to know which platform a league came from.
 
-export type Platform = 'sleeper' | 'espn' | 'yahoo' | 'ffpc';
+export * from './ffpc';
+
+export type Platform ='sleeper' | 'espn' | 'yahoo' | 'ffpc';
 
 export type InjuryStatus = 'Questionable' | 'Doubtful' | 'Out' | 'IR' | 'PUP' | 'Suspended' | null;
 

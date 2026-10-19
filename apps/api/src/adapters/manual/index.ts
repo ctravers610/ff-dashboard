@@ -1,4 +1,11 @@
-import type { LeagueSummary, ManualLeague, RosterEntry, StarterSlot } from '@ffd/shared';
+import {
+  convertFfpcPage,
+  looksLikeFfpcPage,
+  type LeagueSummary,
+  type ManualLeague,
+  type RosterEntry,
+  type StarterSlot,
+} from '@ffd/shared';
 import { buildAlerts } from '../common.js';
 import { sleeperClient } from '../sleeper/client.js';
 import type { AdapterResult } from '../types.js';
@@ -14,7 +21,10 @@ export function toManualSummary(
   const starters: StarterSlot[] = [];
   const unmatched: string[] = [];
 
-  for (const line of parseRosterText(league.rosterText)) {
+  // Accept a raw FFPC page too, in case it was saved without being converted.
+  const text = looksLikeFfpcPage(league.rosterText) ? convertFfpcPage(league.rosterText).rosterText : league.rosterText;
+
+  for (const line of parseRosterText(text)) {
     const player = resolvePlayer(line, index);
     if (!player) {
       unmatched.push(line.name);

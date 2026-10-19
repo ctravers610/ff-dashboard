@@ -1,6 +1,6 @@
-import type { ManualLeague, ManualLeagueInput } from '@ffd/shared';
+import { convertFfpcPage, looksLikeFfpcPage, type ManualLeague, type ManualLeagueInput } from '@ffd/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type ClipboardEvent, type FormEvent } from 'react';
 
 const PLACEHOLDER = `QB Josh Allen
 RB Bijan Robinson
@@ -51,6 +51,22 @@ export function ManualLeagueEditor({ leagueId, onClose }: { leagueId: string | n
     onSuccess,
   });
 
+  // Pasting a whole FFPC team page (Ctrl+A, Ctrl+C) converts it to clean lines
+  // and fills in the league/team names if they're still empty.
+  const [importNotice, setImportNotice] = useState<string | null>(null);
+  const onRosterPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const text = e.clipboardData.getData('text');
+    if (!looksLikeFfpcPage(text)) return;
+    e.preventDefault();
+    const result = convertFfpcPage(text);
+    setForm({
+      name: form.name || result.leagueName || '',
+      teamName: form.teamName || result.teamName || '',
+      rosterText: result.rosterText,
+    });
+    setImportNotice(`Imported ${result.players} players from the FFPC page. Check them, then Save.`);
+  };
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
     save.mutate();
@@ -89,18 +105,19 @@ export function ManualLeagueEditor({ leagueId, onClose }: { leagueId: string | n
         <label className="flex flex-col gap-1 text-sm font-medium">
           Roster
           <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
-            One player per line. Start with a slot (QB, RB, WR, TE, FLEX, SF, K, DEF) for starters, BN for bench, IR
-            for injured reserve.
+            Quickest: on your FFPC team page press Ctrl+A, Ctrl+C, then paste here. Or type one player per line, with a
+            slot (QB, RB, WR, TE, FLEX, SF, K, DEF) for starters, BN for bench, IR for injured reserve.
           </span>
           <textarea
             rows={12}
-            maxLength={5000}
             placeholder={PLACEHOLDER}
             value={form.rosterText}
+            onPaste={onRosterPaste}
             onChange={(e) => setForm({ ...form, rosterText: e.target.value })}
             className={`${field} font-mono`}
           />
         </label>
+        {importNotice && <p className="text-sm text-emerald-600 dark:text-emerald-400">{importNotice}</p>}
 
         {(save.error || remove.error) && (
           <p className="text-sm text-rose-600">{(save.error ?? remove.error)?.message}</p>

@@ -16,7 +16,7 @@ const inputSchema = {
   properties: {
     name: { type: 'string', minLength: 1, maxLength: 80 },
     teamName: { type: 'string', maxLength: 80 },
-    rosterText: { type: 'string', maxLength: 5000 },
+    rosterText: { type: 'string', maxLength: 50000 }, // room for a whole pasted FFPC page
   },
 } as const;
 
