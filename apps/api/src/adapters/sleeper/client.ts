@@ -71,6 +71,11 @@ export const sleeperClient = {
       get<SleeperMatchup[]>(`/league/${leagueId}/matchups/${week}`),
     ),
   players: () => cached('sleeper:players', HOUR, loadPlayers),
+  // A week's transactions; processed waiver claims show when the league's waivers run.
+  transactions: (leagueId: string, week: number) =>
+    cached(`sleeper:transactions:${leagueId}:${week}`, 6 * HOUR, () =>
+      get<{ type: string; status: string; status_updated: number }[]>(`/league/${leagueId}/transactions/${week}`),
+    ),
   // Players added (or dropped) most by all Sleeper users in the last day.
   trending: (type: 'add' | 'drop') =>
     cached(`sleeper:trending:${type}`, 15 * MINUTE, () =>

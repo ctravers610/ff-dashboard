@@ -1,7 +1,8 @@
-import type { WaiverLeague, WaiverMove, WaiverPlayer, WaiverRules } from '@ffd/shared';
+import { friendlyRun, friendlyRunWithTime, nextRun, type WaiverLeague, type WaiverMove, type WaiverPlayer, type WaiverRules } from '@ffd/shared';
 import { useMemo, useState } from 'react';
 import { useWaivers } from '../../api';
 import { PLATFORM_LABEL } from '../../format';
+import { FfpcWaiverPaste } from './FfpcWaiverPaste';
 
 type Sort = 'week' | 'restOfSeason' | 'trending';
 const POSITIONS = ['All', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF'] as const;
@@ -18,9 +19,39 @@ const adds = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n))
 
 function rulesText(r: WaiverRules): string {
   const priority = r.priority != null ? `priority ${r.priority} of ${r.teams}` : null;
-  if (r.type === 'faab') return [`$${r.faabLeft ?? '?'} of $${r.faabTotal ?? '?'} FAAB left`, priority].filter(Boolean).join(' · ');
+  if (r.type === 'faab') {
+    const budget = r.faabTotal != null ? `$${r.faabLeft ?? '?'} of $${r.faabTotal} FAAB left` : `$${r.faabLeft ?? '?'} FAAB left`;
+    return [budget, priority].filter(Boolean).join(' · ');
+  }
   const kind = r.type === 'rolling' ? 'Rolling waivers' : 'Reverse-standings waivers';
   return [kind, priority].filter(Boolean).join(' · ');
+}
+
+const SOURCE_NOTE: Record<NonNullable<WaiverLeague['runsSource']>, string> = {
+  history: "learned from this league's processed claims",
+  ffpc: "from FFPC's page",
+  settings: 'estimated from league settings',
+};
+
+function countdown(to: Date, now = new Date()): string {
+  const minutes = Math.max(0, Math.round((to.getTime() - now.getTime()) / 60_000));
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  if (days > 0) return `in ${days} day${days > 1 ? 's' : ''}${hours ? ` ${hours} hr` : ''}`;
+  if (hours > 0) return `in ${hours} hr ${minutes % 60} min`;
+  return `in ${minutes} min`;
+}
+
+function Schedule({ league, next }: { league: WaiverLeague; next: Date | null }) {
+  if (!next || !league.runsSource) {
+    return <p className="-mt-3 text-sm text-slate-400">When waivers run isn't known yet: there are no processed claims to learn from.</p>;
+  }
+  return (
+    <p className="-mt-3 text-sm text-slate-300">
+      Waivers run {league.runs.map(friendlyRunWithTime).join(' and ')} ET · next {countdown(next)}{' '}
+      <span className="text-slate-400">({SOURCE_NOTE[league.runsSource]})</span>
+    </p>
+  );
 }
 
 function Segmented<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
@@ -170,13 +201,21 @@ export function WaiversView() {
   if (isPending) return <p className="text-slate-400">Loading waivers…</p>;
   if (error) return <p role="alert" className="rounded-lg bg-rose-950/60 p-4 text-sm text-rose-200">Couldn't load waivers: {error.message}</p>;
 
-  const league = data.leagues.find((l) => `${l.platform}:${l.leagueId}` === selected) ?? data.leagues[0];
+  // The league whose waivers run soonest comes first; leagues with no known schedule go last.
+  const ordered = data.leagues
+    .map((l) => {
+      const upcoming = nextRun(l.runs);
+      return { league: l, next: upcoming?.at ?? null, label: upcoming ? friendlyRun(upcoming.run) : null };
+    })
+    .sort((a, b) => (a.next?.getTime() ?? Infinity) - (b.next?.getTime() ?? Infinity));
+  const current = ordered.find((o) => `${o.league.platform}:${o.league.leagueId}` === selected) ?? ordered[0];
+  const league = current?.league;
 
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-slate-400">
         Claims made now play in week {data.week}. Projections are scored with each league's own settings; rest of season runs through week{' '}
-        {data.lastRegularWeek}. FFPC isn't included: it has no API.
+        {data.lastRegularWeek}. FFPC leagues use a pasted copy of FFPC's add/drop page.
       </p>
 
       {data.errors.map((e) => (
@@ -190,7 +229,7 @@ export function WaiversView() {
           label="League"
           value={league ? `${league.platform}:${league.leagueId}` : ''}
           onChange={setSelected}
-          options={data.leagues.map((l) => ({ value: `${l.platform}:${l.leagueId}`, label: l.name }))}
+          options={ordered.map(({ league: l, label }) => ({ value: `${l.platform}:${l.leagueId}`, label: label ? `${l.name} · ${label}` : l.name }))}
         />
       )}
 
@@ -201,20 +240,28 @@ export function WaiversView() {
               {league.name} <span className="text-sm font-normal text-slate-400">· {PLATFORM_LABEL[league.platform]}</span>
             </h2>
             <p className="text-sm text-slate-300">
-              {league.rules ? rulesText(league.rules) : 'Waiver rules unavailable'}
+              {league.rules ? rulesText(league.rules) : league.platform === 'ffpc' ? '' : 'Waiver rules unavailable'}
               {league.openRosterSpots > 0 && ` · ${league.openRosterSpots} open roster spot${league.openRosterSpots > 1 ? 's' : ''}`}
             </p>
           </header>
 
-          <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-200">Suggested moves</h3>
-            <Moves league={league} week={data.week} />
-          </div>
+          <Schedule league={league} next={current?.next ?? null} />
 
-          <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-200">Best available</h3>
-            <Available key={`${league.platform}:${league.leagueId}`} league={league} />
-          </div>
+          {league.platform === 'ffpc' && <FfpcWaiverPaste key={league.leagueId} league={league} />}
+
+          {(league.platform !== 'ffpc' || league.pastedAt) && (
+            <>
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-slate-200">Suggested moves</h3>
+                <Moves league={league} week={data.week} />
+              </div>
+
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-slate-200">Best available</h3>
+                <Available key={`${league.platform}:${league.leagueId}`} league={league} />
+              </div>
+            </>
+          )}
         </section>
       )}
     </div>

@@ -4,6 +4,8 @@
 
 export * from './ffpc';
 export * from './ffpcLive';
+export * from './ffpcWaivers';
+export * from './waiverSchedule';
 
 export type Platform ='sleeper' | 'espn' | 'yahoo' | 'ffpc';
 
@@ -108,6 +110,7 @@ export interface LeagueSummary {
   roster: RosterEntry[]; // every player on your team
   // Set for hand-entered leagues.
   manual?: {
+    leagueName: string; // the tournament, e.g. "Big Gorilla Tourney #104790" (name holds your team name)
     teamName: string;
     updatedAt: string;
     unmatched: string[];
@@ -144,6 +147,7 @@ export interface ManualLeague extends ManualLeagueInput {
   id: string;
   platform: Platform;
   updatedAt: string;
+  waiversCapturedAt: string | null; // when FFPC's add/drop page was last pasted
 }
 
 export interface LeagueRef {
@@ -206,6 +210,8 @@ export interface DashboardResponse {
   errors: SourceError[];
 }
 
+import type { WaiverRun } from './waiverSchedule';
+
 // ── Waivers ────────────────────────────────────────────────────────────
 
 // A player you could pick up, or one on your roster, valued two ways.
@@ -238,6 +244,7 @@ export interface WaiverRules {
   faabTotal: number | null;
   priority: number | null; // your place in the claim order, 1 = first
   teams: number;
+  schedule?: string | null; // when claims are processed, if the platform says
 }
 
 export interface WaiverLeague {
@@ -248,6 +255,13 @@ export interface WaiverLeague {
   moves: WaiverMove[];
   available: WaiverPlayer[]; // the best available at each position, unsorted
   openRosterSpots: number;
+  // FFPC only: when its add/drop page was last pasted (null = never). Everything
+  // above comes from that paste, so it is only as fresh as the paste.
+  pastedAt?: string | null;
+  // When this league's waivers process, and where that came from: its own
+  // processed claims (history), FFPC's page, or (an estimate) its settings.
+  runs: WaiverRun[];
+  runsSource: 'history' | 'ffpc' | 'settings' | null;
 }
 
 export interface WaiversResponse {

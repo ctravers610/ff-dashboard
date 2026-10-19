@@ -1,6 +1,6 @@
-// GET /api/waivers: for each Sleeper and ESPN league, your waiver budget and
-// priority, the best available players, and suggested add/drop moves for the
-// week a claim made now would play in. FFPC is left out: it has no API.
+// GET /api/waivers: for each league, your waiver budget and priority, the best
+// available players, and suggested add/drop moves for the week a claim made now
+// would play in. FFPC leagues come from a pasted copy of FFPC's add/drop page.
 
 import type { WaiversResponse } from '@ffd/shared';
 import { sleeperClient } from '../adapters/sleeper/client.js';
@@ -10,6 +10,7 @@ import { playerKey } from '../exposure.js';
 import { nflGames } from '../scoring/games.js';
 import type { WaiverContext } from './context.js';
 import { fetchEspnWaivers } from './espn.js';
+import { fetchFfpcWaivers } from './ffpc.js';
 import { claimWeek, LAST_REGULAR_WEEK } from './moves.js';
 import { fetchSleeperWaivers } from './sleeper.js';
 
@@ -44,6 +45,7 @@ export async function getWaivers(): Promise<WaiversResponse> {
   const results = await Promise.all([
     fetchSleeperWaivers(config.sleeperUsernames, ctx),
     fetchEspnWaivers(config.espnLeagueIds, config.espnAuth, ctx),
+    fetchFfpcWaivers(ctx),
   ]);
   return {
     season: state.season,

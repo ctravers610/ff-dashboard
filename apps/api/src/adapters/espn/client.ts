@@ -55,6 +55,13 @@ export const espnClient = {
       params.set('scoringPeriodId', String(week));
       return get<EspnLeague>(leagueId, season, auth, params);
     }),
+  // A week's transactions; processed waiver claims show when the league's waivers run.
+  transactions: (leagueId: string, season: string, week: number, auth: EspnAuth | null) =>
+    cached(`espn:transactions:${leagueId}:${season}:${week}`, 6 * 60 * MINUTE, () => {
+      const params = views('mTransactions2');
+      params.set('scoringPeriodId', String(week));
+      return get<{ transactions?: { type: string; status?: string; processDate?: number }[] }>(leagueId, season, auth, params);
+    }),
   freeAgents: (leagueId: string, season: string, week: number, auth: EspnAuth | null) =>
     cached(`espn:free-agents:${leagueId}:${season}:${week}`, 5 * MINUTE, () => {
       const params = views('kona_player_info');

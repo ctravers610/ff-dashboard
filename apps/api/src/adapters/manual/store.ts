@@ -16,6 +16,7 @@ const toLeague = (row: ManualLeagueRow): ManualLeague => ({
   rosterText: row.rosterText,
   matchup: row.matchup ?? null,
   updatedAt: row.updatedAt.toISOString(),
+  waiversCapturedAt: row.waiversCapturedAt?.toISOString() ?? null,
 });
 
 // A store bound to a database, so tests can point it at a throwaway one.
@@ -47,6 +48,22 @@ export function manualLeagueStore(db: Db) {
         .where(eq(manualLeagues.id, id))
         .returning();
       return row ? toLeague(row) : null;
+    },
+
+    // The add/drop page for the Waivers tab. Kept apart from update(), so editing
+    // the roster never wipes a waiver paste, or the other way round.
+    async setWaivers(id: string, text: string): Promise<ManualLeague | null> {
+      const [row] = await db
+        .update(manualLeagues)
+        .set({ waiversText: text, waiversCapturedAt: new Date() })
+        .where(eq(manualLeagues.id, id))
+        .returning();
+      return row ? toLeague(row) : null;
+    },
+
+    async waiverPastes(): Promise<{ id: string; text: string; capturedAt: Date }[]> {
+      const rows = await db.select().from(manualLeagues).orderBy(manualLeagues.createdAt);
+      return rows.flatMap((r) => (r.waiversText && r.waiversCapturedAt ? [{ id: r.id, text: r.waiversText, capturedAt: r.waiversCapturedAt }] : []));
     },
 
     // A deleted league takes its history with it, in one transaction so you

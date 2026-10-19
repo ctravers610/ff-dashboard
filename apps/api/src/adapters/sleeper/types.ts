@@ -24,6 +24,7 @@ export interface SleeperLeague {
   scoring_settings?: Record<string, number>; // stat field → points per unit
   settings?: {
     waiver_type?: number; // 0 = rolling, 1 = reverse standings, 2 = FAAB
+    waiver_day_of_week?: number; // 2 = Wednesday
     waiver_budget?: number;
   };
 }

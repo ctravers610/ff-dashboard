@@ -107,6 +107,7 @@ describe.skipIf(!enabled)('Postgres', () => {
       const file = path.join(dir, 'manual-leagues.json');
       const legacy: ManualLeague = {
         id: '7ec27bd6-7975-4d5e-8edf-a60a48129ed6',
+        waiversCapturedAt: null,
         platform: 'ffpc',
         name: 'Legacy League',
         teamName: 'Old Team',

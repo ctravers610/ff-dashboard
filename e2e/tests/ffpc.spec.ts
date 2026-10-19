@@ -17,7 +17,7 @@ async function importLeague(page: Page) {
   await expect(dialog(page).getByText(/^Imported week 6/)).toBeVisible();
   await dialog(page).getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('heading', { name: 'Add FFPC league' })).toBeHidden();
-  await expect(leagueCard(page, FFPC_LEAGUE)).toBeVisible();
+  await expect(leagueCard(page, FFPC_TEAM)).toBeVisible();
 }
 
 test.describe('FFPC league import', () => {
@@ -44,7 +44,7 @@ test.describe('FFPC league import', () => {
 
   test('scores both lineups live from real-time stats, not from the pasted zeros', async ({ page }) => {
     await importLeague(page);
-    const card = await openLeague(page, FFPC_LEAGUE);
+    const card = await openLeague(page, FFPC_TEAM);
 
     // The pasted page shows 0.00 for everyone; these totals come only from the stats feed.
     await expect(card).toContainText('Live from real-time stats scored with FFPC rules');
@@ -65,7 +65,7 @@ test.describe('FFPC league import', () => {
 
   test('week 6 is an all-play week: my rank against the whole league, with the win line', async ({ page }) => {
     await importLeague(page);
-    const card = await openLeague(page, FFPC_LEAGUE);
+    const card = await openLeague(page, FFPC_TEAM);
 
     await expect(card).toContainText('All-play week · top 3 of 6 win');
     await expect(card).toContainText('3rd of 6'); // Alpha 160, Bravo 150, then my live 146.70
@@ -85,8 +85,8 @@ test.describe('FFPC league import', () => {
   test('is stored in the database, so it survives a reload', async ({ page, request }) => {
     await importLeague(page);
     await page.reload();
-    await expect(leagueCard(page, FFPC_LEAGUE)).toBeVisible();
-    await expect(leagueCard(page, FFPC_LEAGUE)).toContainText(pts(FFPC_ME_POINTS));
+    await expect(leagueCard(page, FFPC_TEAM)).toBeVisible();
+    await expect(leagueCard(page, FFPC_TEAM)).toContainText(pts(FFPC_ME_POINTS));
 
     const stored = (await (await request.get('/api/manual-leagues')).json()) as { name: string }[];
     expect(stored.map((l) => l.name)).toEqual([FFPC_LEAGUE]);
@@ -94,7 +94,7 @@ test.describe('FFPC league import', () => {
 
   test('the Roster tab groups starters and bench', async ({ page }) => {
     await importLeague(page);
-    const card = await openLeague(page, FFPC_LEAGUE);
+    const card = await openLeague(page, FFPC_TEAM);
     await card.getByRole('button', { name: 'Roster', exact: true }).click();
     await expect(card).toContainText('Starters');
     await expect(card).toContainText('Josh Allen');
@@ -104,7 +104,7 @@ test.describe('FFPC league import', () => {
 
   test('editing keeps injured-reserve players when the page is pasted again', async ({ page }) => {
     await importLeague(page);
-    const card = await openLeague(page, FFPC_LEAGUE);
+    const card = await openLeague(page, FFPC_TEAM);
 
     // The Live Scoring page has no IR section, so IR players are added by hand...
     await card.getByRole('button', { name: 'Edit roster' }).click();
@@ -122,15 +122,18 @@ test.describe('FFPC league import', () => {
     await expect(card.getByText('IR', { exact: true })).toBeVisible();
   });
 
-  test('renames a league from the edit dialog', async ({ page }) => {
+  test('is shown by team name, and both names can be changed in the edit dialog', async ({ page }) => {
     await importLeague(page);
-    await (await openLeague(page, FFPC_LEAGUE)).getByRole('button', { name: 'Edit roster' }).click();
+    await (await openLeague(page, FFPC_TEAM)).getByRole('button', { name: 'Edit roster' }).click();
     await expect(dialog(page).getByLabel('League name')).toHaveValue(FFPC_LEAGUE); // prefilled from the database
 
     await dialog(page).getByLabel('League name').fill('Renamed Tourney');
+    await dialog(page).getByLabel('Your team name').fill('Renamed Club');
     await dialog(page).getByRole('button', { name: 'Save' }).click();
-    await expect(leagueCard(page, 'Renamed Tourney')).toBeVisible();
-    await expect(leagueCard(page, FFPC_LEAGUE)).toHaveCount(0);
+    // FFPC tournaments share a name, so the row is labeled by your team; the tournament shows in its details.
+    const card = await openLeague(page, 'Renamed Club');
+    await expect(card).toContainText('Renamed Tourney · entered manually');
+    await expect(leagueCard(page, FFPC_TEAM)).toHaveCount(0);
   });
 
   test('names a player it could not find, so the spelling can be fixed', async ({ page }) => {
@@ -172,7 +175,7 @@ test.describe('FFPC league import', () => {
   test.describe('deleting', () => {
     const openEditor = async (page: Page) => {
       await importLeague(page);
-      await (await openLeague(page, FFPC_LEAGUE)).getByRole('button', { name: 'Edit roster' }).click();
+      await (await openLeague(page, FFPC_TEAM)).getByRole('button', { name: 'Edit roster' }).click();
     };
     const confirmWith = (page: Page, answer: 'accept' | 'dismiss') =>
       page.once('dialog', (d) => (answer === 'accept' ? d.accept() : d.dismiss()));
@@ -182,7 +185,7 @@ test.describe('FFPC league import', () => {
       confirmWith(page, 'dismiss');
       await dialog(page).getByRole('button', { name: 'Delete league' }).click();
       await dialog(page).getByRole('button', { name: 'Cancel' }).click();
-      await expect(leagueCard(page, FFPC_LEAGUE)).toBeVisible();
+      await expect(leagueCard(page, FFPC_TEAM)).toBeVisible();
     });
 
     test('removes the league and its history when confirmed', async ({ page, request }) => {
@@ -190,7 +193,7 @@ test.describe('FFPC league import', () => {
       confirmWith(page, 'accept');
       await dialog(page).getByRole('button', { name: 'Delete league' }).click();
 
-      await expect(leagueCard(page, FFPC_LEAGUE)).toHaveCount(0);
+      await expect(leagueCard(page, FFPC_TEAM)).toHaveCount(0);
       expect(await (await request.get('/api/manual-leagues')).json()).toEqual([]);
       const history = (await (await request.get('/api/history')).json()) as { leagues: { platform: string }[] };
       expect(history.leagues.some((l) => l.platform === 'ffpc')).toBe(false);

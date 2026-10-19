@@ -12,6 +12,7 @@
 //   Nabers at WR (+8) and Chris Olave over Puka Nacua at FLEX (+4).
 
 import type { EspnStat } from '../../apps/api/src/adapters/espn/types.js';
+import { FFPC_TEAM, ME as FFPC_STARTERS, MY_BENCH as FFPC_BENCH } from './ffpc.js';
 import { GAMES, PLAYERS as P, SEASON, UPCOMING_GAMES, WEEK, type FxPlayer } from './players.js';
 
 export const CLAIM_WEEK = WEEK + 1;
@@ -68,3 +69,59 @@ export const espnFreeAgents: [FxPlayer, 'WAIVERS' | 'FREEAGENT'][] = [
   [P.olave, 'FREEAGENT'],
   [P.hall, 'FREEAGENT'],
 ];
+
+// ── FFPC: its add/drop page, as copied from the browser ─────────────────
+// FFPC's own projections: Mike Evans is down to 6, so free agent Jayden Reed
+// (16, questionable but playing) is a +10 upgrade at WR. FFPC rosters are always
+// full, so it needs a drop: Drake Maye (36 rest of season) is replaceable by
+// free agent Geno Smith (144). Olave over Nabers (+4) finds no second safe drop.
+export const FFPC_FAAB_LEFT = 640;
+export const FFPC_BID_SCHEDULE = 'Wednesdays at 11 pm ET and Sundays at 10 am ET';
+const ffpcProjection = (p: FxPlayer) => (p === P.evans ? 6 : p === P.allen ? 20 : weekly(p));
+const ffpcAvailable: FxPlayer[] = [P.reed, P.olave, P.geno];
+
+const ffpcCell = (p: FxPlayer) => {
+  if (p.position === 'DEF') return `${p.team} DST`;
+  const [first, ...last] = p.name.split(' ');
+  const pos = p.position === 'K' ? 'PK' : p.position;
+  return `${last.join(' ')}, ${first} ${p.team} (${pos})${p.injury ? ' Q' : ''}`;
+};
+
+export function ffpcWaiverPage(leagueNumber = '#12345'): string {
+  const others = ['Alpha Dogs', 'Beta Squad', 'Gamma Rays', 'Delta Force', 'Echo Base'];
+  const row = (...cells: (string | number)[]) => cells.join('\t');
+  return [
+    'someuser',
+    'My Teams',
+    `E2E Gorilla Tourney (Aug 5 9:00 PM) ${leagueNumber} - ${FFPC_TEAM} (2-3)`,
+    'Transactions',
+    'Free Agent Auction Bidding',
+    `Remaining FAAB Dollars: $${FFPC_FAAB_LEFT}`,
+    `Your league is currently in a Free Agent Auction Bidding period. Bids will be processed ${FFPC_BID_SCHEDULE}. To place a bid, click 'Add'.`,
+    ...others.flatMap((team, i) => [`$${900 - i * 100}`, team]),
+    'Bid Group Details',
+    'Available Players',
+    'Position: All QB RB WR TE PK DF WL',
+    row('Player', 'Next Opp', 'Bye', 'Opp Rnk', 'Last', 'Proj', 'Avg', 'Pts', '% Own'),
+    ...ffpcAvailable.flatMap((p) => [row('Add', ''), ffpcCell(p), row('OPP', 10, 5, 9, ffpcProjection(p), 8, 40, 30)]),
+    'Team Roster',
+    row('Player', 'BYE', 'PR', 'PROJ', 'PPG'),
+    ...[...FFPC_STARTERS.map((s) => s.player), ...FFPC_BENCH.map(([, p]) => p)].flatMap((p) => [
+      row('Drop', ''),
+      ffpcCell(p),
+      row(10, 20, ffpcProjection(p), 12),
+    ]),
+    '©2026 For Players, By Players LLC.',
+  ].join('\n');
+}
+
+// ── When waivers run ────────────────────────────────────────────────────
+// Sleeper's processed claims from weeks 1-5, each run at 3:05 AM Eastern on a
+// Wednesday, so the app learns "Wed 3:00 AM". ESPN has no history in the
+// fixtures, so its schedule is unknown and it sorts last.
+const SLEEPER_RUNS = ['2026-09-16T07:05:00Z', '2026-09-23T07:05:00Z', '2026-09-30T07:05:00Z', '2026-10-07T07:05:00Z', '2026-10-14T07:05:00Z'];
+export function sleeperTransactions(week: number) {
+  const at = SLEEPER_RUNS[week - 1];
+  if (!at) return [];
+  return [0, 1].map((i) => ({ type: 'waiver', status: i === 0 ? 'complete' : 'failed', status_updated: Date.parse(at) + i * 1000 }));
+}

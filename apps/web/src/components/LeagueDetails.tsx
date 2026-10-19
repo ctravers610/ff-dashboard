@@ -32,7 +32,7 @@ export function LeagueDetails({ league, onEdit }: { league: LeagueSummary; onEdi
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 text-sm">
         <p className="text-slate-400">
           {league.manual
-            ? `${league.manual.teamName || 'My team'} · entered manually, updated ${new Date(league.manual.updatedAt).toLocaleDateString()}`
+            ? `${league.manual.leagueName} · entered manually, updated ${new Date(league.manual.updatedAt).toLocaleDateString()}`
             : `${me?.teamName} · @${league.account}`}
         </p>
         {me && (

@@ -6,6 +6,7 @@ import { espnClient, type EspnAuth } from '../adapters/espn/client.js';
 import { BENCH_SLOT, findMyTeamId, IR_SLOT, SLOT_NAMES, SLOT_ORDER, toEspnPlayer } from '../adapters/espn/mapper.js';
 import type { EspnFreeAgents, EspnLeague, EspnPlayer } from '../adapters/espn/types.js';
 import { waiverPlayer, type WaiverContext } from './context.js';
+import { espnSchedule } from './schedule.js';
 import { pickAvailable, startablePositions, suggestMoves } from './moves.js';
 
 // ESPN's player stats come as many rows; projections are statSourceId 1. The
@@ -71,6 +72,8 @@ export function espnWaiverLeague(league: EspnLeague, freeAgents: EspnFreeAgents,
     moves: suggestMoves({ starters, bench, available, openRosterSpots, byeTeams: ctx.byeTeams }),
     available,
     openRosterSpots,
+    runs: [],
+    runsSource: null,
   };
 }
 
@@ -94,7 +97,8 @@ export async function fetchEspnWaivers(
         if (myTeamId == null) throw new Error(`Couldn't find your team in ESPN league ${leagueId} (check ESPN_SWID)`);
         // The name lives in mSettings, which this request includes.
         const name = league.settings?.name ?? `ESPN league ${leagueId}`;
-        result.leagues.push(espnWaiverLeague(league, freeAgents, myTeamId, name, ctx));
+        const schedule = await espnSchedule(leagueId, ctx.season, ctx.week, auth);
+        result.leagues.push({ ...espnWaiverLeague(league, freeAgents, myTeamId, name, ctx), ...schedule });
       } catch (e) {
         result.errors.push({ source: `espn:${leagueId}`, message: errorMessage(e) });
       }

@@ -50,7 +50,7 @@ const total = (xs: Starter[]) => Math.round(xs.reduce((a, s) => a + s.expected, 
 export const FFPC_ME_POINTS = total(ME); // 146.70
 export const FFPC_OPP_POINTS = total(OPP); // 106.00
 
-const MY_BENCH: [string, FxPlayer][] = [['QB', P.maye], ['RB', P.brooks]];
+export const MY_BENCH: [string, FxPlayer][] = [['QB', P.maye], ['RB', P.brooks]];
 const OPP_BENCH: [string, FxPlayer][] = [['WR', P.rice]];
 
 // All-play week scoreboard, as shown at the top of the page: [name as truncated by FFPC, points, projected].

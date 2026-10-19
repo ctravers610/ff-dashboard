@@ -1,6 +1,6 @@
 import { expect, test } from './fixtures.js';
 import { ESPN_LEAGUE_NAME } from '../fixtures/espn.js';
-import { FFPC_LEAGUE } from '../fixtures/ffpc.js';
+import { FFPC_TEAM } from '../fixtures/ffpc.js';
 import { SLEEPER_LEAGUE_NAME } from '../fixtures/sleeper.js';
 import { openDashboard, openTab } from './helpers.js';
 import { seedFfpcLeague } from './seed.js';
@@ -24,7 +24,7 @@ test.describe('Players tab', () => {
     await expect(nabers).toContainText('WR · NYG');
     await expect(nabers).toContainText(SLEEPER_LEAGUE_NAME);
     await expect(nabers).toContainText(ESPN_LEAGUE_NAME);
-    await expect(nabers).toContainText(FFPC_LEAGUE);
+    await expect(nabers).toContainText(FFPC_TEAM);
   });
 
   test('flags a player I start who an opponent is also starting against me', async ({ page }) => {

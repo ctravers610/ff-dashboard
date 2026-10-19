@@ -1,4 +1,4 @@
-import type { ManualLeagueInput } from '@ffd/shared';
+import { looksLikeFfpcWaivers, parseFfpcWaivers, type ManualLeagueInput } from '@ffd/shared';
 import type { FastifyInstance } from 'fastify';
 import { manualLeagueRepo, type manualLeagueStore } from '../adapters/manual/store.js';
 
@@ -95,6 +95,31 @@ export const manualLeagueRoutes = (store: ReturnType<typeof manualLeagueStore> =
       async (req, reply) => {
         const league = await store.update(req.params.id, req.body);
         return league ?? reply.code(404).send({ error: 'League not found' });
+      },
+    );
+
+    // FFPC's add/drop page, pasted for the Waivers tab.
+    app.put<{ Params: IdParams; Body: { text: string } }>(
+      '/api/manual-leagues/:id/waivers',
+      {
+        schema: {
+          params: idParams,
+          body: { type: 'object', required: ['text'], additionalProperties: false, properties: { text: { type: 'string', maxLength: 200000 } } },
+        },
+      },
+      async (req, reply) => {
+        const league = (await store.list()).find((l) => l.id === req.params.id);
+        if (!league) return reply.code(404).send({ error: 'League not found' });
+        if (!looksLikeFfpcWaivers(req.body.text)) {
+          return reply.code(400).send({ message: "That doesn't look like FFPC's add/drop page. Open the league's free agents page, then Ctrl+A, Ctrl+C." });
+        }
+        // Catch pasting one league's page into another: FFPC puts the league number in the page header.
+        const { leagueNumber } = parseFfpcWaivers(req.body.text);
+        const expected = /#\d+/.exec(league.name)?.[0];
+        if (leagueNumber && expected && leagueNumber !== expected) {
+          return reply.code(400).send({ message: `That page is for league ${leagueNumber}, not ${league.name}.` });
+        }
+        return store.setWaivers(req.params.id, req.body.text);
       },
     );
 

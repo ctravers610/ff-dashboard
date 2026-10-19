@@ -73,7 +73,9 @@ export function toManualSummary(
     leagueId: league.id,
     platform: league.platform,
     account: 'manual',
-    name: league.name,
+    // Shown by your team name: FFPC tournaments share a name ("Big Gorilla
+    // Tourney #104790", "#104979"), so the team is what tells them apart.
+    name: league.teamName || league.name,
     season: nfl.season,
     week: nfl.week,
     myTeamId: 'me',
@@ -82,6 +84,7 @@ export function toManualSummary(
     alerts: buildAlerts(starters),
     roster,
     manual: {
+      leagueName: league.name,
       teamName: league.teamName,
       updatedAt: league.updatedAt,
       unmatched: [...new Set(unmatched)],

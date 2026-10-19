@@ -1,7 +1,7 @@
 import { expect, test } from './fixtures.js';
 import type { Page } from '@playwright/test';
 import { ESPN_LEAGUE_NAME, ESPN_PAST } from '../fixtures/espn.js';
-import { FFPC_LEAGUE } from '../fixtures/ffpc.js';
+import { FFPC_LEAGUE, FFPC_TEAM } from '../fixtures/ffpc.js';
 import { SLEEPER_LEAGUE_NAME, SLEEPER_PAST } from '../fixtures/sleeper.js';
 import { leagueCard, openDashboard, openTab, pts } from './helpers.js';
 import { seedFfpcLeague, waitForHistory } from './seed.js';
@@ -52,7 +52,7 @@ test.describe('History tab', () => {
 
   test('an FFPC league has only the week that was pasted, and it is an all-play week', async ({ page }) => {
     await openHistory(page);
-    const card = leagueCard(page, FFPC_LEAGUE);
+    const card = leagueCard(page, FFPC_TEAM);
 
     expect(await chipTitles(card)).toEqual(['Week 6: in progress']);
     await expect(card).toContainText('Record'); // no finished weeks yet, so the record is blank
@@ -87,7 +87,7 @@ test.describe('History tab', () => {
     await expect(week2).toContainText(pts(SLEEPER_PAST[1]![1]));
 
     // The FFPC all-play week shows a rank instead of an opponent.
-    await expect(leagueCard(page, FFPC_LEAGUE).getByRole('row').nth(1)).toContainText('All-play: 3rd of 6 (top 3 win)');
+    await expect(leagueCard(page, FFPC_TEAM).getByRole('row').nth(1)).toContainText('All-play: 3rd of 6 (top 3 win)');
   });
 
   test('can switch back from the table to the chart', async ({ page }) => {
@@ -102,20 +102,20 @@ test.describe('History tab', () => {
   test('deleting an FFPC league removes it from history', async ({ page, request }) => {
     const { id } = await findSeededLeague(request);
     await openHistory(page);
-    await expect(leagueCard(page, FFPC_LEAGUE)).toHaveCount(1);
+    await expect(leagueCard(page, FFPC_TEAM)).toHaveCount(1);
 
     expect((await request.delete(`/api/manual-leagues/${id}`)).status()).toBe(204);
     await page.reload();
     await openTab(page, 'History');
     await expect(leagueCard(page, SLEEPER_LEAGUE_NAME)).toBeVisible();
-    await expect(leagueCard(page, FFPC_LEAGUE)).toHaveCount(0);
+    await expect(leagueCard(page, FFPC_TEAM)).toHaveCount(0);
   });
 });
 
 // The beforeEach already seeded one league; look it up rather than creating a duplicate.
 async function findSeededLeague(request: import('@playwright/test').APIRequestContext) {
   const leagues = (await (await request.get('/api/manual-leagues')).json()) as { id: string; name: string }[];
-  const found = leagues.find((l) => l.name === FFPC_LEAGUE);
+  const found = leagues.find((l) => l.name === FFPC_LEAGUE); // stored under the tournament name
   if (!found) throw new Error('expected the seeded FFPC league to exist');
   return found;
 }

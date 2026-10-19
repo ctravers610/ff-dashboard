@@ -14,6 +14,7 @@ const index = buildPlayerIndex(players);
 
 const league = (week: number): ManualLeague => ({
   id: 'L1',
+  waiversCapturedAt: null,
   platform: 'ffpc',
   name: 'Test',
   teamName: 'Sample Squad',

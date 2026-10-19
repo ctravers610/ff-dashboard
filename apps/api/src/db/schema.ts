@@ -22,6 +22,9 @@ export const manualLeagues = pgTable('manual_leagues', {
   teamName: text('team_name').notNull().default(''),
   rosterText: text('roster_text').notNull(),
   matchup: jsonb('matchup').$type<ManualMatchup>(),
+  // FFPC's add/drop page as pasted, for the Waivers tab (parsed when read).
+  waiversText: text('waivers_text'),
+  waiversCapturedAt: timestamp('waivers_captured_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

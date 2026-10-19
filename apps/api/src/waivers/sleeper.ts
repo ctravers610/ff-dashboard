@@ -9,6 +9,7 @@ import type { SleeperLeague, SleeperPlayerMap, SleeperRoster } from '../adapters
 import { HOUR } from '../cache.js';
 import { scoreWithSettings, weeklyProjections } from '../scoring/projection.js';
 import { waiverPlayer, type WaiverContext } from './context.js';
+import { sleeperSchedule } from './schedule.js';
 import { pickAvailable, startablePositions, suggestMoves } from './moves.js';
 
 type Projections = Map<string, Record<string, number>>;
@@ -81,6 +82,8 @@ export function sleeperWaiverLeague(
     moves: suggestMoves({ starters, bench, available, openRosterSpots, byeTeams: ctx.byeTeams }),
     available,
     openRosterSpots,
+    runs: [],
+    runsSource: null,
   };
 }
 
@@ -107,7 +110,9 @@ export async function fetchSleeperWaivers(usernames: string[], ctx: WaiverContex
           seen.add(league.league_id);
           const rosters = await sleeperClient.rosters(league.league_id);
           const mine = rosters.find((r) => r.owner_id === user.user_id || r.co_owners?.includes(user.user_id));
-          if (mine) result.leagues.push(sleeperWaiverLeague(league, rosters, mine, players, weeks, ctx));
+          if (!mine) continue;
+          const schedule = await sleeperSchedule(league, ctx.week);
+          result.leagues.push({ ...sleeperWaiverLeague(league, rosters, mine, players, weeks, ctx), ...schedule });
         }
       } catch (e) {
         result.errors.push({ source: `sleeper:${username}`, message: errorMessage(e) });
