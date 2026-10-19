@@ -2,10 +2,11 @@ import { lazy, Suspense, useState, type ComponentType, type SVGProps } from 'rea
 import { signOut, useDashboard, type Me } from './api';
 import { AlertList } from './components/AlertList';
 import { Hero } from './components/Hero';
-import { ChartIcon, FootballIcon, RefreshIcon, ScoreboardIcon, UsersIcon } from './components/icons';
+import { ChartIcon, FootballIcon, RefreshIcon, ScoreboardIcon, SwapIcon, UsersIcon } from './components/icons';
 import { ManualLeagueEditor } from './components/ManualLeagueEditor';
 import { MatchupTable } from './components/MatchupTable';
 import { PlayersView } from './components/PlayersView';
+import { WaiversView } from './components/waivers/WaiversView';
 import { YahooConnect } from './components/YahooConnect';
 
 // The History tab pulls in the charting library, so load it only when it's opened.
@@ -13,9 +14,10 @@ const HistoryView = lazy(() =>
   import('./components/history/HistoryView').then((m) => ({ default: m.HistoryView })),
 );
 
-type View = 'matchups' | 'players' | 'history';
+type View = 'matchups' | 'waivers' | 'players' | 'history';
 const VIEWS: { id: View; label: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
   { id: 'matchups', label: 'Matchups', Icon: ScoreboardIcon },
+  { id: 'waivers', label: 'Waivers', Icon: SwapIcon },
   { id: 'players', label: 'Players', Icon: UsersIcon },
   { id: 'history', label: 'History', Icon: ChartIcon },
 ];
@@ -109,6 +111,10 @@ export default function App({ user }: { user: Me['user'] }) {
             </button>
           </main>
         )
+      ) : view === 'waivers' ? (
+        <main>
+          <WaiversView />
+        </main>
       ) : view === 'players' ? (
         data && (
           <main>

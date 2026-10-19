@@ -2,9 +2,11 @@
 // https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/{year}/segments/0/leagues/{id}
 
 export interface EspnStat {
-  scoringPeriodId: number;
+  seasonId?: number;
+  scoringPeriodId: number; // 0 = the whole season
   statSourceId: number; // 0 = actual, 1 = projected
-  appliedTotal?: number;
+  statSplitTypeId?: number; // 0 = season, 1 = one week
+  appliedTotal?: number; // in this league's scoring
 }
 
 export interface EspnPlayer {
@@ -47,6 +49,8 @@ export interface EspnTeam {
   owners?: string[];
   record?: { overall?: EspnRecord };
   roster?: EspnRoster;
+  waiverRank?: number; // your place in the claim order, 1 = first
+  transactionCounter?: { acquisitionBudgetSpent?: number };
 }
 
 export interface EspnMember {
@@ -79,8 +83,18 @@ export interface EspnLeague {
   settings?: {
     name?: string;
     rosterSettings?: { lineupSlotCounts?: Record<string, number> };
+    acquisitionSettings?: {
+      acquisitionBudget?: number;
+      isUsingAcquisitionBudget?: boolean; // FAAB bidding
+      waiverOrderReset?: boolean; // order reset to reverse standings each week, instead of rolling
+    };
   };
   members?: EspnMember[];
   teams?: EspnTeam[];
   schedule?: EspnScheduleItem[];
+}
+
+// The kona_player_info view: players not on any team in the league.
+export interface EspnFreeAgents {
+  players: { status: 'FREEAGENT' | 'WAIVERS' | string; player: EspnPlayer }[];
 }

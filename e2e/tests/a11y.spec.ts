@@ -38,6 +38,12 @@ test.describe('Accessibility', () => {
     await expectNoViolations(page, 'the Matchups tab (open rows)');
   });
 
+  test('Waivers', async ({ page }) => {
+    await openTab(page, 'Waivers');
+    await expect(page.getByRole('heading', { name: 'Suggested moves' })).toBeVisible();
+    await expectNoViolations(page, 'the Waivers tab');
+  });
+
   test('Players', async ({ page }) => {
     await openTab(page, 'Players');
     await expect(page.getByRole('listitem').first()).toBeVisible();

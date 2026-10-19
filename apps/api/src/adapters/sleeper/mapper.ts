@@ -32,7 +32,7 @@ export interface SleeperLeagueData {
   project?: (player: Player, actual: number) => number;
 }
 
-const NON_STARTER_SLOTS = new Set(['BN', 'IR', 'TAXI']);
+export const NON_STARTER_SLOTS = new Set(['BN', 'IR', 'TAXI']);
 const EMPTY_SLOT_ID = '0';
 
 const INJURY_MAP: Record<string, InjuryStatus> = {

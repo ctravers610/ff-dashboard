@@ -14,6 +14,7 @@ import { config } from './config.js';
 import { getDashboard } from './dashboard.js';
 import { db, type Db } from './db/client.js';
 import { historyRoutes } from './routes/history.js';
+import { getWaivers } from './waivers/index.js';
 import { manualLeagueRoutes } from './routes/manualLeagues.js';
 import { yahooAuthRoutes } from './routes/yahooAuth.js';
 
@@ -68,6 +69,7 @@ export async function buildApp({ logger = true, webDist = config.webDist, auth, 
     }
   });
   app.get('/api/dashboard', async () => getDashboard());
+  app.get('/api/waivers', async () => getWaivers());
   await app.register(yahooAuthRoutes);
   await app.register(manualLeagueRoutes());
   await app.register(historyRoutes);

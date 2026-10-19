@@ -9,6 +9,7 @@ import type {
   SleeperUser,
 } from '../../apps/api/src/adapters/sleeper/types.js';
 import { ALL_PLAYERS, PLAYERS as P, SEASON, WEEK, type FxPlayer } from './players.js';
+import { SLEEPER_FAAB } from './waivers.js';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const sum = (xs: number[]) => round2(xs.reduce((a, b) => a + b, 0));
@@ -31,6 +32,7 @@ export const league: SleeperLeague = {
   total_rosters: 4,
   roster_positions: ['QB', 'RB', 'RB', 'WR', 'WR', 'TE', 'FLEX', 'K', 'DEF', 'BN', 'BN', 'IR'],
   scoring_settings: { pass_yd: 0.04, pass_td: 4, rush_yd: 0.1, rush_td: 6, rec: 1, rec_yd: 0.1, rec_td: 6, fgm: 3, xpm: 1, sack: 1, int: 2 },
+  settings: { waiver_type: 2, waiver_budget: SLEEPER_FAAB.budget }, // FAAB
 };
 
 const owners: SleeperUser[] = [
@@ -58,8 +60,13 @@ const rosterOf = (id: number, owner: string, starters: FxPlayer[], rest: FxPlaye
   settings: { wins: record[0], losses: record[1], ties: 0, fpts: Math.floor(fpts), fpts_decimal: Math.round((fpts % 1) * 100), fpts_against: 500, fpts_against_decimal: 0 },
 });
 
+const withWaivers = (r: SleeperRoster): SleeperRoster => ({
+  ...r,
+  settings: { ...r.settings, waiver_budget_used: SLEEPER_FAAB.used, waiver_position: SLEEPER_FAAB.position },
+});
+
 export const rosters: SleeperRoster[] = [
-  rosterOf(1, 'u1', MY_STARTERS, MY_BENCH, [3, 2], 620.5, MY_IR),
+  withWaivers(rosterOf(1, 'u1', MY_STARTERS, MY_BENCH, [3, 2], 620.5, MY_IR)),
   rosterOf(2, 'u2', OPP_STARTERS, [], [2, 3], 560.25),
   rosterOf(3, 'u3', [], [], [4, 1], 700),
   rosterOf(4, 'u4', [], [], [1, 4], 480),

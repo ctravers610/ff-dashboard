@@ -25,9 +25,10 @@ async function fetchProjections(season: string, week: number): Promise<Map<strin
   return new Map(rows.map((r) => [r.player_id, r.stats ?? {}]));
 }
 
-// Sleeper's projected stats for every player this week, keyed by Sleeper id.
-export const weeklyProjections = (season: string, week: number) =>
-  cached(`projections:${season}:${week}`, 10 * MINUTE, () => fetchProjections(season, week));
+// Sleeper's projected stats for every player in a week, keyed by Sleeper id.
+// Future weeks change slowly, so callers looking ahead can cache them longer.
+export const weeklyProjections = (season: string, week: number, ttlMs = 10 * MINUTE) =>
+  cached(`projections:${season}:${week}`, ttlMs, () => fetchProjections(season, week));
 
 // Sleeper leagues store scoring as { stat field: points per unit }, including
 // 0/1 indicator fields like pts_allow_14_20, so scoring is a weighted sum.

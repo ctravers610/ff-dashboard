@@ -32,7 +32,7 @@ export const paste = (field: Locator, text: string) =>
     el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
   }, text);
 
-export const openTab = (page: Page, name: 'Matchups' | 'Players' | 'History') =>
+export const openTab = (page: Page, name: 'Matchups' | 'Waivers' | 'Players' | 'History') =>
   page
     .getByRole('navigation')
     .getByRole('button', { name: new RegExp(`^${name}$`, 'i') })

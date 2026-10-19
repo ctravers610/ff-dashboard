@@ -22,6 +22,10 @@ export interface SleeperLeague {
   total_rosters: number;
   roster_positions: string[];
   scoring_settings?: Record<string, number>; // stat field → points per unit
+  settings?: {
+    waiver_type?: number; // 0 = rolling, 1 = reverse standings, 2 = FAAB
+    waiver_budget?: number;
+  };
 }
 
 export interface SleeperRoster {
@@ -31,7 +35,10 @@ export interface SleeperRoster {
   starters: string[];
   players: string[] | null;
   reserve?: string[] | null; // IR slots
+  taxi?: string[] | null; // dynasty taxi squad
   settings: {
+    waiver_position?: number;
+    waiver_budget_used?: number;
     wins: number;
     losses: number;
     ties: number;

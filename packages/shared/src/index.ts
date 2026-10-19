@@ -205,3 +205,55 @@ export interface DashboardResponse {
   players: PlayerExposure[];
   errors: SourceError[];
 }
+
+// ── Waivers ────────────────────────────────────────────────────────────
+
+// A player you could pick up, or one on your roster, valued two ways.
+export interface WaiverPlayer {
+  player: Player;
+  week: number | null; // projected points in the week a claim would play in, in this league's scoring
+  restOfSeason: number | null; // projected points from that week through the end of the regular season
+  // Available players only: on waivers (a claim is needed) or a free agent (add any time).
+  // null when the platform doesn't say.
+  availability: 'waivers' | 'free_agent' | null;
+  trendingAdds: number | null; // Sleeper users who added him in the last 24 hours
+}
+
+export type WaiverMoveReason = 'empty' | 'bye' | 'injury' | 'upgrade';
+
+// One suggested transaction: who to add, who to drop for him, and why.
+export interface WaiverMove {
+  slot: string;
+  reason: WaiverMoveReason;
+  replaces: WaiverPlayer | null; // the starter he would take over from
+  add: WaiverPlayer;
+  drop: WaiverPlayer | null; // null when you have an open roster spot
+  gain: number; // projected points gained this week
+}
+
+export interface WaiverRules {
+  // faab: blind bidding; rolling: claiming sends you to the back; reverse: reset to reverse standings each week.
+  type: 'faab' | 'rolling' | 'reverse_standings';
+  faabLeft: number | null;
+  faabTotal: number | null;
+  priority: number | null; // your place in the claim order, 1 = first
+  teams: number;
+}
+
+export interface WaiverLeague {
+  leagueId: string;
+  platform: Platform;
+  name: string;
+  rules: WaiverRules | null;
+  moves: WaiverMove[];
+  available: WaiverPlayer[]; // the best available at each position, unsorted
+  openRosterSpots: number;
+}
+
+export interface WaiversResponse {
+  season: string;
+  week: number; // the week a claim made now would play in
+  lastRegularWeek: number;
+  leagues: WaiverLeague[];
+  errors: SourceError[];
+}

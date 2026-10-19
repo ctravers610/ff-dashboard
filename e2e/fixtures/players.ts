@@ -40,6 +40,7 @@ export const PLAYERS = {
   rice: p('1016', 'Rashee Rice', 'WR', 'KC'),
   reed: p('1017', 'Jayden Reed', 'WR', 'GB', 'Questionable'),
   doubs: p('1018', 'Romeo Doubs', 'WR', 'GB'),
+  geno: p('1019', 'Geno Smith', 'QB', 'NYJ'), // on nobody's Sleeper roster: a free agent there
   bowers: p('9487', 'Brock Bowers', 'TE', 'LV'),
   kelce: p('1009', 'Travis Kelce', 'TE', 'KC'),
   little: p('3451', 'Cam Little', 'K', 'JAX'),

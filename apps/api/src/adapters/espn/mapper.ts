@@ -11,17 +11,17 @@ import type {
 } from '@ffd/shared';
 import { liveProjection } from '../../scoring/projection.js';
 import { buildAlerts, rankStandings, totalSide } from '../common.js';
-import type { EspnLeague, EspnMatchupSide, EspnRosterEntry, EspnTeam } from './types.js';
+import type { EspnLeague, EspnMatchupSide, EspnPlayer, EspnRosterEntry, EspnTeam } from './types.js';
 
 // ESPN identifies lineup slots, positions and NFL teams by number.
-const SLOT_NAMES: Record<number, string> = {
+export const SLOT_NAMES: Record<number, string> = {
   0: 'QB', 2: 'RB', 3: 'RB/WR', 4: 'WR', 5: 'WR/TE', 6: 'TE', 7: 'OP',
   16: 'D/ST', 17: 'K', 18: 'P', 19: 'HC', 23: 'FLEX',
 };
 // Display order for starter slots (bench and IR are never starters).
-const SLOT_ORDER = [0, 2, 4, 3, 6, 5, 23, 7, 16, 17, 18, 19];
-const BENCH_SLOT = 20;
-const IR_SLOT = 21;
+export const SLOT_ORDER = [0, 2, 4, 3, 6, 5, 23, 7, 16, 17, 18, 19];
+export const BENCH_SLOT = 20;
+export const IR_SLOT = 21;
 
 const POSITIONS: Record<number, string> = { 1: 'QB', 2: 'RB', 3: 'WR', 4: 'TE', 5: 'K', 16: 'DEF' };
 
@@ -47,7 +47,10 @@ export const teamName = (t: EspnTeam) =>
 
 function toPlayer(entry: EspnRosterEntry): Player | null {
   const p = entry.playerPoolEntry?.player;
-  if (!p) return null;
+  return p ? toEspnPlayer(p) : null;
+}
+
+export function toEspnPlayer(p: EspnPlayer): Player {
   return {
     playerId: String(p.id),
     name: p.fullName,

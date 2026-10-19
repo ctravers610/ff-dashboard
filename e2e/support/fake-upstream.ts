@@ -8,6 +8,7 @@ import * as ffpc from '../fixtures/ffpc.js';
 import { GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_USERS, type GithubUserKey } from '../fixtures/github.js';
 import { ALL_PLAYERS, GAMES, SEASON, UPCOMING_GAMES, WEEK } from '../fixtures/players.js';
 import * as sleeper from '../fixtures/sleeper.js';
+import * as waivers from '../fixtures/waivers.js';
 import { UPSTREAM_PORT } from './env.js';
 
 type Json = unknown;
@@ -31,6 +32,11 @@ const upcoming = ([home, away]: [string, string]) => ({
       ],
     },
   ],
+});
+
+// Next week's schedule, for waivers: nothing has kicked off, and DEN is on bye.
+const claimWeekBoard = () => ({
+  events: waivers.claimWeekGames.map(upcoming),
 });
 
 const scoreboard = () => ({
@@ -59,19 +65,26 @@ function route(url: URL, headers: http.IncomingHttpHeaders): Reply | null {
   const m = /^\/sleeper\/v1\/league\/[^/]+\/matchups\/(\d+)$/.exec(p);
   if (m) return { body: sleeper.matchups(Number(m[1])) };
   if (p === '/sleeper/v1/players/nfl') return { body: sleeper.playersRaw };
+  if (p === '/sleeper/v1/players/nfl/trending/add') return { body: waivers.trendingAdds };
 
   // ── Sleeper stats and projections ────────────────────────────────────
   if (p === `/sleeper-stats/stats/nfl/${SEASON}/${WEEK}`) return { body: ffpc.statsRows() };
   if (p === `/sleeper-stats/projections/nfl/${SEASON}/${WEEK}`) return { body: projectionRows() };
+  // Later weeks, for waivers: the claim week and the rest of the season.
+  if (p.startsWith(`/sleeper-stats/projections/nfl/${SEASON}/`)) return { body: waivers.sleeperProjectionRows(ALL_PLAYERS) };
 
   // ── ESPN ─────────────────────────────────────────────────────────────
-  if (p === '/espn/scoreboard') return { body: scoreboard() };
+  if (p === '/espn/scoreboard') {
+    return { body: Number(url.searchParams.get('week')) === waivers.CLAIM_WEEK ? claimWeekBoard() : scoreboard() };
+  }
   const e = new RegExp(`^/espn/fantasy/${SEASON}/segments/0/leagues/(\\d+)$`).exec(p);
   if (e) {
     const cookie = headers.cookie ?? '';
     const authed = cookie.includes(`SWID=${espn.ESPN_SWID}`) && cookie.includes(`espn_s2=${espn.ESPN_S2}`);
     if (e[1] === espn.ESPN_FAILING_LEAGUE_ID || !authed) return { status: 401, body: { messages: ['You are not authorized to view this League.'] } };
-    if (e[1] === espn.ESPN_LEAGUE_ID) return { body: espn.league() };
+    if (e[1] === espn.ESPN_LEAGUE_ID) {
+      return { body: url.searchParams.getAll('view').includes('kona_player_info') ? espn.freeAgents() : espn.league() };
+    }
   }
 
   return null;

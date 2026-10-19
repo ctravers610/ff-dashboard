@@ -1,4 +1,4 @@
-import type { DashboardResponse, HistoryResponse } from '@ffd/shared';
+import type { DashboardResponse, HistoryResponse, WaiversResponse } from '@ffd/shared';
 import { useQuery } from '@tanstack/react-query';
 
 /** A 401 from the API: the session is missing or expired. The app answers it with the sign-in screen. */
@@ -44,6 +44,15 @@ export function useHistory() {
     queryKey: ['history'],
     queryFn: () => api<HistoryResponse>('/api/history'),
     refetchInterval: 60_000,
+  });
+}
+
+// Free agents and suggested moves. Waivers change slowly, so every 5 minutes is plenty.
+export function useWaivers() {
+  return useQuery({
+    queryKey: ['waivers'],
+    queryFn: () => api<WaiversResponse>('/api/waivers'),
+    refetchInterval: 5 * 60_000,
   });
 }
 

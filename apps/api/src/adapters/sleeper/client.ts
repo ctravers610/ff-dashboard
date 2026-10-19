@@ -71,4 +71,9 @@ export const sleeperClient = {
       get<SleeperMatchup[]>(`/league/${leagueId}/matchups/${week}`),
     ),
   players: () => cached('sleeper:players', HOUR, loadPlayers),
+  // Players added (or dropped) most by all Sleeper users in the last day.
+  trending: (type: 'add' | 'drop') =>
+    cached(`sleeper:trending:${type}`, 15 * MINUTE, () =>
+      get<{ player_id: string; count: number }[]>(`/players/nfl/trending/${type}?lookback_hours=24&limit=100`),
+    ),
 };

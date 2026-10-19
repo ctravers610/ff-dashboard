@@ -3,6 +3,7 @@
 
 import type { EspnLeague, EspnRosterEntry } from '../../apps/api/src/adapters/espn/types.js';
 import { PLAYERS as P, SEASON, WEEK, type FxPlayer } from './players.js';
+import { ESPN_FAAB, espnFreeAgents as FREE_AGENTS, espnWaiverStats } from './waivers.js';
 
 export const ESPN_LEAGUE_ID = '900001';
 export const ESPN_FAILING_LEAGUE_ID = '900002'; // always answers 401, to test error handling
@@ -33,6 +34,7 @@ const entry = (p: FxPlayer, slot: number, actual: number, projected: number): Es
       stats: [
         { scoringPeriodId: WEEK, statSourceId: 0, appliedTotal: actual },
         { scoringPeriodId: WEEK, statSourceId: 1, appliedTotal: projected },
+        ...espnWaiverStats(p),
       ],
     },
   },
@@ -102,10 +104,11 @@ export function league(): EspnLeague {
       rosterSettings: {
         lineupSlotCounts: { '0': 1, '2': 2, '4': 2, '6': 1, '23': 1, '17': 1, '16': 1, '20': 5, '21': 1 },
       },
+      acquisitionSettings: { acquisitionBudget: ESPN_FAAB.budget, isUsingAcquisitionBudget: true, waiverOrderReset: true },
     },
     members,
     teams: [
-      { id: 1, name: ESPN_MY_TEAM, owners: [ESPN_SWID], record: { overall: { wins: 3, losses: 2, ties: 0, pointsFor: 617.5, pointsAgainst: 573.2 } }, roster: { entries: entries(MY_LINEUP) } },
+      { id: 1, name: ESPN_MY_TEAM, owners: [ESPN_SWID], waiverRank: ESPN_FAAB.waiverRank, transactionCounter: { acquisitionBudgetSpent: ESPN_FAAB.spent }, record: { overall: { wins: 3, losses: 2, ties: 0, pointsFor: 617.5, pointsAgainst: 573.2 } }, roster: { entries: entries(MY_LINEUP) } },
       { id: 2, name: ESPN_OPP_TEAM, owners: ['{OTHER-2}'], record: { overall: { wins: 2, losses: 3, ties: 0, pointsFor: 560, pointsAgainst: 590 } }, roster: { entries: entries(OPP_LINEUP) } },
       { id: 3, name: 'Third Place Finish', owners: ['{OTHER-3}'], record: { overall: { wins: 4, losses: 1, ties: 0, pointsFor: 650, pointsAgainst: 540 } }, roster: { entries: [] } },
       { id: 4, name: 'Basement Bandits', owners: ['{OTHER-4}'], record: { overall: { wins: 1, losses: 4, ties: 0, pointsFor: 480, pointsAgainst: 610 } }, roster: { entries: [] } },
@@ -136,5 +139,22 @@ export function league(): EspnLeague {
         },
       },
     ],
+  };
+}
+
+// The kona_player_info view: players on no team in the league.
+export function freeAgents() {
+  return {
+    players: FREE_AGENTS.map(([p, status]) => ({
+      status,
+      player: {
+        id: p.espnId,
+        fullName: p.name,
+        defaultPositionId: POSITION_ID[p.position],
+        proTeamId: TEAM_ID[p.team] ?? 0,
+        injuryStatus: p.injury ? 'QUESTIONABLE' : 'ACTIVE',
+        stats: espnWaiverStats(p),
+      },
+    })),
   };
 }
