@@ -1,12 +1,12 @@
 // Hand-entered leagues (FFPC), stored in Postgres.
 
 import type { ManualLeague, ManualLeagueInput } from '@ffd/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../../config.js';
 import { db as appDb, type Db } from '../../db/client.js';
-import { manualLeagues, type ManualLeagueRow } from '../../db/schema.js';
+import { leagueSnapshots, manualLeagues, type ManualLeagueRow } from '../../db/schema.js';
 
 const toLeague = (row: ManualLeagueRow): ManualLeague => ({
   id: row.id,
@@ -49,9 +49,17 @@ export function manualLeagueStore(db: Db) {
       return row ? toLeague(row) : null;
     },
 
+    // A deleted league takes its history with it, in one transaction so you
+    // never end up with snapshots for a league that no longer exists.
     async remove(id: string): Promise<boolean> {
-      const rows = await db.delete(manualLeagues).where(eq(manualLeagues.id, id)).returning({ id: manualLeagues.id });
-      return rows.length > 0;
+      return db.transaction(async (tx) => {
+        const rows = await tx.delete(manualLeagues).where(eq(manualLeagues.id, id)).returning({ id: manualLeagues.id });
+        if (rows.length === 0) return false;
+        await tx
+          .delete(leagueSnapshots)
+          .where(and(eq(leagueSnapshots.platform, 'ffpc'), eq(leagueSnapshots.leagueId, id)));
+        return true;
+      });
     },
 
     // Before the database existed, leagues lived in apps/api/data/manual-leagues.json.

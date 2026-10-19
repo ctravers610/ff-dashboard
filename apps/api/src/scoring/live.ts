@@ -4,6 +4,7 @@
 
 import type { Player } from '@ffd/shared';
 import { cached, MINUTE } from '../cache.js';
+import { config } from '../config.js';
 import { nflGames, type GameScore } from './games.js';
 import { liveProjection, weeklyProjections } from './projection.js';
 import type { ScoringRules } from './rules.js';
@@ -15,7 +16,7 @@ interface StatRow {
 }
 
 async function fetchStats(season: string, week: number): Promise<Map<string, Record<string, number>>> {
-  const res = await fetch(`https://api.sleeper.com/stats/nfl/${season}/${week}?season_type=regular`);
+  const res = await fetch(`${config.upstream.sleeperStats}/stats/nfl/${season}/${week}?season_type=regular`);
   if (!res.ok) throw new Error(`Sleeper stats returned HTTP ${res.status}`);
   const rows = (await res.json()) as StatRow[];
   return new Map(rows.map((r) => [r.player_id, r.stats ?? {}]));

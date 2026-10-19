@@ -11,10 +11,8 @@ import type {
   SleeperUser,
 } from './types.js';
 
-const BASE_URL = 'https://api.sleeper.app/v1';
-
 async function get<T>(urlPath: string): Promise<T> {
-  const res = await fetch(BASE_URL + urlPath);
+  const res = await fetch(config.upstream.sleeperApi + urlPath);
   if (!res.ok) throw new Error(`Sleeper ${urlPath} returned HTTP ${res.status}`);
   return (await res.json()) as T;
 }

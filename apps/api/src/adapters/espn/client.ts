@@ -1,7 +1,7 @@
 import { cached, MINUTE } from '../../cache.js';
+import { config } from '../../config.js';
 import type { EspnLeague } from './types.js';
 
-const BASE_URL = 'https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons';
 const VIEWS = ['mSettings', 'mTeam', 'mRoster', 'mMatchupScore', 'mScoreboard', 'mStatus'];
 
 export interface EspnAuth {
@@ -12,7 +12,7 @@ export interface EspnAuth {
 // Private leagues need the espn_s2 and SWID cookies from a logged-in browser.
 async function fetchLeague(leagueId: string, season: string, auth: EspnAuth | null): Promise<EspnLeague> {
   const params = new URLSearchParams(VIEWS.map((v) => ['view', v]));
-  const url = `${BASE_URL}/${season}/segments/0/leagues/${leagueId}?${params}`;
+  const url = `${config.upstream.espnFantasy}/${season}/segments/0/leagues/${leagueId}?${params}`;
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (auth) headers.Cookie = `espn_s2=${auth.espnS2}; SWID=${auth.swid}`;
 

@@ -4,7 +4,7 @@ import { pts, record } from '../format';
 export function StandingsTable({ standings, myTeamId }: { standings: TeamStanding[]; myTeamId: string }) {
   return (
     <table className="w-full text-sm">
-      <thead className="text-xs text-slate-500 dark:text-slate-400">
+      <thead className="text-xs text-slate-600 dark:text-slate-400">
         <tr>
           <th className="py-1 text-left font-medium">#</th>
           <th className="py-1 text-left font-medium">Team</th>

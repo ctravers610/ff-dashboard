@@ -2,6 +2,7 @@
 // when no database is reachable, except in CI, where a missing database is a failure.
 
 import type { LeagueSummary, ManualLeague, ManualLeagueInput } from '@ffd/shared';
+import { sql } from 'drizzle-orm';
 import Fastify from 'fastify';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -24,7 +25,17 @@ describe.skipIf(!enabled)('Postgres', () => {
     await testDb?.drop();
   });
 
-  const input: ManualLeagueInput = { name: 'League A', teamName: 'Team A', rosterText: 'QB Josh Allen', matchup: null };
+  it('survives the server dropping its connections, then reconnects', async () => {
+    await testDb.db.execute(sql`select 1`); // opens a pooled connection
+    await testDb.killConnections();
+    await new Promise((r) => setTimeout(r, 300)); // let the pool notice the dropped connection
+
+    // A restart must not crash the process, and the next query gets a fresh connection.
+    const result = await testDb.db.execute(sql`select 1 as ok`);
+    expect(result.rows[0]).toEqual({ ok: 1 });
+  });
+
+  const input: ManualLeagueInput ={ name: 'League A', teamName: 'Team A', rosterText: 'QB Josh Allen', matchup: null };
 
   describe('manual league store', () => {
     it('creates, lists, updates and removes a league', async () => {
@@ -40,6 +51,29 @@ describe.skipIf(!enabled)('Postgres', () => {
       expect(await store.remove(created.id)).toBe(true);
       expect(await store.remove(created.id)).toBe(false);
       expect(await store.update(created.id, input)).toBeNull();
+    });
+
+    it("deleting a league also deletes its history, but not other leagues' history", async () => {
+      const store = manualLeagueStore(testDb.db);
+      const snapshots = snapshotStore(testDb.db);
+      const doomed = await store.create(input);
+      const kept = await store.create(input);
+      const row = (leagueId: string, platform = 'ffpc'): NewSnapshot => ({
+        platform,
+        leagueId,
+        leagueName: 'x',
+        season: '2031',
+        week: 1,
+        points: 1,
+      });
+      await snapshots.save([row(doomed.id), row(kept.id), row(doomed.id, 'sleeper')]); // same id on another platform is unrelated
+
+      expect(await store.remove(doomed.id)).toBe(true);
+      const left = await snapshots.listForSeason('2031');
+      expect(left.map((r) => `${r.platform}:${r.leagueId === kept.id ? 'kept' : 'doomed'}`).sort()).toEqual([
+        'ffpc:kept',
+        'sleeper:doomed',
+      ]);
     });
 
     it('stores the pasted matchup as JSON and reads it back unchanged', async () => {

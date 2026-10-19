@@ -38,6 +38,10 @@ export async function createTestDb() {
 
   return {
     db,
+    // Simulates a database restart or failover: the server hangs up every connection to this database.
+    async killConnections() {
+      await admin.query('SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1', [name]);
+    },
     async drop() {
       await pool.end();
       await admin.query(`DROP DATABASE ${name} WITH (FORCE)`);

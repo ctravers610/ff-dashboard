@@ -154,7 +154,7 @@ export function ManualLeagueEditor({ leagueId, onClose }: { leagueId: string | n
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Roster
-          <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
+          <span className="text-xs font-normal text-slate-600 dark:text-slate-400">
             Filled in automatically by the Live Scoring paste below. You can also paste your FFPC team page here (Ctrl+A,
             Ctrl+C) or type one player per line, with a slot (QB, RB, WR, TE, FLEX, SF, K, DEF) for starters, BN for
             bench, IR for injured reserve.
@@ -168,11 +168,11 @@ export function ManualLeagueEditor({ leagueId, onClose }: { leagueId: string | n
             className={`${field} font-mono`}
           />
         </label>
-        {importNotice && <p className="text-sm text-emerald-600 dark:text-emerald-400">{importNotice}</p>}
+        {importNotice && <p className="text-sm text-emerald-700 dark:text-emerald-400">{importNotice}</p>}
 
         <div className="flex flex-col gap-1 text-sm font-medium">
-          Weekly Live Scoring paste <span className="font-normal text-slate-500">(recommended)</span>
-          <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
+          Weekly Live Scoring paste <span className="font-normal text-slate-600 dark:text-slate-400">(recommended)</span>
+          <span className="text-xs font-normal text-slate-600 dark:text-slate-400">
             Once a week, after lineups lock: on FFPC's Live Scoring page press Ctrl+A, Ctrl+C, then paste below. It
             fills in the league, your roster and both lineups; scores then update live from real-time stats.
           </span>
@@ -181,7 +181,7 @@ export function ManualLeagueEditor({ leagueId, onClose }: { leagueId: string | n
               <span>
                 Week {form.matchup.week}: {form.matchup.me.teamName} {form.matchup.me.points.toFixed(2)} vs{' '}
                 {form.matchup.opponent.teamName} {form.matchup.opponent.points.toFixed(2)}
-                <span className="ml-1 text-xs text-slate-500">
+                <span className="ml-1 text-xs text-slate-600 dark:text-slate-400">
                   ({form.matchup.me.starters.length} + {form.matchup.opponent.starters.length} starters)
                 </span>
               </span>

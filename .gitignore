@@ -5,3 +5,8 @@ apps/api/.cache/
 apps/api/data/
 *.log
 .DS_Store
+
+# Playwright (report and trace folders, wherever the tests were launched from)
+e2e/.tmp/
+test-results/
+playwright-report/

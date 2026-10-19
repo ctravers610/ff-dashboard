@@ -16,7 +16,7 @@ const isConflict = (p: PlayerExposure) => p.facing.length > 0 && p.owned.some((o
 const STATUS_STYLE = {
   starter: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
   bench: 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
-  ir: 'bg-slate-100 text-slate-500 line-through dark:bg-slate-900 dark:text-slate-500',
+  ir: 'bg-slate-100 text-slate-600 line-through dark:bg-slate-900 dark:text-slate-400',
 };
 
 function Chip({ className, title, children }: { className: string; title: string; children: string }) {
@@ -55,7 +55,7 @@ export function PlayersView({ players }: { players: PlayerExposure[] }) {
                   : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
               }`}
             >
-              {f.label} <span className="opacity-60">{counts[f.value]}</span>
+              {f.label} <span className="font-normal">{counts[f.value]}</span>
             </button>
           ))}
         </div>
@@ -69,7 +69,7 @@ export function PlayersView({ players }: { players: PlayerExposure[] }) {
       </div>
 
       {visible.length === 0 ? (
-        <p className="py-6 text-center text-sm text-slate-500">No players match.</p>
+        <p className="py-6 text-center text-sm text-slate-600 dark:text-slate-400">No players match.</p>
       ) : (
         <ul className="divide-y divide-slate-200 dark:divide-slate-800">
           {visible.map((p) => (
@@ -83,9 +83,9 @@ export function PlayersView({ players }: { players: PlayerExposure[] }) {
                     </span>
                   )}
                 </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">
+                <div className="text-xs text-slate-600 dark:text-slate-400">
                   {p.player.position} · {p.player.nflTeam ?? 'FA'}
-                  {p.player.injuryStatus && <span className="ml-1 font-medium text-amber-600">{p.player.injuryStatus}</span>}
+                  {p.player.injuryStatus && <span className="ml-1 font-medium text-amber-700 dark:text-amber-400">{p.player.injuryStatus}</span>}
                 </div>
               </div>
               <div className="flex flex-wrap gap-1">
@@ -111,7 +111,7 @@ export function PlayersView({ players }: { players: PlayerExposure[] }) {
         </ul>
       )}
 
-      <p className="mt-4 flex flex-wrap gap-3 text-xs text-slate-500 dark:text-slate-400">
+      <p className="mt-4 flex flex-wrap gap-3 text-xs text-slate-600 dark:text-slate-400">
         <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-500" />Starting</span>
         <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-slate-400" />Bench / IR</span>
         <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-rose-500" />Opponent starting him this week</span>

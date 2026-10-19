@@ -14,7 +14,7 @@ One place to follow all of my fantasy football teams across platforms, instead o
 - **Frontend:** React 19, TypeScript, Vite, TanStack Query, Tailwind CSS, Recharts
 - **Backend:** Node.js, TypeScript, Fastify
 - **Database:** PostgreSQL 17 in Docker, Drizzle ORM, versioned SQL migrations
-- **Testing & CI:** Vitest (unit tests plus tests against a real Postgres), GitHub Actions
+- **Testing & CI:** Vitest (unit tests plus tests against a real Postgres), Playwright end-to-end tests with axe-core accessibility scans, GitHub Actions
 - **Repo:** npm workspaces monorepo
 
 ```
@@ -23,6 +23,7 @@ apps/
   web/        React dashboard
 packages/
   shared/     Platform-neutral TypeScript types and page parsers used by both apps
+e2e/          Playwright end-to-end tests, fixtures and a fake upstream server
 ```
 
 Each platform has an **adapter** in `apps/api/src/adapters/<platform>/` that fetches that platform's data and maps it into one shared model, so the frontend never deals with platform differences. Pure mapping functions are kept apart from network calls, which keeps them easy to test.
@@ -53,7 +54,14 @@ npm run dev              # API on :3001, web on https://localhost:5173
 
 The API applies database migrations on startup. The dev site uses HTTPS with a self-signed certificate (Yahoo only accepts `https` redirect URIs), so the browser asks you to continue once.
 
-Other scripts: `npm test`, `npm run typecheck`, `npm run build`.
+Other scripts: `npm test`, `npm run typecheck`, `npm run build`, `npm run e2e`.
+
+### Tests
+
+- `npm test` runs the fast tests: unit tests for the mappers, parsers and scoring engine, plus tests against a throwaway Postgres.
+- `npm run e2e` runs Playwright end to end. It boots the real stack (the production web build, the real API, a real Postgres database `ffd_e2e` that it creates and drops) and drives it in Chromium. Run `npx playwright install chromium` once first.
+
+The e2e tests never touch Sleeper, ESPN or your accounts. The API's upstream URLs are configurable, so the tests point it at a small fake server (`e2e/support/fake-upstream.ts`) that serves fixture data shaped like the real APIs, and `NODE_ENV=test` keeps your `.env` out of the run. Expected scores in the FFPC tests are worked out by hand from FFPC's published rules, so they check the scoring engine independently of its own code. A separate spec scans every screen with axe-core for WCAG 2.1 AA violations, in light and dark mode.
 
 ### Database
 

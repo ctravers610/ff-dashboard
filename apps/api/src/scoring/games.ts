@@ -2,6 +2,7 @@
 // points allowed) and how far along each game is (for live projections).
 
 import { cached, MINUTE } from '../cache.js';
+import { config } from '../config.js';
 
 interface EspnScoreboard {
   events: {
@@ -32,7 +33,7 @@ export function gameProgress(state: 'pre' | 'in' | 'post', period = 0, clockSeco
 }
 
 async function fetchGames(season: string, week: number): Promise<Map<string, GameScore>> {
-  const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2&week=${week}&dates=${season}`;
+  const url = `${config.upstream.espnScoreboard}?seasontype=2&week=${week}&dates=${season}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`ESPN scoreboard returned HTTP ${res.status}`);
   const board = (await res.json()) as EspnScoreboard;

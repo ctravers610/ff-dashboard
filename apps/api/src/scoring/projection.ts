@@ -3,6 +3,7 @@
 // once the game is final, just his actual points.
 
 import { cached, MINUTE } from '../cache.js';
+import { config } from '../config.js';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -18,7 +19,7 @@ interface StatRow {
 }
 
 async function fetchProjections(season: string, week: number): Promise<Map<string, Record<string, number>>> {
-  const res = await fetch(`https://api.sleeper.com/projections/nfl/${season}/${week}?season_type=regular`);
+  const res = await fetch(`${config.upstream.sleeperStats}/projections/nfl/${season}/${week}?season_type=regular`);
   if (!res.ok) throw new Error(`Sleeper projections returned HTTP ${res.status}`);
   const rows = (await res.json()) as StatRow[];
   return new Map(rows.map((r) => [r.player_id, r.stats ?? {}]));

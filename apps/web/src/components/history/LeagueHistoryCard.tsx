@@ -21,14 +21,14 @@ export function LeagueHistoryCard({ history, mode }: { history: LeagueHistory; m
 
       <div className="flex flex-wrap items-end gap-x-8 gap-y-2">
         <div>
-          <div className="text-xs text-slate-500 dark:text-slate-400">Record</div>
+          <div className="text-xs text-slate-600 dark:text-slate-400">Record</div>
           {/* Big standalone numbers use proportional figures, not tabular-nums. */}
           <div className="text-2xl font-semibold">
             {finished ? `${record.wins}-${record.losses}${record.ties ? `-${record.ties}` : ''}` : '—'}
           </div>
         </div>
         <div>
-          <div className="text-xs text-slate-500 dark:text-slate-400">Avg points / week</div>
+          <div className="text-xs text-slate-600 dark:text-slate-400">Avg points / week</div>
           <div className="text-2xl font-semibold">{avgPoints != null ? avgPoints.toFixed(1) : '—'}</div>
         </div>
         <div className="flex flex-wrap gap-1" aria-label="Weekly results">

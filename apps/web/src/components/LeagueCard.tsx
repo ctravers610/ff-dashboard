@@ -32,7 +32,7 @@ export function LeagueCard({ league, onEdit }: { league: LeagueSummary; onEdit?:
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="truncate text-lg font-semibold">{league.name}</h2>
-          <p className="truncate text-sm text-slate-500 dark:text-slate-400">
+          <p className="truncate text-sm text-slate-600 dark:text-slate-400">
             {league.manual
               ? `${league.manual.teamName || 'My team'} · entered manually, updated ${new Date(league.manual.updatedAt).toLocaleDateString()}`
               : `${me?.teamName} · @${league.account}`}
@@ -46,13 +46,13 @@ export function LeagueCard({ league, onEdit }: { league: LeagueSummary; onEdit?:
       {me && (
         <div className="flex gap-6 text-sm">
           <div>
-            <div className="text-slate-500 dark:text-slate-400">Record</div>
+            <div className="text-slate-600 dark:text-slate-400">Record</div>
             <div className="text-base font-semibold tabular-nums">{record(me)}</div>
           </div>
           <div>
-            <div className="text-slate-500 dark:text-slate-400">Rank</div>
+            <div className="text-slate-600 dark:text-slate-400">Rank</div>
             <div className="text-base font-semibold">
-              {ordinal(me.rank)} <span className="font-normal text-slate-400">of {league.standings.length}</span>
+              {ordinal(me.rank)} <span className="font-normal text-slate-600 dark:text-slate-400">of {league.standings.length}</span>
             </div>
           </div>
         </div>
@@ -66,7 +66,7 @@ export function LeagueCard({ league, onEdit }: { league: LeagueSummary; onEdit?:
             <Scoreboard matchup={league.matchup} />
           )}
           {league.manual?.matchupCapturedAt && (
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-slate-600 dark:text-slate-400">
               {league.manual.liveScored ? (
                 <>
                   <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500 align-middle" />
@@ -88,11 +88,11 @@ export function LeagueCard({ league, onEdit }: { league: LeagueSummary; onEdit?:
           )}
         </div>
       ) : league.manual ? (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-slate-600 dark:text-slate-400">
           {league.roster.length} players · paste this week's Live Scoring page in Edit roster to see your matchup.
         </p>
       ) : (
-        <p className="text-sm text-slate-500">No matchup this week.</p>
+        <p className="text-sm text-slate-600 dark:text-slate-400">No matchup this week.</p>
       )}
 
       {league.manual && league.manual.unmatched.length > 0 && (

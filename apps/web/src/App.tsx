@@ -37,7 +37,7 @@ export default function App() {
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Fantasy Dashboard</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
             {data ? `${data.season} season · Week ${data.week}` : 'Loading…'}
             {data && ` · updated ${new Date(data.updatedAt).toLocaleTimeString()}`}
           </p>
@@ -81,14 +81,14 @@ export default function App() {
               key={label}
               className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900"
             >
-              <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
+              <div className="text-xs text-slate-600 dark:text-slate-400">{label}</div>
               <div className="text-xl font-semibold tabular-nums">{value}</div>
             </div>
           ))}
         </section>
       )}
 
-      {isPending && <p className="text-slate-500">Loading your leagues…</p>}
+      {isPending && <p className="text-slate-600 dark:text-slate-400">Loading your leagues…</p>}
 
       {data && data.leagues.length > 0 && (
         <nav className="mb-4 flex gap-1 border-b border-slate-200 dark:border-slate-800">
@@ -100,7 +100,7 @@ export default function App() {
               className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium capitalize transition ${
                 view === v
                   ? 'border-slate-900 text-slate-900 dark:border-slate-100 dark:text-slate-100'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
               }`}
             >
               {v}
@@ -122,7 +122,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setEditing('new')}
-              className="flex min-h-32 items-center justify-center rounded-xl border-2 border-dashed border-slate-300 text-sm font-medium text-slate-500 hover:border-slate-400 hover:text-slate-700 dark:border-slate-700 dark:hover:border-slate-500 dark:hover:text-slate-300"
+              className="flex min-h-32 items-center justify-center rounded-xl border-2 border-dashed border-slate-300 text-sm font-medium text-slate-600 dark:text-slate-400 hover:border-slate-400 hover:text-slate-700 dark:border-slate-700 dark:hover:border-slate-500 dark:hover:text-slate-300"
             >
               + Add FFPC league (manual roster)
             </button>
@@ -131,7 +131,7 @@ export default function App() {
       ) : view === 'players' ? (
         data && <PlayersView players={data.players} />
       ) : (
-        <Suspense fallback={<p className="text-slate-500">Loading history…</p>}>
+        <Suspense fallback={<p className="text-slate-600 dark:text-slate-400">Loading history…</p>}>
           <HistoryView />
         </Suspense>
       )}
