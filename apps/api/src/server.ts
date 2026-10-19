@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import { config } from './config.js';
 import { getDashboard } from './dashboard.js';
+import { manualLeagueRoutes } from './routes/manualLeagues.js';
 import { yahooAuthRoutes } from './routes/yahooAuth.js';
 
 const app = Fastify({ logger: true });
@@ -8,5 +9,6 @@ const app = Fastify({ logger: true });
 app.get('/api/health', async () => ({ ok: true }));
 app.get('/api/dashboard', async () => getDashboard());
 await app.register(yahooAuthRoutes);
+await app.register(manualLeagueRoutes);
 
 await app.listen({ port: config.port, host: '127.0.0.1' });

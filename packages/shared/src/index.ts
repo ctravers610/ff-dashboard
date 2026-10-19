@@ -74,6 +74,20 @@ export interface LeagueSummary {
   matchup: Matchup | null;
   alerts: LineupAlert[];
   roster: RosterEntry[]; // every player on your team
+  manual?: { teamName: string; updatedAt: string; unmatched: string[] }; // set for hand-entered leagues
+}
+
+// A league you maintain by hand (e.g. FFPC, which has no API we can use).
+export interface ManualLeagueInput {
+  name: string;
+  teamName: string;
+  rosterText: string; // one player per line, optional slot prefix: "WR Puka Nacua"
+}
+
+export interface ManualLeague extends ManualLeagueInput {
+  id: string;
+  platform: Platform;
+  updatedAt: string;
 }
 
 export interface LeagueRef {

@@ -5,18 +5,22 @@ import type { LeagueRef, LeagueSummary, Player, PlayerExposure } from '@ffd/shar
 
 const NAME_SUFFIXES = /\b(jr|sr|ii|iii|iv|v)\b/g;
 
-// Platforms use different player ids, so identity is position + normalized
-// name ("A.J. Brown Jr." → "ajbrown"); team defenses are keyed by NFL team.
-export function playerKey(p: Player): string {
-  if (p.position === 'DEF') return `DEF:${p.nflTeam ?? p.name}`;
-  const name = p.name
+// "A.J. Brown Jr." → "ajbrown"
+export function normalizeName(name: string): string {
+  return name
     .toLowerCase()
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '') // strip accents
     .replace(/[.'’-]/g, '')
     .replace(NAME_SUFFIXES, '')
     .replace(/[^a-z]/g, '');
-  return `${p.position}:${name}`;
+}
+
+// Platforms use different player ids, so identity is position + normalized
+// name; team defenses are keyed by NFL team.
+export function playerKey(p: Player): string {
+  if (p.position === 'DEF') return `DEF:${p.nflTeam ?? p.name}`;
+  return `${p.position}:${normalizeName(p.name)}`;
 }
 
 const STATUS_ORDER = { starter: 0, bench: 1, ir: 2 } as const;

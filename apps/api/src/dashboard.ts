@@ -1,5 +1,6 @@
 import type { DashboardResponse } from '@ffd/shared';
 import { fetchEspnLeagues } from './adapters/espn/index.js';
+import { fetchManualLeagues } from './adapters/manual/index.js';
 import { fetchSleeperLeagues, sleeperNflState } from './adapters/sleeper/index.js';
 import { config } from './config.js';
 import { buildExposure } from './exposure.js';
@@ -11,6 +12,7 @@ export async function getDashboard(): Promise<DashboardResponse> {
   const results = await Promise.all([
     fetchSleeperLeagues(config.sleeperUsernames),
     fetchEspnLeagues(config.espnLeagueIds, nfl.season, config.espnAuth),
+    fetchManualLeagues(nfl),
   ]);
 
   // The same league can show up under two of your accounts; keep it once.

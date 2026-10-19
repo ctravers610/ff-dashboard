@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useDashboard } from './api';
 import { LeagueCard } from './components/LeagueCard';
+import { ManualLeagueEditor } from './components/ManualLeagueEditor';
 import { PlayersView } from './components/PlayersView';
 import { YahooConnect } from './components/YahooConnect';
 
 export default function App() {
   const { data, error, isPending, isFetching, refetch } = useDashboard();
   const [view, setView] = useState<'leagues' | 'players'>('leagues');
+  const [editing, setEditing] = useState<string | null>(null); // 'new' or a manual league id
 
   const totals = data?.leagues.reduce(
     (acc, l) => {
@@ -101,10 +103,29 @@ export default function App() {
 
       {view === 'leagues' ? (
         <main className="grid gap-5 lg:grid-cols-2">
-          {data?.leagues.map((l) => <LeagueCard key={`${l.platform}:${l.leagueId}`} league={l} />)}
+          {data?.leagues.map((l) => (
+            <LeagueCard
+              key={`${l.platform}:${l.leagueId}`}
+              league={l}
+              onEdit={l.manual ? () => setEditing(l.leagueId) : undefined}
+            />
+          ))}
+          {data && (
+            <button
+              type="button"
+              onClick={() => setEditing('new')}
+              className="flex min-h-32 items-center justify-center rounded-xl border-2 border-dashed border-slate-300 text-sm font-medium text-slate-500 hover:border-slate-400 hover:text-slate-700 dark:border-slate-700 dark:hover:border-slate-500 dark:hover:text-slate-300"
+            >
+              + Add FFPC league (manual roster)
+            </button>
+          )}
         </main>
       ) : (
         data && <PlayersView players={data.players} />
+      )}
+
+      {editing && (
+        <ManualLeagueEditor leagueId={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />
       )}
     </div>
   );

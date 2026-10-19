@@ -33,4 +33,5 @@ export const config = {
         }
       : null,
   cacheDir: path.join(rootDir, 'apps', 'api', '.cache'),
+  dataDir: path.join(rootDir, 'apps', 'api', 'data'),
 };
