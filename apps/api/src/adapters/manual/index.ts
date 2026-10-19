@@ -15,7 +15,7 @@ import { buildAlerts, buildAllPlay, totalSide } from '../common.js';
 import { sleeperClient } from '../sleeper/client.js';
 import type { AdapterResult } from '../types.js';
 import { buildPlayerIndex, parseRosterText, resolvePlayer, statusForSlot, type PlayerIndex } from './parse.js';
-import { listManualLeagues } from './store.js';
+import { manualLeagueRepo } from './store.js';
 
 // FFPC's week 6 is an all-play week every season: the top half of the league's
 // weekly scores win, the bottom half lose.
@@ -92,7 +92,7 @@ export function toManualSummary(
 }
 
 export async function fetchManualLeagues(nfl: { season: string; week: number }): Promise<AdapterResult> {
-  const leagues = await listManualLeagues();
+  const leagues = await manualLeagueRepo.list();
   if (leagues.length === 0) return { leagues: [], errors: [] };
   const errors: SourceError[] = [];
   try {

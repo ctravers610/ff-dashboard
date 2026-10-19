@@ -32,6 +32,9 @@ export const config = {
             process.env.YAHOO_REDIRECT_URI ?? 'https://localhost:5173/api/auth/yahoo/callback',
         }
       : null,
+  // Matches docker-compose.yml, so `docker compose up -d` works with no setup.
+  databaseUrl: process.env.DATABASE_URL ?? 'postgres://ffd:ffd_dev_password@127.0.0.1:5432/ffd',
+  migrationsDir: path.join(rootDir, 'apps', 'api', 'drizzle'),
   cacheDir: path.join(rootDir, 'apps', 'api', '.cache'),
   dataDir: path.join(rootDir, 'apps', 'api', 'data'),
 };

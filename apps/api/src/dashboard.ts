@@ -2,8 +2,10 @@ import type { DashboardResponse } from '@ffd/shared';
 import { fetchEspnLeagues } from './adapters/espn/index.js';
 import { fetchManualLeagues } from './adapters/manual/index.js';
 import { fetchSleeperLeagues, sleeperNflState } from './adapters/sleeper/index.js';
+import { backfillHistory } from './backfill.js';
 import { config } from './config.js';
 import { buildExposure } from './exposure.js';
+import { recordSnapshots } from './snapshots.js';
 
 export async function getDashboard(): Promise<DashboardResponse> {
   // Sleeper's /state/nfl doubles as our "what season/week is it" clock for all platforms.
@@ -25,6 +27,10 @@ export async function getDashboard(): Promise<DashboardResponse> {
       seen.add(key);
       return true;
     });
+
+  // Record history in the background: a database problem must never break the dashboard.
+  recordSnapshots(leagues).catch((e) => console.error('Could not save league snapshots:', e));
+  backfillHistory(leagues).catch((e) => console.error('Could not backfill past weeks:', e));
 
   return {
     season: nfl.season,

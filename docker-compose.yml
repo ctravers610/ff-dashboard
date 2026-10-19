@@ -1,0 +1,22 @@
+# Local development database. Start it with `docker compose up -d`.
+# These credentials are for a database that only listens on localhost.
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ffd
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ffd_dev_password}
+      POSTGRES_DB: ffd
+    ports:
+      - '127.0.0.1:5432:5432' # bound to localhost so nothing else on your network can reach it
+    volumes:
+      - pgdata:/var/lib/postgresql/data # survives container restarts and recreation
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ffd -d ffd']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useDashboard } from './api';
 import { LeagueCard } from './components/LeagueCard';
 import { ManualLeagueEditor } from './components/ManualLeagueEditor';
@@ -6,9 +6,14 @@ import { PlayersView } from './components/PlayersView';
 import { YahooConnect } from './components/YahooConnect';
 import { matchupStatus } from './format';
 
+// The History tab pulls in the charting library, so load it only when it's opened.
+const HistoryView = lazy(() =>
+  import('./components/history/HistoryView').then((m) => ({ default: m.HistoryView })),
+);
+
 export default function App() {
   const { data, error, isPending, isFetching, refetch } = useDashboard();
-  const [view, setView] = useState<'leagues' | 'players'>('leagues');
+  const [view, setView] = useState<'leagues' | 'players' | 'history'>('leagues');
   const [editing, setEditing] = useState<string | null>(null); // 'new' or a manual league id
 
   const totals = data?.leagues.reduce(
@@ -87,7 +92,7 @@ export default function App() {
 
       {data && data.leagues.length > 0 && (
         <nav className="mb-4 flex gap-1 border-b border-slate-200 dark:border-slate-800">
-          {(['leagues', 'players'] as const).map((v) => (
+          {(['leagues', 'players', 'history'] as const).map((v) => (
             <button
               key={v}
               type="button"
@@ -123,8 +128,12 @@ export default function App() {
             </button>
           )}
         </main>
-      ) : (
+      ) : view === 'players' ? (
         data && <PlayersView players={data.players} />
+      ) : (
+        <Suspense fallback={<p className="text-slate-500">Loading history…</p>}>
+          <HistoryView />
+        </Suspense>
       )}
 
       {editing && (

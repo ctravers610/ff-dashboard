@@ -1,11 +1,6 @@
 import type { ManualLeagueInput } from '@ffd/shared';
 import type { FastifyInstance } from 'fastify';
-import {
-  createManualLeague,
-  deleteManualLeague,
-  listManualLeagues,
-  updateManualLeague,
-} from '../adapters/manual/store.js';
+import { manualLeagueRepo, type manualLeagueStore } from '../adapters/manual/store.js';
 
 const sideSchema = {
   type: 'object',
@@ -79,23 +74,31 @@ interface IdParams {
   id: string;
 }
 
-export async function manualLeagueRoutes(app: FastifyInstance) {
-  app.get('/api/manual-leagues', async () => listManualLeagues());
+const idParams = {
+  type: 'object',
+  required: ['id'],
+  properties: { id: { type: 'string', format: 'uuid' } },
+} as const;
 
-  app.post<{ Body: ManualLeagueInput }>('/api/manual-leagues', { schema: { body: inputSchema } }, async (req, reply) =>
-    reply.code(201).send(await createManualLeague(req.body)),
-  );
+// A factory so tests can hand in a store bound to a throwaway database.
+export const manualLeagueRoutes = (store: ReturnType<typeof manualLeagueStore> = manualLeagueRepo) =>
+  async function (app: FastifyInstance) {
+    app.get('/api/manual-leagues', async () => store.list());
 
-  app.put<{ Params: IdParams; Body: ManualLeagueInput }>(
-    '/api/manual-leagues/:id',
-    { schema: { body: inputSchema } },
-    async (req, reply) => {
-      const league = await updateManualLeague(req.params.id, req.body);
-      return league ?? reply.code(404).send({ error: 'League not found' });
-    },
-  );
+    app.post<{ Body: ManualLeagueInput }>('/api/manual-leagues', { schema: { body: inputSchema } }, async (req, reply) =>
+      reply.code(201).send(await store.create(req.body)),
+    );
 
-  app.delete<{ Params: IdParams }>('/api/manual-leagues/:id', async (req, reply) =>
-    (await deleteManualLeague(req.params.id)) ? reply.code(204).send() : reply.code(404).send({ error: 'League not found' }),
-  );
-}
+    app.put<{ Params: IdParams; Body: ManualLeagueInput }>(
+      '/api/manual-leagues/:id',
+      { schema: { params: idParams, body: inputSchema } },
+      async (req, reply) => {
+        const league = await store.update(req.params.id, req.body);
+        return league ?? reply.code(404).send({ error: 'League not found' });
+      },
+    );
+
+    app.delete<{ Params: IdParams }>('/api/manual-leagues/:id', { schema: { params: idParams } }, async (req, reply) =>
+      (await store.remove(req.params.id)) ? reply.code(204).send() : reply.code(404).send({ error: 'League not found' }),
+    );
+  };

@@ -3,3 +3,26 @@
 body {
   @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
 }
+
+/* Chart colors, defined once as roles so light/dark swap in one place. The
+   series color and the neutral inks were checked against the card surfaces
+   (white / slate-900) with the dataviz palette validator. */
+:root {
+  --chart-series: #2a78d6; /* the one data series: your points */
+  --chart-ink: #475569; /* opponent marker; secondary text */
+  --chart-muted: #64748b; /* axis labels */
+  --chart-grid: #e2e8f0; /* hairline gridlines */
+  --chart-axis: #cbd5e1; /* baseline */
+  --chart-surface: #ffffff; /* card surface, used for gaps and rings */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --chart-series: #3987e5;
+    --chart-ink: #cbd5e1;
+    --chart-muted: #94a3b8;
+    --chart-grid: #1e293b;
+    --chart-axis: #334155;
+    --chart-surface: #0f172a;
+  }
+}

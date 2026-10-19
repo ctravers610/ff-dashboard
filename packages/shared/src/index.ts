@@ -151,6 +151,38 @@ export interface PlayerExposure {
   facing: LeagueRef[]; // your opponent is starting him this week
 }
 
+// win/loss/tie once the week is over; live while it's still being played;
+// null when there was no opponent to compare against.
+export type WeekResult = 'win' | 'loss' | 'tie' | 'live' | null;
+
+export interface HistoryWeek {
+  week: number;
+  points: number;
+  projected: number | null;
+  opponentName: string | null;
+  opponentPoints: number | null;
+  result: WeekResult;
+  allPlay: { rank: number; teams: number; winSlots: number } | null;
+  capturedAt: string;
+}
+
+export interface LeagueHistory {
+  platform: Platform;
+  leagueId: string;
+  name: string;
+  weeks: HistoryWeek[]; // oldest first
+  // Head-to-head results over finished weeks. Leagues that also score against
+  // the league median (a "double" record) will differ from the site's standings.
+  record: { wins: number; losses: number; ties: number };
+  avgPoints: number | null; // over finished weeks
+}
+
+export interface HistoryResponse {
+  season: string;
+  week: number;
+  leagues: LeagueHistory[];
+}
+
 export interface SourceError {
   source: string;
   message: string;

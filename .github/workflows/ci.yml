@@ -8,6 +8,24 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+
+    # A real Postgres for the database tests. Credentials match the app's
+    # default DATABASE_URL, so no extra configuration is needed.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: ffd
+          POSTGRES_PASSWORD: ffd_dev_password
+          POSTGRES_DB: ffd
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ffd -d ffd"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
     steps:
       - uses: actions/checkout@v4
 
@@ -22,7 +40,17 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Unit tests
+      # Fails if schema.ts was changed without generating a migration for it.
+      - name: Check migrations are up to date
+        run: |
+          npm run db:generate -w @ffd/api
+          if [ -n "$(git status --porcelain apps/api/drizzle)" ]; then
+            echo "::error::schema.ts changed without a migration. Run: npm run db:generate -w @ffd/api"
+            git status --porcelain apps/api/drizzle
+            exit 1
+          fi
+
+      - name: Unit and database tests
         run: npm test
 
       - name: Build web app
