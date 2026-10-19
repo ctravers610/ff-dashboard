@@ -21,7 +21,18 @@ const list = (value: string | undefined) =>
     .filter(Boolean);
 
 export const config = {
-  port: Number(process.env.API_PORT ?? 3001),
+  // API_PORT is this app's own setting; PORT is what hosts like Render assign.
+  port: Number(process.env.API_PORT ?? process.env.PORT ?? 3001),
+  // Loopback by default so a dev server is never reachable from the network;
+  // the container sets 0.0.0.0 so the host's router can reach it.
+  host: process.env.HOST ?? '127.0.0.1',
+  // Behind a host's load balancer, trust its X-Forwarded-* headers for the
+  // client's IP and whether the original request was https.
+  trustProxy: process.env.TRUST_PROXY === '1',
+  // Which commit is running, for /api/health (Render sets RENDER_GIT_COMMIT).
+  commit: process.env.RENDER_GIT_COMMIT ?? process.env.GIT_COMMIT ?? 'dev',
+  // The built web app, served by the API in production (one container, one origin).
+  webDist: process.env.WEB_DIST ?? path.join(rootDir, 'apps', 'web', 'dist'),
   sleeperUsernames: list(process.env.SLEEPER_USERNAMES),
   espnLeagueIds: list(process.env.ESPN_LEAGUE_IDS),
   espnAuth:

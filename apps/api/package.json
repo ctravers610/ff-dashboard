@@ -5,11 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --include ../../.env src/server.ts",
+    "build": "node build.mjs",
+    "start": "node --enable-source-maps dist/server.js",
     "db:generate": "drizzle-kit generate",
     "test": "vitest run",
     "typecheck": "tsc -p ."
   },
   "dependencies": {
+    "@fastify/static": "^10.1.6",
     "@ffd/shared": "^0.1.0",
     "drizzle-orm": "^0.45.4",
     "fastify": "^5.12.7",
@@ -19,6 +22,7 @@
     "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.11",
+    "esbuild": "^0.28.2",
     "tsx": "^4.23.15",
     "vitest": "^5.0.5"
   }

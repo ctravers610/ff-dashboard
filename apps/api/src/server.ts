@@ -1,13 +1,11 @@
-import Fastify from 'fastify';
-import { manualLeagueRepo } from './adapters/manual/store.js';
-import { config } from './config.js';
-import { getDashboard } from './dashboard.js';
-import { runMigrations } from './db/client.js';
-import { historyRoutes } from './routes/history.js';
-import { manualLeagueRoutes } from './routes/manualLeagues.js';
-import { yahooAuthRoutes } from './routes/yahooAuth.js';
+// Starts the API: bring the database up to date, then listen.
 
-const app = Fastify({ logger: true });
+import { manualLeagueRepo } from './adapters/manual/store.js';
+import { buildApp } from './app.js';
+import { config } from './config.js';
+import { pool, runMigrations } from './db/client.js';
+
+const app = await buildApp();
 
 // Bring the database schema up to date before taking requests.
 try {
@@ -19,10 +17,15 @@ try {
   process.exit(1);
 }
 
-app.get('/api/health', async () => ({ ok: true }));
-app.get('/api/dashboard', async () => getDashboard());
-await app.register(yahooAuthRoutes);
-await app.register(manualLeagueRoutes());
-await app.register(historyRoutes);
+// Hosts stop the old instance with SIGTERM on every deploy (and Ctrl+C sends
+// SIGINT): stop accepting requests, let in-flight ones finish, close the pool.
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+  process.once(signal, async () => {
+    app.log.info(`${signal} received, shutting down`);
+    await app.close();
+    await pool.end();
+    process.exit(0);
+  });
+}
 
-await app.listen({ port: config.port, host: '127.0.0.1' });
+await app.listen({ port: config.port, host: config.host });

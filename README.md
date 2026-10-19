@@ -13,7 +13,8 @@ One place to follow all of my fantasy football teams across platforms, instead o
 
 - **Frontend:** React 19, TypeScript, Vite, TanStack Query, Tailwind CSS, Recharts
 - **Backend:** Node.js, TypeScript, Fastify
-- **Database:** PostgreSQL 17 in Docker, Drizzle ORM, versioned SQL migrations
+- **Database:** PostgreSQL 17, Drizzle ORM, versioned SQL migrations
+- **Deployment:** one Docker image (the API also serves the built web app), API bundled with esbuild
 - **Testing & CI:** Vitest (unit tests plus tests against a real Postgres), Playwright end-to-end tests with axe-core accessibility scans, GitHub Actions
 - **Repo:** npm workspaces monorepo
 
@@ -62,6 +63,17 @@ Other scripts: `npm test`, `npm run typecheck`, `npm run build`, `npm run e2e`.
 - `npm run e2e` runs Playwright end to end. It boots the real stack (the production web build, the real API, a real Postgres database `ffd_e2e` that it creates and drops) and drives it in Chromium. Run `npx playwright install chromium` once first.
 
 The e2e tests never touch Sleeper, ESPN or your accounts. The API's upstream URLs are configurable, so the tests point it at a small fake server (`e2e/support/fake-upstream.ts`) that serves fixture data shaped like the real APIs, and `NODE_ENV=test` keeps your `.env` out of the run. Expected scores in the FFPC tests are worked out by hand from FFPC's published rules, so they check the scoring engine independently of its own code. A separate spec scans every screen with axe-core for WCAG 2.1 AA violations, in light and dark mode.
+
+### Production build in Docker
+
+The deployable image runs the bundled API, which also serves the built web app, so the whole app is one container on one origin.
+
+```bash
+docker compose --profile app up --build    # http://localhost:8080, using your .env accounts
+node scripts/smoke-test.mjs http://localhost:8080
+```
+
+The image runs as a non-root user, contains no secrets (they come from environment variables), and reports its commit at `/api/health`. It shuts down cleanly on `SIGTERM`, finishing in-flight requests first. `scripts/smoke-test.mjs` checks a running deployment: health and commit, the database, the web app and its caching, and JSON errors. CI builds the image and runs it on every push.
 
 ### Database
 

@@ -18,5 +18,26 @@ services:
       timeout: 3s
       retries: 10
 
+  # The production image, run locally: `docker compose --profile app up --build`,
+  # then open http://localhost:8080. Not started by a plain `docker compose up`.
+  app:
+    profiles: [app]
+    build:
+      context: .
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-local}
+    depends_on:
+      db:
+        condition: service_healthy
+    # Your accounts from .env (if present), as a deployed instance would get them from the host.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgres://ffd:${POSTGRES_PASSWORD:-ffd_dev_password}@db:5432/ffd
+      API_PORT: '3001'
+    ports:
+      - '127.0.0.1:8080:3001'
+
 volumes:
   pgdata:
