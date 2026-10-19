@@ -1,5 +1,6 @@
 import { useDashboard } from './api';
 import { LeagueCard } from './components/LeagueCard';
+import { YahooConnect } from './components/YahooConnect';
 
 export default function App() {
   const { data, error, isPending, isFetching, refetch } = useDashboard();
@@ -37,6 +38,8 @@ export default function App() {
           {isFetching ? 'Refreshing…' : 'Refresh'}
         </button>
       </header>
+
+      <YahooConnect />
 
       {error && (
         <div className="mb-6 rounded-lg bg-rose-50 p-4 text-sm text-rose-800 dark:bg-rose-950/60 dark:text-rose-200">

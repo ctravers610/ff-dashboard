@@ -23,5 +23,14 @@ export const config = {
     process.env.ESPN_S2 && process.env.ESPN_SWID
       ? { espnS2: process.env.ESPN_S2.trim(), swid: process.env.ESPN_SWID.trim() }
       : null,
+  yahoo:
+    process.env.YAHOO_CLIENT_ID && process.env.YAHOO_CLIENT_SECRET
+      ? {
+          clientId: process.env.YAHOO_CLIENT_ID.trim(),
+          clientSecret: process.env.YAHOO_CLIENT_SECRET.trim(),
+          redirectUri:
+            process.env.YAHOO_REDIRECT_URI ?? 'https://localhost:5173/api/auth/yahoo/callback',
+        }
+      : null,
   cacheDir: path.join(rootDir, 'apps', 'api', '.cache'),
 };
