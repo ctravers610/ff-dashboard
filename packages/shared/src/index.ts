@@ -21,6 +21,7 @@ export interface StarterSlot {
   slot: string; // roster position, e.g. "QB", "FLEX"
   player: Player | null; // null = empty slot
   points: number;
+  projected?: number | null; // live projection: actual so far + projection for time remaining
 }
 
 export interface TeamStanding {
@@ -40,13 +41,32 @@ export interface MatchupSide {
   teamId: string;
   teamName: string;
   points: number;
+  projected?: number | null;
   starters: StarterSlot[];
+}
+
+// All-play week (e.g. FFPC week 6): you win by finishing in the top half of
+// the league's weekly scores, not by beating one opponent.
+export interface AllPlayTeam {
+  teamName: string;
+  points: number;
+  projected: number | null;
+  isMe: boolean;
+  live: boolean; // false = score as of the last paste
+}
+
+export interface AllPlay {
+  teams: AllPlayTeam[]; // sorted by points, highest first
+  winSlots: number; // top N win
+  myRank: number;
+  myProjectedRank: number | null;
 }
 
 export interface Matchup {
   week: number;
   me: MatchupSide;
   opponent: MatchupSide | null; // null on a bye / median-only week
+  allPlay?: AllPlay | null;
 }
 
 export type AlertReason = 'empty' | 'injury';
@@ -98,6 +118,7 @@ export interface ManualLeagueInput {
 export interface ManualMatchupSide {
   teamName: string;
   points: number;
+  projected?: number | null;
   starters: { slot: string; name: string; points: number }[];
 }
 
@@ -106,6 +127,8 @@ export interface ManualMatchup {
   capturedAt: string; // when it was pasted; scores are a snapshot, not live
   me: ManualMatchupSide;
   opponent: ManualMatchupSide;
+  // The league-wide weekly scoreboard, when the page shows one.
+  scoreboard?: { teamName: string; points: number; projected: number | null }[];
 }
 
 export interface ManualLeague extends ManualLeagueInput {

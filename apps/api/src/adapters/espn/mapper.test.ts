@@ -18,7 +18,7 @@ const entry = (
       proTeamId: extra.team ?? 2,
       injuryStatus: extra.injury ?? 'ACTIVE',
       stats: [
-        { scoringPeriodId: 6, statSourceId: 1, appliedTotal: 99 }, // projection: ignored
+        { scoringPeriodId: 6, statSourceId: 1, appliedTotal: 20 }, // ESPN's projection
         { scoringPeriodId: 6, statSourceId: 0, appliedTotal: extra.week6 ?? 0 },
       ],
     },
@@ -92,6 +92,16 @@ describe('ESPN mapper', () => {
       ['FLEX', null, 0],
     ]);
     expect(starters[0]!.player).toMatchObject({ position: 'QB', nflTeam: 'BUF', injuryStatus: null });
+  });
+
+  it("uses ESPN's live team projection, and blends player projections with game progress", () => {
+    const data = league();
+    data.schedule![1]!.away!.totalProjectedPointsLive = 131.42;
+    // All fixture players are on BUF, whose game is half over: actual + half the projection of 20.
+    const summary = toLeagueSummary({ league: data, myTeamId: 1, account: 'colin', progressFor: (t) => (t === 'BUF' ? 0.5 : 0) });
+    expect(summary.matchup?.me.projected).toBe(131.42);
+    expect(summary.matchup?.me.starters.map((s) => s.projected)).toEqual([34.36, 10, 0, 0]); // empty slots project 0
+    expect(summary.matchup?.opponent?.projected).toBe(28); // no ESPN total: sum of starters (18 + 10)
   });
 
   it('maps standings, the current matchup and lineup alerts', () => {

@@ -1,4 +1,20 @@
-import type { TeamStanding } from '@ffd/shared';
+import type { Matchup, TeamStanding } from '@ffd/shared';
+
+// Whether you're winning this week, now and by projection. In an all-play week
+// that means being inside the top-N win line; otherwise beating your opponent.
+// null = no matchup to judge (bye, no data).
+export function matchupStatus(m: Matchup | null): { leading: boolean | null; projectedWin: boolean | null } {
+  if (m?.allPlay) {
+    const { myRank, myProjectedRank, winSlots } = m.allPlay;
+    return { leading: myRank <= winSlots, projectedWin: myProjectedRank != null ? myProjectedRank <= winSlots : null };
+  }
+  if (!m?.opponent) return { leading: null, projectedWin: null };
+  const { me, opponent } = m;
+  return {
+    leading: me.points > opponent.points,
+    projectedWin: me.projected != null && opponent.projected != null ? me.projected > opponent.projected : null,
+  };
+}
 
 export const pts = (n: number) => n.toFixed(2);
 

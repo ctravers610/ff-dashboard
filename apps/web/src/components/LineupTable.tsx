@@ -14,19 +14,34 @@ function PlayerCell({ starter, align }: { starter: StarterSlot | undefined; alig
   );
 }
 
+function PointsCell({ starter, align }: { starter: StarterSlot | undefined; align: 'left' | 'right' }) {
+  if (!starter) return <div />;
+  return (
+    <div className={`tabular-nums ${align === 'right' ? 'text-right' : ''}`}>
+      <div>{pts(starter.points)}</div>
+      {starter.projected != null && <div className="text-xs text-slate-400">{pts(starter.projected)}</div>}
+    </div>
+  );
+}
+
 // Side-by-side starters for both teams, one row per roster slot.
 export function LineupTable({ matchup }: { matchup: Matchup }) {
   const mine = matchup.me.starters;
   const theirs = matchup.opponent?.starters ?? [];
 
+  const hasProjections = mine.some((s) => s.projected != null);
+
   return (
     <div className="divide-y divide-slate-200 text-sm dark:divide-slate-800">
+      {hasProjections && (
+        <p className="pb-1.5 text-xs text-slate-500 dark:text-slate-400">Points, with live projection underneath.</p>
+      )}
       {mine.map((s, i) => (
         <div key={i} className="grid grid-cols-[1fr_3rem_2.5rem_3rem_1fr] items-center gap-2 py-1.5">
           <PlayerCell starter={s} align="left" />
-          <div className="text-right tabular-nums">{pts(s.points)}</div>
+          <PointsCell starter={s} align="right" />
           <div className="text-center text-xs font-medium text-slate-400">{s.slot}</div>
-          <div className="tabular-nums">{theirs[i] ? pts(theirs[i].points) : ''}</div>
+          <PointsCell starter={theirs[i]} align="left" />
           <PlayerCell starter={theirs[i]} align="right" />
         </div>
       ))}

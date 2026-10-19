@@ -10,7 +10,7 @@ import type {
   StarterSlot,
   TeamStanding,
 } from '@ffd/shared';
-import { buildAlerts, rankStandings } from '../common.js';
+import { buildAlerts, rankStandings, totalSide } from '../common.js';
 import type {
   SleeperLeague,
   SleeperMatchup,
@@ -28,6 +28,8 @@ export interface SleeperLeagueData {
   rosters: SleeperRoster[];
   matchups: SleeperMatchup[];
   players: SleeperPlayerMap;
+  // Live projection for a starter given his points so far; omitted when projections are unavailable.
+  project?: (player: Player, actual: number) => number;
 }
 
 const NON_STARTER_SLOTS = new Set(['BN', 'IR', 'TAXI']);
@@ -118,12 +120,20 @@ export function toLeagueSummary(data: SleeperLeagueData): LeagueSummary | null {
     standings.find((t) => t.teamId === String(rosterId))?.teamName ?? `Team ${rosterId}`;
   const starterSlots = league.roster_positions.filter((s) => !NON_STARTER_SLOTS.has(s));
 
-  const toSide = (m: SleeperMatchup): MatchupSide => ({
-    teamId: String(m.roster_id),
-    teamName: teamName(m.roster_id),
-    points: m.points ?? 0,
-    starters: buildStarters(starterSlots, m.starters ?? [], m.starters_points ?? [], players),
-  });
+  const toSide = (m: SleeperMatchup): MatchupSide => {
+    const starters = buildStarters(starterSlots, m.starters ?? [], m.starters_points ?? [], players);
+    const { project } = data;
+    if (project) {
+      for (const s of starters) s.projected = s.player ? project(s.player, s.points) : 0;
+    }
+    return {
+      teamId: String(m.roster_id),
+      teamName: teamName(m.roster_id),
+      points: m.points ?? 0,
+      projected: project ? totalSide(starters).projected : null,
+      starters,
+    };
+  };
 
   const mine = matchups.find((m) => m.roster_id === myRoster.roster_id);
   const theirs =

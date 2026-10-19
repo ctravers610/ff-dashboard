@@ -14,6 +14,7 @@ const sideSchema = {
   properties: {
     teamName: { type: 'string', maxLength: 80 },
     points: { type: 'number' },
+    projected: { type: ['number', 'null'] },
     starters: {
       type: 'array',
       maxItems: 30,
@@ -53,6 +54,20 @@ const inputSchema = {
             capturedAt: { type: 'string', format: 'date-time' },
             me: sideSchema,
             opponent: sideSchema,
+            scoreboard: {
+              type: 'array',
+              maxItems: 40,
+              items: {
+                type: 'object',
+                required: ['teamName', 'points', 'projected'],
+                additionalProperties: false,
+                properties: {
+                  teamName: { type: 'string', maxLength: 80 },
+                  points: { type: 'number' },
+                  projected: { type: ['number', 'null'] },
+                },
+              },
+            },
           },
         },
       ],

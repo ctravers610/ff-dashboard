@@ -4,6 +4,7 @@ import { LeagueCard } from './components/LeagueCard';
 import { ManualLeagueEditor } from './components/ManualLeagueEditor';
 import { PlayersView } from './components/PlayersView';
 import { YahooConnect } from './components/YahooConnect';
+import { matchupStatus } from './format';
 
 export default function App() {
   const { data, error, isPending, isFetching, refetch } = useDashboard();
@@ -13,15 +14,17 @@ export default function App() {
   const totals = data?.leagues.reduce(
     (acc, l) => {
       const me = l.standings.find((t) => t.teamId === l.myTeamId);
-      const m = l.matchup;
+      const status = matchupStatus(l.matchup);
       return {
         wins: acc.wins + (me?.wins ?? 0),
         losses: acc.losses + (me?.losses ?? 0),
-        leadingNow: acc.leadingNow + (m?.opponent && m.me.points > m.opponent.points ? 1 : 0),
+        matchups: acc.matchups + (status.leading != null ? 1 : 0),
+        leadingNow: acc.leadingNow + (status.leading ? 1 : 0),
+        projectedWins: acc.projectedWins + (status.projectedWin ? 1 : 0),
         alerts: acc.alerts + l.alerts.length,
       };
     },
-    { wins: 0, losses: 0, leadingNow: 0, alerts: 0 },
+    { wins: 0, losses: 0, matchups: 0, leadingNow: 0, projectedWins: 0, alerts: 0 },
   );
 
   return (
@@ -64,9 +67,9 @@ export default function App() {
       {totals && data && data.leagues.length > 0 && (
         <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            ['Leagues', data.leagues.length],
             ['Combined record', `${totals.wins}-${totals.losses}`],
-            ['Leading this week', `${totals.leadingNow} of ${data.leagues.length}`],
+            ['Winning right now', `${totals.leadingNow} of ${totals.matchups}`],
+            ['Projected to win', `${totals.projectedWins} of ${totals.matchups}`],
             ['Lineup alerts', totals.alerts],
           ].map(([label, value]) => (
             <div

@@ -1,12 +1,13 @@
 import type { LeagueSummary } from '@ffd/shared';
 import { useState } from 'react';
 import { ordinal, PLATFORM_LABEL, record } from '../format';
+import { AllPlaySummary, AllPlayTable } from './AllPlay';
 import { LineupTable } from './LineupTable';
 import { RosterList } from './RosterList';
 import { Scoreboard } from './Scoreboard';
 import { StandingsTable } from './StandingsTable';
 
-type Tab = 'lineup' | 'standings' | 'roster' | null;
+type Tab = 'allplay' | 'lineup' | 'standings' | 'roster' | null;
 
 export function LeagueCard({ league, onEdit }: { league: LeagueSummary; onEdit?: () => void }) {
   const [tab, setTab] = useState<Tab>(null);
@@ -59,7 +60,11 @@ export function LeagueCard({ league, onEdit }: { league: LeagueSummary; onEdit?:
 
       {league.matchup ? (
         <div className="flex flex-col gap-1">
-          <Scoreboard matchup={league.matchup} />
+          {league.matchup.allPlay ? (
+            <AllPlaySummary allPlay={league.matchup.allPlay} />
+          ) : (
+            <Scoreboard matchup={league.matchup} />
+          )}
           {league.manual?.matchupCapturedAt && (
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {league.manual.liveScored ? (
@@ -114,6 +119,7 @@ export function LeagueCard({ league, onEdit }: { league: LeagueSummary; onEdit?:
       )}
 
       <div className="flex items-center gap-1">
+        {league.matchup?.allPlay && tabButton('allplay', 'All-play')}
         {league.matchup && tabButton('lineup', 'Lineups')}
         {league.standings.length > 0 && tabButton('standings', 'Standings')}
         {league.manual && tabButton('roster', 'Roster')}
@@ -128,6 +134,7 @@ export function LeagueCard({ league, onEdit }: { league: LeagueSummary; onEdit?:
         )}
       </div>
 
+      {tab === 'allplay' && league.matchup?.allPlay && <AllPlayTable allPlay={league.matchup.allPlay} />}
       {tab === 'roster' && <RosterList roster={league.roster} />}
       {tab === 'lineup' && league.matchup && <LineupTable matchup={league.matchup} />}
       {tab === 'standings' && <StandingsTable standings={league.standings} myTeamId={league.myTeamId} />}

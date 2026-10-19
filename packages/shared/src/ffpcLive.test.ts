@@ -78,8 +78,17 @@ describe('FFPC Live Scoring import', () => {
     const m = convertFfpcLiveScoring(PAGE, 'Sample Squad', '2026-10-19T20:00:00Z')!;
     expect(m.week).toBe(6);
     expect(m.capturedAt).toBe('2026-10-19T20:00:00Z');
-    expect([m.me.teamName, m.me.points]).toEqual(['Sample Squad', 140.45]);
-    expect([m.opponent.teamName, m.opponent.points]).toEqual(['Rival Team', 140.7]);
+    expect([m.me.teamName, m.me.points, m.me.projected]).toEqual(['Sample Squad', 140.45, 150.54]);
+    expect([m.opponent.teamName, m.opponent.points, m.opponent.projected]).toEqual(['Rival Team', 140.7, 165.9]);
+  });
+
+  it('reads the league-wide scoreboard', () => {
+    const page = PAGE.replace('Sample Squad\n140\nPMR: 60\tProj: 151', 'Sample Squad\n140\nPMR: 60\tProj: 151\nThird Team\n98\nPMR: 0\tProj: 98');
+    expect(convertFfpcLiveScoring(page)!.scoreboard).toEqual([
+      { teamName: 'Rival Team', points: 141, projected: 166 },
+      { teamName: 'Sample Squad', points: 140, projected: 151 },
+      { teamName: 'Third Team', points: 98, projected: 98 },
+    ]);
   });
 
   it("reads each team's starters with slots and points, skipping bench tables", () => {

@@ -11,11 +11,15 @@ import {
 } from '@ffd/shared';
 import { liveScorer, type LiveScorer } from '../../scoring/live.js';
 import { FFPC_RULES } from '../../scoring/rules.js';
-import { buildAlerts } from '../common.js';
+import { buildAlerts, buildAllPlay, totalSide } from '../common.js';
 import { sleeperClient } from '../sleeper/client.js';
 import type { AdapterResult } from '../types.js';
 import { buildPlayerIndex, parseRosterText, resolvePlayer, statusForSlot, type PlayerIndex } from './parse.js';
 import { listManualLeagues } from './store.js';
+
+// FFPC's week 6 is an all-play week every season: the top half of the league's
+// weekly scores win, the bottom half lose.
+const FFPC_ALL_PLAY_WEEKS = [6];
 
 export function toManualSummary(
   league: ManualLeague,
@@ -49,16 +53,21 @@ export function toManualSummary(
       const line = parseRosterText(`${s.slot} ${s.name}`)[0] ?? { slot: s.slot, name: s.name };
       const player = resolvePlayer(line, index);
       if (!player) unmatched.push(s.name);
-      return { slot: line.slot ?? s.slot, player, points: scorer && player ? scorer(player) : s.points };
+      const live = scorer && player ? scorer(player) : null;
+      return { slot: line.slot ?? s.slot, player, points: live?.points ?? s.points, projected: live?.projected ?? null };
     });
-    const total = slots.reduce((sum, s) => sum + s.points, 0);
-    return {
-      teamId,
-      teamName: side.teamName,
-      points: scorer ? Math.round(total * 100) / 100 : side.points,
-      starters: slots,
-    };
+    if (!scorer) {
+      // No live feed: show the pasted totals, including FFPC's own projection.
+      return { teamId, teamName: side.teamName, points: side.points, projected: side.projected ?? null, starters: slots };
+    }
+    return { teamId, teamName: side.teamName, ...totalSide(slots), starters: slots };
   };
+  const me = snapshot ? toSide(snapshot.me, 'me') : null;
+  const opponent = snapshot ? toSide(snapshot.opponent, 'opponent') : null;
+  const allPlay =
+    snapshot?.scoreboard && me && FFPC_ALL_PLAY_WEEKS.includes(snapshot.week)
+      ? buildAllPlay(snapshot.scoreboard, me, opponent)
+      : null;
 
   return {
     leagueId: league.id,
@@ -69,9 +78,7 @@ export function toManualSummary(
     week: nfl.week,
     myTeamId: 'me',
     standings: [],
-    matchup: snapshot
-      ? { week: snapshot.week, me: toSide(snapshot.me, 'me'), opponent: toSide(snapshot.opponent, 'opponent') }
-      : null,
+    matchup: snapshot && me ? { week: snapshot.week, me, opponent, allPlay } : null,
     alerts: buildAlerts(starters),
     roster,
     manual: {

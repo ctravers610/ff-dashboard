@@ -51,13 +51,48 @@ describe('toManualSummary', () => {
     expect(summary.manual?.matchupCapturedAt).toBeNull();
   });
 
-  it('replaces snapshot points with live ones when a scorer is available', () => {
-    const live = { 'Drake Maye': 30, 'Seattle Seahawks': 7, 'Brock Purdy': 12.5 } as Record<string, number>;
-    const summary = toManualSummary(league(6), index, { season: '2026', week: 6 }, (p) => live[p.name] ?? 0);
-    expect(summary.matchup?.me.starters.map((s) => s.points)).toEqual([30, 7]);
-    expect(summary.matchup?.me.points).toBe(37);
+  const live = { 'Drake Maye': 30, 'Seattle Seahawks': 7, 'Brock Purdy': 12.5 } as Record<string, number>;
+  const scorer = (p: { name: string }) => ({ points: live[p.name] ?? 0, projected: (live[p.name] ?? 0) + 2 });
+
+  it('replaces snapshot points with live ones and adds projections when a scorer is available', () => {
+    const summary = toManualSummary(league(6), index, { season: '2026', week: 6 }, scorer);
+    expect(summary.matchup?.me.starters.map((s) => [s.points, s.projected])).toEqual([
+      [30, 32],
+      [7, 9],
+    ]);
+    expect(summary.matchup?.me).toMatchObject({ points: 37, projected: 41 });
     expect(summary.matchup?.opponent?.points).toBe(12.5);
     expect(summary.manual?.liveScored).toBe(true);
+  });
+
+  it("falls back to FFPC's pasted projection without a live feed", () => {
+    const withProj = league(6);
+    withProj.matchup!.me.projected = 150.54;
+    expect(toManualSummary(withProj, index, { season: '2026', week: 6 }).matchup?.me.projected).toBe(150.54);
+  });
+
+  it('ranks the all-play week from the pasted scoreboard plus my live score', () => {
+    const allPlayLeague = league(6);
+    allPlayLeague.matchup!.scoreboard = [
+      { teamName: 'Sample Squad', points: 20, projected: 30 },
+      { teamName: 'Rival', points: 10, projected: 25 },
+      { teamName: 'Third', points: 35, projected: 40 },
+      { teamName: 'Fourth', points: 5, projected: 10 },
+    ];
+    const allPlay = toManualSummary(allPlayLeague, index, { season: '2026', week: 6 }, scorer).matchup?.allPlay;
+    expect(allPlay?.teams.map((t) => [t.teamName, t.points])).toEqual([
+      ['Sample Squad', 37],
+      ['Third', 35],
+      ['Rival', 12.5],
+      ['Fourth', 5],
+    ]);
+    expect([allPlay?.myRank, allPlay?.winSlots]).toEqual([1, 2]);
+  });
+
+  it('only treats FFPC week 6 as all-play', () => {
+    const notAllPlay = league(7);
+    notAllPlay.matchup!.scoreboard = [{ teamName: 'Sample Squad', points: 20, projected: 30 }];
+    expect(toManualSummary(notAllPlay, index, { season: '2026', week: 7 }).matchup?.allPlay).toBeNull();
   });
 
   it('still builds the roster and alerts without a matchup', () => {

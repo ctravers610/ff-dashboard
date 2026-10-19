@@ -1,7 +1,10 @@
-import type { LeagueSummary } from '@ffd/shared';
+import type { LeagueSummary, Player } from '@ffd/shared';
+import { nflGames } from '../../scoring/games.js';
+import { liveProjection, scoreWithSettings, weeklyProjections } from '../../scoring/projection.js';
 import type { AdapterResult } from '../types.js';
 import { sleeperClient } from './client.js';
 import { toLeagueSummary } from './mapper.js';
+import type { SleeperLeague } from './types.js';
 
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -10,6 +13,23 @@ export async function fetchSleeperLeagues(usernames: string[]): Promise<AdapterR
   if (usernames.length === 0) return result;
 
   const [state, players] = await Promise.all([sleeperClient.state(), sleeperClient.players()]);
+
+  // Projections are a bonus: without them leagues still load, just without projected scores.
+  const [projections, games] =
+    state.week > 0
+      ? await Promise.all([
+          weeklyProjections(state.season, state.week).catch(() => null),
+          nflGames(state.season, state.week).catch(() => null),
+        ])
+      : [null, null];
+  const projectorFor = (league: SleeperLeague) =>
+    projections
+      ? (player: Player, actual: number) => {
+          const proj = projections.get(player.playerId);
+          const full = proj ? scoreWithSettings(proj, league.scoring_settings ?? {}) : 0;
+          return liveProjection(actual, full, games?.get(player.nflTeam ?? player.playerId)?.progress ?? 0);
+        }
+      : undefined;
 
   // Load every account in parallel; one bad username shouldn't hide the others.
   await Promise.all(
@@ -35,6 +55,7 @@ export async function fetchSleeperLeagues(usernames: string[]): Promise<AdapterR
               rosters,
               matchups,
               players,
+              project: projectorFor(league),
             });
           }),
         );

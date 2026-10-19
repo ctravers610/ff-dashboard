@@ -1,3 +1,4 @@
+import { nflGames } from '../../scoring/games.js';
 import type { AdapterResult } from '../types.js';
 import { espnClient, type EspnAuth } from './client.js';
 import { findMyTeamId, toLeagueSummary } from './mapper.js';
@@ -24,8 +25,13 @@ export async function fetchEspnLeagues(
           );
         }
         const member = league.members?.find((m) => m.id.toUpperCase() === auth!.swid.toUpperCase());
+        // Game clocks for per-player live projections; optional if the scoreboard is down.
+        const games = await nflGames(season, league.scoringPeriodId).catch(() => null);
+        const progressFor = games
+          ? (team: string | null) => (team ? (games.get(team === 'WSH' ? 'WAS' : team)?.progress ?? 0) : 0)
+          : undefined;
         result.leagues.push(
-          toLeagueSummary({ league, myTeamId, account: member?.displayName ?? 'espn' }),
+          toLeagueSummary({ league, myTeamId, account: member?.displayName ?? 'espn', progressFor }),
         );
       } catch (e) {
         result.errors.push({ source: `espn:${leagueId}`, message: errorMessage(e) });

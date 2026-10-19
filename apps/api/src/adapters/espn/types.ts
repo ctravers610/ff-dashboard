@@ -60,6 +60,7 @@ export interface EspnMatchupSide {
   teamId: number;
   totalPoints?: number;
   totalPointsLive?: number;
+  totalProjectedPointsLive?: number; // ESPN's in-game projection for the team
   rosterForCurrentScoringPeriod?: EspnRoster;
 }
 

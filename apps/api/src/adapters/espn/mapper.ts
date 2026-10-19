@@ -9,7 +9,8 @@ import type {
   StarterSlot,
   TeamStanding,
 } from '@ffd/shared';
-import { buildAlerts, rankStandings } from '../common.js';
+import { liveProjection } from '../../scoring/projection.js';
+import { buildAlerts, rankStandings, totalSide } from '../common.js';
 import type { EspnLeague, EspnMatchupSide, EspnRosterEntry, EspnTeam } from './types.js';
 
 // ESPN identifies lineup slots, positions and NFL teams by number.
@@ -57,12 +58,16 @@ function toPlayer(entry: EspnRosterEntry): Player | null {
 }
 
 // Points this player scored in the given week (actual stats, not projections).
-function weekPoints(entry: EspnRosterEntry, scoringPeriod: number): number {
+// statSourceId 0 = actual points, 1 = ESPN's projection.
+function weekStat(entry: EspnRosterEntry, scoringPeriod: number, source: 0 | 1): number | null {
   const stat = entry.playerPoolEntry?.player.stats?.find(
-    (s) => s.scoringPeriodId === scoringPeriod && s.statSourceId === 0,
+    (s) => s.scoringPeriodId === scoringPeriod && s.statSourceId === source,
   );
-  return round2(stat?.appliedTotal ?? 0);
+  return stat?.appliedTotal != null ? round2(stat.appliedTotal) : null;
 }
+
+// Share of each NFL team's game played this week (0 = not started, 1 = final).
+export type ProgressFor = (nflTeam: string | null) => number;
 
 // Expand the league's slot counts (e.g. {"2": 2}) into ordered slots and drop
 // each rostered starter into the matching slot; unfilled slots stay empty.
@@ -70,6 +75,7 @@ export function buildStarters(
   entries: EspnRosterEntry[],
   slotCounts: Record<string, number>,
   scoringPeriod: number,
+  progressFor?: ProgressFor,
 ): StarterSlot[] {
   const starters: StarterSlot[] = [];
   for (const slotId of SLOT_ORDER) {
@@ -77,10 +83,15 @@ export function buildStarters(
     const inSlot = entries.filter((e) => e.lineupSlotId === slotId);
     for (let i = 0; i < count; i++) {
       const entry = inSlot[i];
+      const player = entry ? toPlayer(entry) : null;
+      const points = entry ? (weekStat(entry, scoringPeriod, 0) ?? 0) : 0;
+      const projection = entry ? weekStat(entry, scoringPeriod, 1) : null;
       starters.push({
         slot: SLOT_NAMES[slotId] ?? String(slotId),
-        player: entry ? toPlayer(entry) : null,
-        points: entry ? weekPoints(entry, scoringPeriod) : 0,
+        player,
+        points,
+        projected:
+          !entry ? 0 : projection == null || !progressFor ? null : liveProjection(points, projection, progressFor(player?.nflTeam ?? null)),
       });
     }
   }
@@ -103,6 +114,7 @@ export interface EspnLeagueData {
   league: EspnLeague;
   myTeamId: number;
   account: string;
+  progressFor?: ProgressFor; // enables per-player live projections
 }
 
 // ESPN lists your team's owners by SWID, the same value as your SWID cookie.
@@ -112,7 +124,7 @@ export function findMyTeamId(league: EspnLeague, swid: string): number | null {
   return team?.id ?? null;
 }
 
-export function toLeagueSummary({ league, myTeamId, account }: EspnLeagueData): LeagueSummary {
+export function toLeagueSummary({ league, myTeamId, account, progressFor }: EspnLeagueData): LeagueSummary {
   const teams = league.teams ?? [];
   const membersById = new Map((league.members ?? []).map((m) => [m.id, m]));
   const slotCounts = league.settings?.rosterSettings?.lineupSlotCounts ?? {};
@@ -145,11 +157,15 @@ export function toLeagueSummary({ league, myTeamId, account }: EspnLeagueData): 
 
   const toSide = (side: EspnMatchupSide): MatchupSide => {
     const team = teamsById.get(side.teamId);
+    const starters = buildStarters(rosterFor(side), slotCounts, scoringPeriod, progressFor);
     return {
       teamId: String(side.teamId),
       teamName: team ? teamName(team) : `Team ${side.teamId}`,
       points: round2(side.totalPointsLive ?? side.totalPoints ?? 0),
-      starters: buildStarters(rosterFor(side), slotCounts, scoringPeriod),
+      // Prefer ESPN's own live team projection; fall back to summing starters.
+      projected:
+        side.totalProjectedPointsLive != null ? round2(side.totalProjectedPointsLive) : totalSide(starters).projected,
+      starters,
     };
   };
 

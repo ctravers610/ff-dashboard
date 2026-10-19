@@ -39,6 +39,11 @@ describe('FFPC scoring', () => {
     expect(scoreStats({}, 'DEF', FFPC_RULES, 0)).toBe(12);
   });
 
+  it('estimates kicker yardage from distance bands for projections', () => {
+    // Projections have no fgm_yds_over_30: 1 make in 30-39 (~5 yds over) + 1 in 50+ (~22).
+    expect(scoreStats({ fgm: 2, fgm_30_39: 1, fgm_50p: 1, xpm: 3 }, 'K', FFPC_RULES)).toBe(11.7);
+  });
+
   it('ignores stats that are not in the rules', () => {
     expect(scoreStats({ rec: 1, targets: 10, anytime_tds: 3 }, 'WR', FFPC_RULES)).toBe(1);
   });

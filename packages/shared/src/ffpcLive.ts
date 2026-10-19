@@ -34,17 +34,35 @@ interface LiveTeam extends ManualMatchupSide {
   bench: string[];
 }
 
-function parseLivePage(text: string): { week: number; teams: LiveTeam[] } | null {
+type Scoreboard = NonNullable<ManualMatchup['scoreboard']>;
+
+function parseLivePage(text: string): { week: number; teams: LiveTeam[]; scoreboard: Scoreboard } | null {
   const lines = text.split(/\r?\n/).map((l) => l.trim());
   const week = Number(/Week\s+(\d+)\s*\(Current\)/.exec(text)?.[1] ?? 0);
+
+  // League-wide scoreboard: "SR21" / "141" / "PMR: 60  Proj: 166" triples.
+  const scoreboard: Scoreboard = [];
+  for (let i = 0; i < lines.length - 2; i++) {
+    const proj = /^PMR:.*Proj:\s*(-?[\d.]+)/.exec(lines[i + 2]!);
+    if (proj && POINTS.test(lines[i + 1]!) && lines[i]) {
+      scoreboard.push({ teamName: lines[i]!, points: Number(lines[i + 1]), projected: Number(proj[1]) });
+    }
+  }
 
   // Score blocks: a team name line followed by "In Play:".
   const teams: LiveTeam[] = [];
   for (let i = 0; i < lines.length - 1; i++) {
     if (!lines[i + 1]!.startsWith('In Play:')) continue;
     const projIdx = lines.findIndex((l, j) => j > i && l.startsWith('Projected Points:'));
+    const projected = projIdx >= 0 ? Number(/(-?[\d.]+)\s*$/.exec(lines[projIdx]!)?.[1]) : NaN;
     const score = lines.slice(projIdx + 1).find((l) => POINTS.test(l));
-    teams.push({ teamName: lines[i]!, points: Number(score ?? 0), starters: [], bench: [] });
+    teams.push({
+      teamName: lines[i]!,
+      points: Number(score ?? 0),
+      projected: Number.isFinite(projected) ? projected : null,
+      starters: [],
+      bench: [],
+    });
   }
   if (teams.length < 2) return null;
 
@@ -73,7 +91,7 @@ function parseLivePage(text: string): { week: number; teams: LiveTeam[] } | null
     const pointsLine = lines.slice(i + 2).find((l) => POINTS.test(l));
     side.starters.push({ slot: SLOT_OUT[slot] ?? slot, name: starterName(nameLine), points: Number(pointsLine ?? 0) });
   }
-  return { week, teams };
+  return { week, teams, scoreboard };
 }
 
 // Which of the two teams is yours: by name (yours, or the page header's), else the first.
@@ -83,7 +101,12 @@ function splitTeams(teams: LiveTeam[], myTeamName: string | null | undefined): [
   return mine && b.teamName.toLowerCase() === mine ? [b, a] : [a, b];
 }
 
-const toSide = ({ teamName, points, starters }: LiveTeam): ManualMatchupSide => ({ teamName, points, starters });
+const toSide = ({ teamName, points, projected, starters }: LiveTeam): ManualMatchupSide => ({
+  teamName,
+  points,
+  projected,
+  starters,
+});
 
 export function convertFfpcLiveScoring(
   text: string,
@@ -116,7 +139,13 @@ export function convertFfpcLivePage(
   return {
     leagueName: header?.leagueName ?? null,
     teamName: header?.teamName ?? me.teamName,
-    matchup: { week: parsed.week, capturedAt, me: toSide(me), opponent: toSide(opponent) },
+    matchup: {
+      week: parsed.week,
+      capturedAt,
+      me: toSide(me),
+      opponent: toSide(opponent),
+      ...(parsed.scoreboard.length > 2 ? { scoreboard: parsed.scoreboard } : {}),
+    },
     rosterText: roster.join('\n'),
     players: roster.length,
   };

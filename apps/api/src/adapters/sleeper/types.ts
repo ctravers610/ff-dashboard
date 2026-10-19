@@ -21,6 +21,7 @@ export interface SleeperLeague {
   status: string;
   total_rosters: number;
   roster_positions: string[];
+  scoring_settings?: Record<string, number>; // stat field → points per unit
 }
 
 export interface SleeperRoster {

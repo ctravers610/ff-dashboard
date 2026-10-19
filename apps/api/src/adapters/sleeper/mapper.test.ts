@@ -77,6 +77,13 @@ describe('toLeagueSummary', () => {
     ]);
   });
 
+  it('adds live projections for each starter and the team when a projector is given', () => {
+    const summary = toLeagueSummary({ ...baseData(), project: (_p, actual) => actual + 10 })!;
+    expect(summary.matchup?.me.starters.map((s) => s.projected)).toEqual([30, 0, 91.5]);
+    expect(summary.matchup?.me.projected).toBe(121.5);
+    expect(toLeagueSummary(baseData())!.matchup?.me.projected).toBeNull();
+  });
+
   it('returns null when the account has no team in the league', () => {
     expect(toLeagueSummary({ ...baseData(), myUserId: 'nobody' })).toBeNull();
   });
