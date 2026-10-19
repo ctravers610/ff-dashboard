@@ -62,13 +62,23 @@ export function LeagueCard({ league, onEdit }: { league: LeagueSummary; onEdit?:
           <Scoreboard matchup={league.matchup} />
           {league.manual?.matchupCapturedAt && (
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Snapshot as of{' '}
+              {league.manual.liveScored ? (
+                <>
+                  <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500 align-middle" />
+                  Live from real-time stats scored with FFPC rules; may differ slightly from FFPC's official totals.
+                  Lineups as of{' '}
+                </>
+              ) : (
+                'Snapshot as of '
+              )}
               {new Date(league.manual.matchupCapturedAt).toLocaleString([], {
                 weekday: 'short',
                 hour: 'numeric',
                 minute: '2-digit',
               })}
-              , not live. Re-paste the Live Scoring page in Edit roster to update.
+              {league.manual.liveScored
+                ? '.'
+                : ', not live. Re-paste the Live Scoring page in Edit roster to update.'}
             </p>
           )}
         </div>

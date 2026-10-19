@@ -51,6 +51,15 @@ describe('toManualSummary', () => {
     expect(summary.manual?.matchupCapturedAt).toBeNull();
   });
 
+  it('replaces snapshot points with live ones when a scorer is available', () => {
+    const live = { 'Drake Maye': 30, 'Seattle Seahawks': 7, 'Brock Purdy': 12.5 } as Record<string, number>;
+    const summary = toManualSummary(league(6), index, { season: '2026', week: 6 }, (p) => live[p.name] ?? 0);
+    expect(summary.matchup?.me.starters.map((s) => s.points)).toEqual([30, 7]);
+    expect(summary.matchup?.me.points).toBe(37);
+    expect(summary.matchup?.opponent?.points).toBe(12.5);
+    expect(summary.manual?.liveScored).toBe(true);
+  });
+
   it('still builds the roster and alerts without a matchup', () => {
     const summary = toManualSummary({ ...league(6), matchup: null }, index, { season: '2026', week: 6 });
     expect(summary.roster.map((r) => [r.player.name, r.status])).toEqual([

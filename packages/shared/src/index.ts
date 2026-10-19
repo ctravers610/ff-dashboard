@@ -78,7 +78,13 @@ export interface LeagueSummary {
   alerts: LineupAlert[];
   roster: RosterEntry[]; // every player on your team
   // Set for hand-entered leagues.
-  manual?: { teamName: string; updatedAt: string; unmatched: string[]; matchupCapturedAt: string | null };
+  manual?: {
+    teamName: string;
+    updatedAt: string;
+    unmatched: string[];
+    matchupCapturedAt: string | null;
+    liveScored: boolean; // points computed from live stats rather than the pasted snapshot
+  };
 }
 
 // A league you maintain by hand (e.g. FFPC, which has no API we can use).
