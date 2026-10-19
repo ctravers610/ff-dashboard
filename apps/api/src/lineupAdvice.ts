@@ -64,8 +64,15 @@ export function adviseLeague(league: LeagueSummary, ctx: AdviceContext): LineupA
     return { playerName: best.player.name, position: best.player.position, projected: best.projected };
   };
 
+  // A starter whose team has no game this week scores nothing: flag it like an injury.
+  const byes: LineupAlert[] = (league.matchup?.me.starters ?? []).flatMap((s) =>
+    s.player && gameState(s.player, ctx.games) === 'bye' && !league.alerts.some((a) => a.playerId === s.player!.playerId)
+      ? [{ slot: s.slot, playerId: s.player.playerId, playerName: s.player.name, reason: 'bye' as const, detail: 'On bye' }]
+      : [],
+  );
+
   const advice: LineupAlert[] = [];
-  for (const alert of league.alerts) {
+  for (const alert of [...league.alerts, ...byes]) {
     const starter = alert.playerId ? rosterById.get(alert.playerId) : undefined;
     if (starter && gameState(starter, ctx.games) === 'started') continue;
     advice.push({ ...alert, suggestion: bestFor(alert.slot) });
@@ -82,7 +89,7 @@ const PPR: Record<string, number> = {
 
 /** Loads this week's games and projections, then advises every league. */
 export async function adviseLeagues(leagues: LeagueSummary[], nfl: { season: string; week: number }): Promise<LeagueSummary[]> {
-  if (nfl.week <= 0 || leagues.every((l) => l.alerts.length === 0)) return leagues;
+  if (nfl.week <= 0) return leagues;
 
   // Advice is a bonus: if a feed is down, alerts still show, just without it.
   const [games, projections, players] = await Promise.all([
@@ -100,5 +107,5 @@ export async function adviseLeagues(leagues: LeagueSummary[], nfl: { season: str
     }
   }
   const ctx: AdviceContext = { games, projectedFor: (p) => byKey.get(playerKey(p)) ?? null };
-  return leagues.map((l) => (l.alerts.length ? { ...l, alerts: adviseLeague(l, ctx) } : l));
+  return leagues.map((l) => ({ ...l, alerts: adviseLeague(l, ctx) }));
 }

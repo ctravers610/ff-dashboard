@@ -147,3 +147,10 @@ export const liveEvents = pgTable(
   },
   (t) => [index('live_events_week').on(t.season, t.week, t.id)],
 );
+
+// One row per notification sent for something that should only be sent once
+// (a lineup problem in a given week), keyed by what it was about.
+export const notificationsSent = pgTable('notifications_sent', {
+  key: text('key').primaryKey(),
+  sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
+});

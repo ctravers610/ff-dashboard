@@ -11,7 +11,7 @@ const wp = (name: string, position: string, week: number, restOfSeason: number, 
   trendingAdds: null,
 });
 
-const game = (started: boolean): GameScore => ({ opponent: 'X', opponentScore: 0, started, progress: started ? 1 : 0 });
+const game = (started: boolean): GameScore => ({ opponent: 'X', opponentScore: 0, started, progress: started ? 1 : 0, kickoff: null });
 
 describe('claimWeek', () => {
   it('is this week until its first game kicks off, then next week', () => {

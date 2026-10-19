@@ -12,6 +12,7 @@ function lineupUrl(league: LeagueSummary): string | null {
 }
 
 function describe(alert: LineupAlert, league: string) {
+  if (alert.reason === 'bye') return `${alert.playerName} is on bye but starts at ${alert.slot} in ${league}`;
   return alert.playerName
     ? `${alert.playerName} (${alert.detail}) starts at ${alert.slot} in ${league}`
     : `${alert.detail} in ${league}`;
@@ -28,7 +29,7 @@ export function AlertList({ leagues }: { leagues: LeagueSummary[] }) {
     <section aria-label="Lineup alerts" className="mb-4">
       <ul className="flex flex-col gap-2">
         {items.map(({ league, alert, key }) => {
-          const serious = alert.reason === 'empty' || ['Out', 'IR', 'Doubtful', 'Suspended'].includes(alert.detail);
+          const serious = alert.reason === 'empty' || alert.reason === 'bye' || ['Out', 'IR', 'Doubtful', 'Suspended'].includes(alert.detail);
           const url = lineupUrl(league);
           return (
             <li

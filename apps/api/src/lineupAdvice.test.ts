@@ -33,7 +33,7 @@ const injured = (p: Player, slot: string): LineupAlert => ({
   detail: p.injuryStatus ?? '',
 });
 
-const game = (started: boolean): GameScore => ({ opponent: 'X', opponentScore: 0, started, progress: started ? 0.5 : 0 });
+const game = (started: boolean): GameScore => ({ opponent: 'X', opponentScore: 0, started, progress: started ? 0.5 : 0, kickoff: null });
 
 // TB and DAL haven't kicked off, MIA is underway, and BUF is on a bye (no game listed).
 const ctx = (projections: Record<string, number> = {}): AdviceContext => ({
@@ -117,5 +117,17 @@ describe('adviseLeague', () => {
     const waddle = player('Jaylen Waddle', 'WR', 'MIA', 'Questionable');
     const l = league([[waddle, 'starter']], [injured(waddle, 'WR')]);
     expect(adviseLeague(l, { games: null, projectedFor: () => null })).toHaveLength(1);
+  });
+
+  it('flags a starter whose team is on bye, with a swap', () => {
+    const onBye = player('Bye Starter', 'WR', 'BUF'); // BUF has no game this week
+    const thomas = player('Brian Thomas', 'WR', 'JAX');
+    const l = {
+      ...league([[onBye, 'starter'], [thomas, 'bench']], []),
+      matchup: { week: 6, me: { teamId: '1', teamName: 'Me', points: 0, starters: [{ slot: 'WR', player: onBye, points: 0 }] }, opponent: null },
+    };
+    expect(adviseLeague(l, ctx())).toEqual([
+      expect.objectContaining({ slot: 'WR', playerName: 'Bye Starter', reason: 'bye', detail: 'On bye', suggestion: expect.objectContaining({ playerName: 'Brian Thomas' }) }),
+    ]);
   });
 });

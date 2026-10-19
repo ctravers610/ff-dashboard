@@ -4,6 +4,9 @@
 
 import type { WaiverLeague } from '@ffd/shared';
 import webpush from 'web-push';
+import { getDashboard } from '../dashboard.js';
+import { nflGames } from '../scoring/games.js';
+import { dueLineupIssues, lineupIssues, lineupMessage } from './lineup.js';
 import { dueReminders, reminderMessage, type ReminderMessage } from './plan.js';
 import type { PushSubscriptionInput, ReminderStore } from './store.js';
 
@@ -46,5 +49,17 @@ export async function sendDueReminders(leagues: WaiverLeague[], store: ReminderS
     await sendToAll(store, sender, reminderMessage(reminder));
     await store.markReminded(reminder.league.platform, reminder.league.leagueId, reminder.runAt);
   }
+  return due.length;
+}
+
+/** The pre-kickoff lineup check: one notification for every lineup problem now due. Returns how many it covered. */
+export async function sendLineupCheck(store: ReminderStore, sender: Sender, now = new Date()): Promise<number> {
+  const dashboard = await getDashboard();
+  const games = await nflGames(dashboard.season, dashboard.week);
+  const issues = lineupIssues(dashboard.leagues, games, dashboard.season, dashboard.week);
+  const due = dueLineupIssues(issues, await store.sentKeys(issues.map((i) => i.key)), now);
+  if (due.length === 0) return 0;
+  await sendToAll(store, sender, lineupMessage(due));
+  await store.markSent(due.map((i) => i.key));
   return due.length;
 }

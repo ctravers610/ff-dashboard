@@ -6,6 +6,7 @@ import { config } from '../config.js';
 
 interface EspnScoreboard {
   events: {
+    date?: string; // kickoff, ISO
     competitions: {
       status: { clock?: number; period?: number; type: { state: 'pre' | 'in' | 'post' } };
       competitors: { score: string; team: { abbreviation: string } }[];
@@ -18,6 +19,7 @@ export interface GameScore {
   opponentScore: number;
   started: boolean;
   progress: number; // 0 = not started, 1 = final
+  kickoff: string | null; // ISO time the game starts
 }
 
 // ESPN and Sleeper disagree on a couple of team codes.
@@ -47,8 +49,9 @@ async function fetchGames(season: string, week: number): Promise<Map<string, Gam
     const [a, b] = game.competitors as [(typeof game.competitors)[0], (typeof game.competitors)[0]];
     const code = (abbr: string) => ESPN_TO_SLEEPER[abbr] ?? abbr;
     const started = state !== 'pre';
-    games.set(code(a.team.abbreviation), { opponent: code(b.team.abbreviation), opponentScore: Number(b.score), started, progress });
-    games.set(code(b.team.abbreviation), { opponent: code(a.team.abbreviation), opponentScore: Number(a.score), started, progress });
+    const kickoff = event.date ?? null;
+    games.set(code(a.team.abbreviation), { opponent: code(b.team.abbreviation), opponentScore: Number(b.score), started, progress, kickoff });
+    games.set(code(b.team.abbreviation), { opponent: code(a.team.abbreviation), opponentScore: Number(a.score), started, progress, kickoff });
   }
   return games;
 }

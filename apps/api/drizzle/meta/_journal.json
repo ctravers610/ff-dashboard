@@ -43,6 +43,13 @@
       "when": 1792446657745,
       "tag": "0005_live_events",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792447165254,
+      "tag": "0006_notifications_sent",
+      "breakpoints": true
     }
   ]
 }

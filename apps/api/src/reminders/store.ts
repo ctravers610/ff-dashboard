@@ -2,7 +2,7 @@
 
 import { and, eq, gte, inArray } from 'drizzle-orm';
 import { db as appDb, type Db } from '../db/client.js';
-import { pushSubscriptions, waiverReminders } from '../db/schema.js';
+import { notificationsSent, pushSubscriptions, waiverReminders } from '../db/schema.js';
 import { reminderKey, type ReminderState } from './plan.js';
 
 export interface PushSubscriptionInput {
@@ -48,6 +48,16 @@ export function reminderStore(db: Db) {
     async get(platform: string, leagueId: string, runAt: Date): Promise<ReminderState | null> {
       const [r] = await db.select().from(waiverReminders).where(row(platform, leagueId, runAt));
       return r ? { claimsSetAt: r.claimsSetAt, remindedAt: r.remindedAt } : null;
+    },
+
+    /** Which of these one-time notifications have already gone out. */
+    async sentKeys(keys: string[]): Promise<Set<string>> {
+      if (keys.length === 0) return new Set();
+      const rows = await db.select({ key: notificationsSent.key }).from(notificationsSent).where(inArray(notificationsSent.key, keys));
+      return new Set(rows.map((r) => r.key));
+    },
+    async markSent(keys: string[]) {
+      if (keys.length) await db.insert(notificationsSent).values(keys.map((key) => ({ key }))).onConflictDoNothing();
     },
 
     // Subscriptions the push service says are gone (the browser unsubscribed or was reset).

@@ -3,7 +3,7 @@ import { gameProgress } from './games.js';
 import { pointsAllowed } from './live.js';
 import { liveProjection, scoreWithSettings } from './projection.js';
 
-const game = (opponentScore: number, started = true) => ({ opponent: 'DEN', opponentScore, started, progress: 0.5 });
+const game = (opponentScore: number, started = true) => ({ opponent: 'DEN', opponentScore, started, progress: 0.5, kickoff: null });
 
 describe('pointsAllowed', () => {
   it("is null before kickoff so an unplayed game isn't a shutout", () => {

@@ -71,7 +71,7 @@ export interface Matchup {
   allPlay?: AllPlay | null;
 }
 
-export type AlertReason = 'empty' | 'injury';
+export type AlertReason = 'empty' | 'injury' | 'bye';
 
 // A healthy bench player who could fill a slot with a problem.
 export interface BenchSuggestion {

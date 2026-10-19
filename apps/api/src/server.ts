@@ -7,7 +7,7 @@ import { sessionStore } from './auth/sessions.js';
 import { config, configProblems } from './config.js';
 import { db, pool, runMigrations } from './db/client.js';
 import { defaultSender } from './reminders/routes.js';
-import { sendDueReminders } from './reminders/send.js';
+import { sendDueReminders, sendLineupCheck } from './reminders/send.js';
 import { reminderRepo } from './reminders/store.js';
 import { getWaivers } from './waivers/index.js';
 import { sleeperNflState } from './adapters/sleeper/index.js';
@@ -51,11 +51,15 @@ setInterval(purge, 24 * 60 * 60 * 1000).unref();
 // sleep) catches up on anything due, and each run still only reminds once.
 const sender = defaultSender();
 if (sender) {
-  const checkReminders = () =>
-    getWaivers()
+  const checkReminders = async () => {
+    await getWaivers()
       .then((w) => sendDueReminders(w.leagues, reminderRepo, sender))
       .then((n) => n > 0 && app.log.info(`Sent ${n} waiver reminder(s)`))
       .catch((e) => app.log.warn(e, 'Could not check waiver reminders'));
+    await sendLineupCheck(reminderRepo, sender)
+      .then((n) => n > 0 && app.log.info(`Sent a lineup check covering ${n} starter(s)`))
+      .catch((e) => app.log.warn(e, 'Could not run the lineup check'));
+  };
   setTimeout(checkReminders, 30_000).unref(); // shortly after startup, once caches are warm
   setInterval(checkReminders, 5 * 60 * 1000).unref();
 } else {

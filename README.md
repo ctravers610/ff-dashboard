@@ -9,6 +9,7 @@ One place to follow all of my fantasy football teams across platforms, instead o
 - **Matchups:** every league in one scoreboard table (my score, the opponent's, the margin), opening into projections, standings and side-by-side lineups
 - **Lineup alerts:** empty slots and injured starters whose games haven't kicked off yet, each with the best healthy bench player who could still fill in
 - **Waivers:** per league (Sleeper and ESPN), your FAAB and claim priority, the best available players ranked by next week, rest of season or Sleeper's trending adds, and suggested add/drop moves for byes, injuries and upgrades. A player is only suggested as a drop when someone as good at his position is still available
+- **Lineup check:** a push 90 minutes before a lineup problem locks: a starter who's out or doubtful (before his game), questionable with a healthy swap available, on bye, or an empty slot (before the week's first game)
 - **Waiver reminders:** browser push notifications at 9 PM ET before overnight runs and 2 hours before the rest, skipped once your claims are in (ESPN shows you your own pending claims; elsewhere you mark them set, from the tab or the notification)
 - **Players:** where each player sits across all my leagues, who I'm facing this week, and "start and face" conflicts
 - **History:** weekly results and points for every league, as charts or a table
