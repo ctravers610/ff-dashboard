@@ -262,6 +262,16 @@ export interface WaiverLeague {
   // processed claims (history), FFPC's page, or (an estimate) its settings.
   runs: WaiverRun[];
   runsSource: 'history' | 'ffpc' | 'settings' | null;
+  // Your claims for the next run (null when there's no known next run). ESPN
+  // shows you your own pending claims; elsewhere you mark them set yourself.
+  claims: WaiverClaims | null;
+}
+
+export interface WaiverClaims {
+  runAt: string; // the next run this refers to
+  set: boolean;
+  source: 'espn' | 'you' | null; // who says they're set
+  pending: number | null; // ESPN only: how many claims you have in
 }
 
 export interface WaiversResponse {

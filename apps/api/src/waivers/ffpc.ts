@@ -37,7 +37,7 @@ export function ffpcWaiverLeague(
 ): WaiverLeague {
   // Named by your team, as everywhere else in the app (see adapters/manual).
   const base = { leagueId: league.id, platform: 'ffpc' as const, name: league.teamName || league.name, moves: [], available: [], openRosterSpots: 0 };
-  if (!paste) return { ...base, rules: null, pastedAt: null, runs: [], runsSource: null };
+  if (!paste) return { ...base, rules: null, pastedAt: null, runs: [], runsSource: null, claims: null };
 
   const page = parseFfpcWaivers(paste.text);
   const restOfSeason = (p: Player) => {
@@ -89,6 +89,7 @@ export function ffpcWaiverLeague(
     // FFPC says when bids process right on the page.
     runs: page.bidSchedule ? parseFfpcBidSchedule(page.bidSchedule) : [],
     runsSource: page.bidSchedule ? 'ffpc' : null,
+    claims: null,
   };
 }
 

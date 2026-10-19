@@ -1,8 +1,10 @@
 import { friendlyRun, friendlyRunWithTime, nextRun, type WaiverLeague, type WaiverMove, type WaiverPlayer, type WaiverRules } from '@ffd/shared';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { useWaivers } from '../../api';
+import { api, useWaivers } from '../../api';
 import { PLATFORM_LABEL } from '../../format';
 import { FfpcWaiverPaste } from './FfpcWaiverPaste';
+import { Reminders } from './Reminders';
 
 type Sort = 'week' | 'restOfSeason' | 'trending';
 const POSITIONS = ['All', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF'] as const;
@@ -42,15 +44,64 @@ function countdown(to: Date, now = new Date()): string {
   return `in ${minutes} min`;
 }
 
+// Whether your claims are in for the next run. ESPN shows us your pending
+// claims; for the others you tick it off yourself, which also stops the reminder.
+function Claims({ league }: { league: WaiverLeague }) {
+  const queryClient = useQueryClient();
+  const mark = useMutation({
+    mutationFn: (set: boolean) =>
+      api('/api/waivers/claims', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform: league.platform, leagueId: league.leagueId, runAt: league.claims!.runAt, set }),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['waivers'] }),
+  });
+  const claims = league.claims;
+  if (!claims) return null;
+
+  if (claims.source === 'espn') {
+    return (
+      <p className="text-sm text-emerald-300">
+        {claims.pending} claim{claims.pending === 1 ? '' : 's'} in for this run (seen on ESPN), so no reminder.
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm">
+      {claims.set ? (
+        <>
+          <span className="text-emerald-300">Claims set for this run, so no reminder.</span>
+          <button type="button" onClick={() => mark.mutate(false)} className="rounded-md px-2 py-0.5 text-slate-400 hover:bg-slate-800">
+            Undo
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={() => mark.mutate(true)}
+          disabled={mark.isPending}
+          className="rounded-md border border-slate-700 px-3 py-1 font-medium text-slate-200 hover:bg-slate-800"
+        >
+          {league.platform === 'espn' ? 'Mark claims set' : 'Claims set'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function Schedule({ league, next }: { league: WaiverLeague; next: Date | null }) {
   if (!next || !league.runsSource) {
     return <p className="-mt-3 text-sm text-slate-400">When waivers run isn't known yet: there are no processed claims to learn from.</p>;
   }
   return (
-    <p className="-mt-3 text-sm text-slate-300">
-      Waivers run {league.runs.map(friendlyRunWithTime).join(' and ')} ET · next {countdown(next)}{' '}
-      <span className="text-slate-400">({SOURCE_NOTE[league.runsSource]})</span>
-    </p>
+    <div className="-mt-3 flex flex-col gap-2">
+      <p className="text-sm text-slate-300">
+        Waivers run {league.runs.map(friendlyRunWithTime).join(' and ')} ET · next {countdown(next)}{' '}
+        <span className="text-slate-400">({SOURCE_NOTE[league.runsSource]})</span>
+      </p>
+      <Claims league={league} />
+    </div>
   );
 }
 
@@ -196,7 +247,8 @@ function Available({ league }: { league: WaiverLeague }) {
 
 export function WaiversView() {
   const { data, error, isPending } = useWaivers();
-  const [selected, setSelected] = useState<string | null>(null);
+  // A reminder notification links straight to its league: /?view=waivers&league=sleeper:123
+  const [selected, setSelected] = useState<string | null>(() => new URLSearchParams(window.location.search).get('league'));
 
   if (isPending) return <p className="text-slate-400">Loading waivers…</p>;
   if (error) return <p role="alert" className="rounded-lg bg-rose-950/60 p-4 text-sm text-rose-200">Couldn't load waivers: {error.message}</p>;
@@ -217,6 +269,8 @@ export function WaiversView() {
         Claims made now play in week {data.week}. Projections are scored with each league's own settings; rest of season runs through week{' '}
         {data.lastRegularWeek}. FFPC leagues use a pasted copy of FFPC's add/drop page.
       </p>
+
+      <Reminders />
 
       {data.errors.map((e) => (
         <div key={e.source} className="rounded-lg bg-amber-950/60 p-3 text-sm text-amber-200">

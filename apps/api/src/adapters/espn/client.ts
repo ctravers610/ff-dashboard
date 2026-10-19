@@ -62,6 +62,13 @@ export const espnClient = {
       params.set('scoringPeriodId', String(week));
       return get<{ transactions?: { type: string; status?: string; processDate?: number }[] }>(leagueId, season, auth, params);
     }),
+  // The same, fresh: signed in as you, ESPN includes your own pending claims (and nobody else's).
+  pendingTransactions: (leagueId: string, season: string, week: number, auth: EspnAuth | null) =>
+    cached(`espn:pending:${leagueId}:${season}:${week}`, 5 * MINUTE, () => {
+      const params = views('mTransactions2');
+      params.set('scoringPeriodId', String(week));
+      return get<{ transactions?: { type: string; status?: string; teamId?: number }[] }>(leagueId, season, auth, params);
+    }),
   freeAgents: (leagueId: string, season: string, week: number, auth: EspnAuth | null) =>
     cached(`espn:free-agents:${leagueId}:${season}:${week}`, 5 * MINUTE, () => {
       const params = views('kona_player_info');

@@ -63,6 +63,23 @@ test.describe('Waivers', () => {
     await expect(leagueSection(page, ESPN_LEAGUE_NAME)).toContainText("When waivers run isn't known yet");
   });
 
+  test('marking claims set for the next run sticks, and can be undone', async ({ page }) => {
+    const section = leagueSection(page, SLEEPER_LEAGUE_NAME);
+    await section.getByRole('button', { name: 'Claims set' }).click();
+    await expect(section).toContainText('Claims set for this run, so no reminder.');
+
+    await page.reload();
+    await openTab(page, 'Waivers');
+    await expect(leagueSection(page, SLEEPER_LEAGUE_NAME)).toContainText('Claims set for this run');
+    await leagueSection(page, SLEEPER_LEAGUE_NAME).getByRole('button', { name: 'Undo' }).click();
+    await expect(leagueSection(page, SLEEPER_LEAGUE_NAME).getByRole('button', { name: 'Claims set' })).toBeVisible();
+  });
+
+  test('a reminder’s link opens the Waivers tab on its league', async ({ page }) => {
+    await page.goto(`/?view=waivers&league=${encodeURIComponent('espn:900001')}`);
+    await expect(leagueSection(page, ESPN_LEAGUE_NAME)).toBeVisible();
+  });
+
   test('best available can be ranked by this week, rest of season or trending adds', async ({ page }) => {
     const section = leagueSection(page, SLEEPER_LEAGUE_NAME);
     await section.getByRole('group', { name: 'Position' }).getByRole('button', { name: 'WR', exact: true }).click();

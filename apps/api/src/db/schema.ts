@@ -6,6 +6,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   serial,
   text,
   timestamp,
@@ -96,3 +97,26 @@ export type ManualLeagueRow = typeof manualLeagues.$inferSelect;
 export type SessionRow = typeof sessions.$inferSelect;
 export type NewSnapshot = typeof leagueSnapshots.$inferInsert;
 export type SnapshotRow = typeof leagueSnapshots.$inferSelect;
+
+// Browsers that asked for waiver reminders. The endpoint is the browser's push
+// address; p256dh and auth are the keys each message is encrypted with.
+export const pushSubscriptions = pgTable('push_subscriptions', {
+  endpoint: text('endpoint').primaryKey(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// One row per league per waiver run that needed attention: when you said your
+// claims were in, and when a reminder went out (so each run reminds once).
+export const waiverReminders = pgTable(
+  'waiver_reminders',
+  {
+    platform: text('platform').notNull(),
+    leagueId: text('league_id').notNull(),
+    runAt: timestamp('run_at', { withTimezone: true }).notNull(),
+    claimsSetAt: timestamp('claims_set_at', { withTimezone: true }),
+    remindedAt: timestamp('reminded_at', { withTimezone: true }),
+  },
+  (t) => [primaryKey({ columns: [t.platform, t.leagueId, t.runAt] })],
+);

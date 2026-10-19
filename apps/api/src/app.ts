@@ -15,6 +15,7 @@ import { getDashboard } from './dashboard.js';
 import { db, type Db } from './db/client.js';
 import { historyRoutes } from './routes/history.js';
 import { getWaivers } from './waivers/index.js';
+import { reminderRoutes } from './reminders/routes.js';
 import { manualLeagueRoutes } from './routes/manualLeagues.js';
 import { yahooAuthRoutes } from './routes/yahooAuth.js';
 
@@ -73,6 +74,7 @@ export async function buildApp({ logger = true, webDist = config.webDist, auth, 
   await app.register(yahooAuthRoutes);
   await app.register(manualLeagueRoutes());
   await app.register(historyRoutes);
+  await app.register(reminderRoutes());
 
   if (webDist && fs.existsSync(path.join(webDist, 'index.html'))) await serveWeb(app, webDist);
   return app;

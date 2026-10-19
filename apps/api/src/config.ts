@@ -54,6 +54,11 @@ export function loadConfig(env: Env = process.env) {
     auth: loadAuth(env),
     // Encrypts stored OAuth tokens (Yahoo). 32 random bytes, base64.
     tokenKey: env.TOKEN_ENCRYPTION_KEY?.trim() || null,
+    // Browser push for waiver reminders. Generate a pair with: npx web-push generate-vapid-keys
+    push:
+      env.VAPID_PUBLIC_KEY?.trim() && env.VAPID_PRIVATE_KEY?.trim()
+        ? { publicKey: env.VAPID_PUBLIC_KEY.trim(), privateKey: env.VAPID_PRIVATE_KEY.trim() }
+        : null,
     // The built web app, served by the API in production (one container, one origin).
     webDist: env.WEB_DIST ?? path.join(rootDir, 'apps', 'web', 'dist'),
     sleeperUsernames: list(env.SLEEPER_USERNAMES),
@@ -108,6 +113,9 @@ export function configProblems(cfg: Config, env: Env = process.env): string[] {
   }
   if (cfg.auth.mode === 'github' && !cfg.publicUrl.startsWith('https://') && env.NODE_ENV === 'production') {
     problems.push(`PUBLIC_URL must be https in production so session cookies are only sent encrypted (got ${cfg.publicUrl}).`);
+  }
+  if (!cfg.push && (env.VAPID_PUBLIC_KEY?.trim() || env.VAPID_PRIVATE_KEY?.trim())) {
+    problems.push('Waiver reminders need both VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY; only one is set.');
   }
   if (cfg.yahoo) {
     if (!cfg.tokenKey) problems.push('Yahoo is configured but TOKEN_ENCRYPTION_KEY is not set, so Yahoo tokens cannot be stored.');

@@ -6,6 +6,10 @@ import { buildApp } from './app.js';
 import { sessionStore } from './auth/sessions.js';
 import { config, configProblems } from './config.js';
 import { db, pool, runMigrations } from './db/client.js';
+import { defaultSender } from './reminders/routes.js';
+import { sendDueReminders } from './reminders/send.js';
+import { reminderRepo } from './reminders/store.js';
+import { getWaivers } from './waivers/index.js';
 
 const app = await buildApp();
 
@@ -39,6 +43,22 @@ const purge = () =>
     .catch((e) => app.log.warn(e, 'Could not remove expired sessions'));
 await purge();
 setInterval(purge, 24 * 60 * 60 * 1000).unref();
+
+// Waiver reminders: every 5 minutes, push any that are due. A scheduled job
+// rather than a timer per reminder, so a restart (or a host waking the app from
+// sleep) catches up on anything due, and each run still only reminds once.
+const sender = defaultSender();
+if (sender) {
+  const checkReminders = () =>
+    getWaivers()
+      .then((w) => sendDueReminders(w.leagues, reminderRepo, sender))
+      .then((n) => n > 0 && app.log.info(`Sent ${n} waiver reminder(s)`))
+      .catch((e) => app.log.warn(e, 'Could not check waiver reminders'));
+  setTimeout(checkReminders, 30_000).unref(); // shortly after startup, once caches are warm
+  setInterval(checkReminders, 5 * 60 * 1000).unref();
+} else {
+  app.log.info('Waiver reminders are off: set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY to turn them on.');
+}
 
 // Hosts stop the old instance with SIGTERM on every deploy (and Ctrl+C sends
 // SIGINT): stop accepting requests, let in-flight ones finish, close the pool.

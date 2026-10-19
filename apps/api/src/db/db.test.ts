@@ -12,6 +12,8 @@ import { manualLeagueStore } from '../adapters/manual/store.js';
 import { buildApp } from '../app.js';
 import crypto from 'node:crypto';
 import { hashToken } from '../auth/crypto.js';
+import { reminderKey } from '../reminders/plan.js';
+import { reminderStore } from '../reminders/store.js';
 import { sessionStore } from '../auth/sessions.js';
 import { oauthTokenStore } from '../auth/tokens.js';
 import { manualLeagueRoutes } from '../routes/manualLeagues.js';
@@ -264,6 +266,33 @@ describe.skipIf(!enabled)('Postgres', () => {
     it('cannot be read with a different key', async () => {
       await oauthTokenStore(testDb.db, () => key, 'yahoo').save(tokens);
       await expect(oauthTokenStore(testDb.db, () => crypto.randomBytes(32), 'yahoo').load()).rejects.toThrow();
+    });
+  });
+
+  describe('reminder store', () => {
+    const runAt = new Date('2030-01-02T08:00:00Z'); // in the future, so it counts as upcoming
+
+    it('keeps one row per league and run, recording claims set and reminders sent', async () => {
+      const store = reminderStore(testDb.db);
+      await store.setClaims('sleeper', 'L1', runAt, true);
+      await store.markReminded('sleeper', 'L1', runAt);
+      const state = await store.get('sleeper', 'L1', runAt);
+      expect(state?.claimsSetAt).toBeInstanceOf(Date);
+      expect(state?.remindedAt).toBeInstanceOf(Date);
+
+      await store.setClaims('sleeper', 'L1', runAt, false); // undo keeps the reminder record
+      expect(await store.get('sleeper', 'L1', runAt)).toMatchObject({ claimsSetAt: null, remindedAt: expect.any(Date) });
+      expect([...(await store.upcoming(new Date('2030-01-01T00:00:00Z'))).keys()]).toEqual([reminderKey('sleeper', 'L1', runAt)]);
+      expect((await store.upcoming(new Date('2030-01-03T00:00:00Z'))).size).toBe(0); // past runs drop out
+    });
+
+    it('stores a browser subscription once, updates its keys, and removes it', async () => {
+      const store = reminderStore(testDb.db);
+      await store.subscribe({ endpoint: 'https://push.example/x', keys: { p256dh: 'one', auth: 'a' } });
+      await store.subscribe({ endpoint: 'https://push.example/x', keys: { p256dh: 'two', auth: 'b' } });
+      expect(await store.subscriptions()).toEqual([{ endpoint: 'https://push.example/x', keys: { p256dh: 'two', auth: 'b' } }]);
+      await store.removeSubscriptions(['https://push.example/x']);
+      expect(await store.subscriptions()).toEqual([]);
     });
   });
 

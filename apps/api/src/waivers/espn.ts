@@ -74,6 +74,7 @@ export function espnWaiverLeague(league: EspnLeague, freeAgents: EspnFreeAgents,
     openRosterSpots,
     runs: [],
     runsSource: null,
+    claims: null,
   };
 }
 
@@ -83,8 +84,8 @@ export async function fetchEspnWaivers(
   leagueIds: string[],
   auth: EspnAuth | null,
   ctx: WaiverContext,
-): Promise<{ leagues: WaiverLeague[]; errors: SourceError[] }> {
-  const result = { leagues: [] as WaiverLeague[], errors: [] as SourceError[] };
+): Promise<{ leagues: WaiverLeague[]; errors: SourceError[]; pendingClaims: Map<string, number> }> {
+  const result = { leagues: [] as WaiverLeague[], errors: [] as SourceError[], pendingClaims: new Map<string, number>() };
   await Promise.all(
     leagueIds.map(async (leagueId) => {
       try {
@@ -98,6 +99,12 @@ export async function fetchEspnWaivers(
         // The name lives in mSettings, which this request includes.
         const name = league.settings?.name ?? `ESPN league ${leagueId}`;
         const schedule = await espnSchedule(leagueId, ctx.season, ctx.week, auth);
+        // Your own claims for the coming run, so reminders can skip a league you've already handled.
+        const pending = await espnClient.pendingTransactions(leagueId, ctx.season, ctx.week, auth).catch(() => null);
+        if (pending) {
+          const mine = (pending.transactions ?? []).filter((t) => t.type === 'WAIVER' && t.status === 'PENDING' && t.teamId === myTeamId);
+          result.pendingClaims.set(String(league.id), mine.length);
+        }
         result.leagues.push({ ...espnWaiverLeague(league, freeAgents, myTeamId, name, ctx), ...schedule });
       } catch (e) {
         result.errors.push({ source: `espn:${leagueId}`, message: errorMessage(e) });

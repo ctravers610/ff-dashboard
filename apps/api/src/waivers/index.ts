@@ -2,7 +2,9 @@
 // available players, and suggested add/drop moves for the week a claim made now
 // would play in. FFPC leagues come from a pasted copy of FFPC's add/drop page.
 
-import type { WaiversResponse } from '@ffd/shared';
+import { nextRun, type WaiverClaims, type WaiverLeague, type WaiversResponse } from '@ffd/shared';
+import { reminderKey } from '../reminders/plan.js';
+import { reminderRepo } from '../reminders/store.js';
 import { sleeperClient } from '../adapters/sleeper/client.js';
 import { toPlayer } from '../adapters/sleeper/mapper.js';
 import { config } from '../config.js';
@@ -47,13 +49,33 @@ export async function getWaivers(): Promise<WaiversResponse> {
     fetchEspnWaivers(config.espnLeagueIds, config.espnAuth, ctx),
     fetchFfpcWaivers(ctx),
   ]);
+  const [, espn] = results;
+  const leagues = await withClaims(results.flatMap((r) => r.leagues), espn.pendingClaims);
   return {
     season: state.season,
     week,
     lastRegularWeek: LAST_REGULAR_WEEK,
-    leagues: results.flatMap((r) => r.leagues),
+    leagues,
     errors: results.flatMap((r) => r.errors),
   };
+}
+
+/** Whether your claims are in for each league's next run: ESPN tells us; elsewhere you say so. */
+async function withClaims(leagues: WaiverLeague[], espnPending: Map<string, number>, now = new Date()): Promise<WaiverLeague[]> {
+  const state = await reminderRepo.upcoming(now).catch(() => new Map());
+  return leagues.map((league) => {
+    const next = nextRun(league.runs, now);
+    if (!next) return { ...league, claims: null };
+    const pending = league.platform === 'espn' ? (espnPending.get(league.leagueId) ?? null) : null;
+    const yours = state.get(reminderKey(league.platform, league.leagueId, next.at))?.claimsSetAt;
+    const claims: WaiverClaims = {
+      runAt: next.at.toISOString(),
+      set: Boolean(pending) || Boolean(yours),
+      source: pending ? 'espn' : yours ? 'you' : null,
+      pending,
+    };
+    return { ...league, claims };
+  });
 }
 
 const NFL_TEAMS = [

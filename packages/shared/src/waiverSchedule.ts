@@ -10,7 +10,8 @@ export interface WaiverRun {
 export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const ZONE = 'America/New_York';
 
-const parts = (date: Date) => {
+/** A moment's date and time as read on a New York clock. */
+export const easternParts = (date: Date) => {
   const fmt = new Intl.DateTimeFormat('en-US', {
     timeZone: ZONE,
     weekday: 'short',
@@ -38,7 +39,7 @@ export function easternTime(year: number, month: number, day: number, hour: numb
   let guess = wanted;
   // Two passes settle the offset, including on the day the clocks change.
   for (let i = 0; i < 2; i++) {
-    const p = parts(new Date(guess));
+    const p = easternParts(new Date(guess));
     const seen = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute);
     guess += wanted - seen;
   }
@@ -49,7 +50,7 @@ export function easternTime(year: number, month: number, day: number, hour: numb
 export function nextRun(runs: WaiverRun[], now = new Date()): { run: WaiverRun; at: Date } | null {
   let best: { run: WaiverRun; at: Date } | null = null;
   for (let offset = 0; offset <= 7; offset++) {
-    const date = parts(new Date(now.getTime() + offset * 86_400_000));
+    const date = easternParts(new Date(now.getTime() + offset * 86_400_000));
     for (const run of runs) {
       if (run.day !== date.weekday) continue;
       const [h, m] = run.time.split(':').map(Number);
@@ -107,7 +108,7 @@ export function friendlyRunWithTime(run: WaiverRun): string {
 export function inferWaiverRuns(processedAt: Date[]): WaiverRun[] {
   const byDay = new Map<number, number[]>();
   for (const at of processedAt) {
-    const p = parts(at);
+    const p = easternParts(at);
     byDay.set(p.weekday, [...(byDay.get(p.weekday) ?? []), p.hour * 60 + p.minute]);
   }
   const runs: WaiverRun[] = [];

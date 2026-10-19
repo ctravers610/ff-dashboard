@@ -84,6 +84,7 @@ export function sleeperWaiverLeague(
     openRosterSpots,
     runs: [],
     runsSource: null,
+    claims: null,
   };
 }
 

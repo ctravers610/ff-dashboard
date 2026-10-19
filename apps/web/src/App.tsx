@@ -24,7 +24,11 @@ const VIEWS: { id: View; label: string; Icon: ComponentType<SVGProps<SVGSVGEleme
 
 export default function App({ user }: { user: Me['user'] }) {
   const { data, error, isPending, isFetching, refetch } = useDashboard();
-  const [view, setView] = useState<View>('matchups');
+  // Reminder notifications open /?view=waivers, so honor a view in the address.
+  const [view, setView] = useState<View>(() => {
+    const requested = new URLSearchParams(window.location.search).get('view');
+    return VIEWS.some((v) => v.id === requested) ? (requested as View) : 'matchups';
+  });
   const [editing, setEditing] = useState<string | null>(null); // 'new' or a manual league id
 
   return (
