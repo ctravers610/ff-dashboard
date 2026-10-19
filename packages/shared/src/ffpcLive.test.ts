@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { looksLikeFfpcPage } from './ffpc';
-import { convertFfpcLiveScoring, looksLikeFfpcLiveScoring } from './ffpcLive';
+import { convertFfpcLivePage, convertFfpcLiveScoring, looksLikeFfpcLiveScoring } from './ffpcLive';
 
 // Trimmed copy of an FFPC Live Scoring page, with made-up team names.
 const PAGE = [
@@ -97,6 +97,41 @@ describe('FFPC Live Scoring import', () => {
     const m = convertFfpcLiveScoring(PAGE, 'rival team')!;
     expect(m.me.teamName).toBe('Rival Team');
     expect(m.me.starters[0]!.name).toBe('Brock Purdy');
+  });
+
+  describe('one-paste import', () => {
+    const withHeader = `Test Tourney (Aug 5 9:00 PM) #12345 - Sample Squad (2-3)\n${PAGE}`;
+
+    it('reads the league and team name from the page header', () => {
+      const result = convertFfpcLivePage(withHeader)!;
+      expect(result.leagueName).toBe('Test Tourney #12345');
+      expect(result.teamName).toBe('Sample Squad');
+    });
+
+    it('builds my roster from my starters and my bench table only', () => {
+      const result = convertFfpcLivePage(withHeader)!;
+      expect(result.rosterText.split('\n')).toEqual([
+        'QB Drake Maye',
+        'FLEX Matthew Golden',
+        'K Eddy Pineiro',
+        'DEF SEA DST',
+        'BN Bryce Young',
+        'BN Samaje Perine',
+      ]);
+      expect(result.players).toBe(6);
+    });
+
+    it("uses the header's team name to tell which team is mine", () => {
+      const swapped = `Test Tourney (Aug 5 9:00 PM) #12345 - Rival Team (3-2)\n${PAGE}`;
+      const result = convertFfpcLivePage(swapped)!;
+      expect(result.matchup.me.teamName).toBe('Rival Team');
+      expect(result.rosterText.split('\n')).toEqual(['QB Brock Purdy', 'FLEX Hunter Henry', 'DEF NE DST', 'BN C.J. Stroud']);
+    });
+
+    it('reads bench defenses', () => {
+      const page = PAGE.replace('RB\tSamaje Perine, CIN\tBYE\t\t0.00', 'DST\tSEA Team Defense, SEA\tDEN\t\t5.00');
+      expect(convertFfpcLivePage(page)!.rosterText).toContain('BN SEA DST');
+    });
   });
 
   it('returns null for text without two score blocks', () => {

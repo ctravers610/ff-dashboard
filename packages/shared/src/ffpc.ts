@@ -23,6 +23,15 @@ const HEADER = /^(.+?)\s*\([^)]*\)\s*(#\d+)\s*-\s*(.+?)\s*\(\d+-\d+(?:-\d+)?\)\s
 
 const SLOT_OUT: Record<string, string> = { PK: 'K', DST: 'DEF' };
 
+// League and team name from the header line every FFPC league page starts with.
+export function parseFfpcHeader(text: string): { leagueName: string; teamName: string } | null {
+  for (const line of text.split(/\r?\n/)) {
+    const m = HEADER.exec(line.trim());
+    if (m) return { leagueName: `${m[1]} ${m[2]}`, teamName: m[3]! };
+  }
+  return null;
+}
+
 export function looksLikeFfpcPage(text: string): boolean {
   return /^SLOT\s+PLAYER\s+POS/m.test(text);
 }
@@ -36,8 +45,7 @@ function playerName(cell: string): string | null {
 }
 
 export function convertFfpcPage(text: string): FfpcImport {
-  let leagueName: string | null = null;
-  let teamName: string | null = null;
+  const header = parseFfpcHeader(text);
   let section: 'starter' | 'bench' | 'ir' = 'starter';
   const out: string[] = [];
 
@@ -45,12 +53,6 @@ export function convertFfpcPage(text: string): FfpcImport {
     const line = raw.trimEnd();
     const trimmed = line.trim();
 
-    const header: RegExpExecArray | null = leagueName ? null : HEADER.exec(trimmed);
-    if (header) {
-      leagueName = `${header[1]} ${header[2]}`;
-      teamName = header[3]!;
-      continue;
-    }
     if (/^Starters$/i.test(trimmed)) section = 'starter';
     else if (/^(Bench|Taxi.*)$/i.test(trimmed)) section = 'bench';
     else if (/^(IR|Injured Reserve|Reserve)$/i.test(trimmed)) section = 'ir';
@@ -64,5 +66,10 @@ export function convertFfpcPage(text: string): FfpcImport {
     out.push(`${slot} ${name}`);
   }
 
-  return { leagueName, teamName, rosterText: out.join('\n'), players: out.length };
+  return {
+    leagueName: header?.leagueName ?? null,
+    teamName: header?.teamName ?? null,
+    rosterText: out.join('\n'),
+    players: out.length,
+  };
 }

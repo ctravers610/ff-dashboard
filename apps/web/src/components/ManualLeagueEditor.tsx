@@ -1,5 +1,5 @@
 import {
-  convertFfpcLiveScoring,
+  convertFfpcLivePage,
   convertFfpcPage,
   looksLikeFfpcLiveScoring,
   looksLikeFfpcPage,
@@ -70,21 +70,32 @@ export function ManualLeagueEditor({ leagueId, onClose }: { leagueId: string | n
   const [importNotice, setImportNotice] = useState<string | null>(null);
   const [matchupError, setMatchupError] = useState<string | null>(null);
 
-  // Pasting the Live Scoring page captures this week's matchup snapshot.
+  // The Live Scoring page has everything: league/team name, your starters and
+  // bench, and the matchup. It has no IR section, so keep IR players already listed.
   const importLiveScoring = (text: string) => {
-    const matchup = convertFfpcLiveScoring(text, form.teamName);
-    if (!matchup) {
+    const result = convertFfpcLivePage(text, form.teamName);
+    if (!result) {
       setMatchupError("That doesn't look like an FFPC Live Scoring page.");
       return;
     }
     setMatchupError(null);
-    setForm((f) => ({ ...f, matchup }));
+    setForm((f) => {
+      const irLines = f.rosterText.split(/\r?\n/).filter((l) => /^IR\b/i.test(l.trim()));
+      return {
+        name: f.name || result.leagueName || '',
+        teamName: f.teamName || result.teamName || '',
+        rosterText: [result.rosterText, ...irLines].join('\n'),
+        matchup: result.matchup,
+      };
+    });
+    setImportNotice(
+      `Imported week ${result.matchup.week}: your ${result.players} players and your matchup vs ${result.matchup.opponent.teamName}. Check them, then Save.`,
+    );
   };
 
   const onRosterPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
     const text = e.clipboardData.getData('text');
     if (looksLikeFfpcLiveScoring(text)) {
-      // Pasted into the wrong box; it's still useful, so treat it as the matchup.
       e.preventDefault();
       importLiveScoring(text);
       return;
@@ -144,8 +155,9 @@ export function ManualLeagueEditor({ leagueId, onClose }: { leagueId: string | n
         <label className="flex flex-col gap-1 text-sm font-medium">
           Roster
           <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
-            Quickest: on your FFPC team page press Ctrl+A, Ctrl+C, then paste here. Or type one player per line, with a
-            slot (QB, RB, WR, TE, FLEX, SF, K, DEF) for starters, BN for bench, IR for injured reserve.
+            Filled in automatically by the Live Scoring paste below. You can also paste your FFPC team page here (Ctrl+A,
+            Ctrl+C) or type one player per line, with a slot (QB, RB, WR, TE, FLEX, SF, K, DEF) for starters, BN for
+            bench, IR for injured reserve.
           </span>
           <textarea
             rows={12}
@@ -159,10 +171,10 @@ export function ManualLeagueEditor({ leagueId, onClose }: { leagueId: string | n
         {importNotice && <p className="text-sm text-emerald-600 dark:text-emerald-400">{importNotice}</p>}
 
         <div className="flex flex-col gap-1 text-sm font-medium">
-          This week's matchup <span className="font-normal text-slate-500">(optional)</span>
+          Weekly Live Scoring paste <span className="font-normal text-slate-500">(recommended)</span>
           <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
-            On FFPC's Live Scoring page press Ctrl+A, Ctrl+C, then paste below. It's a snapshot: re-paste to update the
-            score. Your opponent's starters show up under Facing in the Players tab.
+            Once a week, after lineups lock: on FFPC's Live Scoring page press Ctrl+A, Ctrl+C, then paste below. It
+            fills in the league, your roster and both lineups; scores then update live from real-time stats.
           </span>
           {form.matchup ? (
             <div className="flex items-center justify-between gap-3 rounded-lg bg-slate-100 px-3 py-2 font-normal dark:bg-slate-800">
@@ -187,7 +199,7 @@ export function ManualLeagueEditor({ leagueId, onClose }: { leagueId: string | n
             value=""
             onChange={() => {}}
             onPaste={onMatchupPaste}
-            placeholder={form.matchup ? 'Paste again to update the snapshot' : 'Paste the Live Scoring page here'}
+            placeholder={form.matchup ? 'Paste again after lineup changes' : 'Paste the Live Scoring page here'}
             className={`${field} font-normal`}
           />
           {matchupError && <span className="text-xs font-normal text-rose-600">{matchupError}</span>}
