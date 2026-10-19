@@ -2,9 +2,17 @@ import { expect, type Locator, type Page } from '@playwright/test';
 
 export const pts = (n: number) => n.toFixed(2);
 
-/** The dashboard card for a league, found by its heading. */
-export const leagueCard = (page: Page, name: string): Locator =>
-  page.locator('article').filter({ has: page.getByRole('heading', { name, exact: true }) });
+/** A league, found by name: its row on the Matchups tab, or its card on the History tab. */
+export const leagueCard = (page: Page, name: string): Locator => page.getByRole('article', { name, exact: true });
+
+/** Opens a league's row on the Matchups tab (lineups, standings, roster) and returns it. */
+export async function openLeague(page: Page, name: string): Promise<Locator> {
+  const card = leagueCard(page, name);
+  const toggle = card.locator('button[aria-expanded]');
+  if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  return card;
+}
 
 /** Opens the app and waits until the dashboard data has loaded. */
 export async function openDashboard(page: Page) {
@@ -24,8 +32,7 @@ export const paste = (field: Locator, text: string) =>
     el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
   }, text);
 
-// The tab labels are lowercase in the DOM and capitalized by CSS, so match case-insensitively.
-export const openTab = (page: Page, name: 'Leagues' | 'Players' | 'History') =>
+export const openTab = (page: Page, name: 'Matchups' | 'Players' | 'History') =>
   page
     .getByRole('navigation')
     .getByRole('button', { name: new RegExp(`^${name}$`, 'i') })

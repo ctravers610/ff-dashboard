@@ -108,7 +108,7 @@ test.describe('History tab', () => {
     await page.reload();
     await openTab(page, 'History');
     await expect(leagueCard(page, SLEEPER_LEAGUE_NAME)).toBeVisible();
-    await expect(page.getByRole('heading', { name: FFPC_LEAGUE })).toHaveCount(0);
+    await expect(leagueCard(page, FFPC_LEAGUE)).toHaveCount(0);
   });
 });
 

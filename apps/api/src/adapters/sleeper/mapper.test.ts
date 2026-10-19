@@ -72,8 +72,8 @@ describe('toLeagueSummary', () => {
   it('flags empty slots and injured starters', () => {
     const summary = toLeagueSummary(baseData())!;
     expect(summary.alerts).toEqual([
-      { slot: 'RB', playerName: null, reason: 'empty', detail: 'Empty RB slot' },
-      { slot: 'FLEX', playerName: 'Hurt Guy', reason: 'injury', detail: 'Out' },
+      { slot: 'RB', playerId: null, playerName: null, reason: 'empty', detail: 'Empty RB slot' },
+      { slot: 'FLEX', playerId: 'p2', playerName: 'Hurt Guy', reason: 'injury', detail: 'Out' },
     ]);
   });
 

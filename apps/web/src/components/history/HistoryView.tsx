@@ -6,11 +6,11 @@ export function HistoryView() {
   const { data, error, isPending, isFetching } = useHistory();
   const [mode, setMode] = useState<HistoryMode>('chart');
 
-  if (isPending) return <p className="text-slate-600 dark:text-slate-400">Loading history…</p>;
+  if (isPending) return <p className="text-slate-400">Loading history…</p>;
   if (error) return <p className="text-rose-600">Couldn't load history: {error.message}</p>;
   if (data.leagues.length === 0) {
     return (
-      <p className="text-slate-600 dark:text-slate-400">
+      <p className="text-slate-400">
         No history yet. Weeks are recorded each time the dashboard loads, so check back after a few games.
       </p>
     );
@@ -20,7 +20,7 @@ export function HistoryView() {
     <section className="flex flex-col gap-4">
       {/* One control row above the cards; it scopes every card below. */}
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-slate-600 dark:text-slate-400">
+        <p className="text-sm text-slate-400">
           {data.season} season · results are head-to-head against your opponent each week
         </p>
         <div className="flex gap-1" role="group" aria-label="View">
@@ -32,8 +32,8 @@ export function HistoryView() {
               onClick={() => setMode(m)}
               className={`rounded-md px-3 py-1 text-sm font-medium capitalize transition ${
                 mode === m
-                  ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                  ? 'bg-slate-100 text-slate-900'
+                  : 'text-slate-300 hover:bg-slate-800'
               }`}
             >
               {m}

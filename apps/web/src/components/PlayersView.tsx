@@ -14,9 +14,9 @@ const FILTERS: { value: Filter; label: string; test: (p: PlayerExposure) => bool
 const isConflict = (p: PlayerExposure) => p.facing.length > 0 && p.owned.some((o) => o.status === 'starter');
 
 const STATUS_STYLE = {
-  starter: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
-  bench: 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
-  ir: 'bg-slate-100 text-slate-600 line-through dark:bg-slate-900 dark:text-slate-400',
+  starter: 'bg-emerald-950 text-emerald-300',
+  bench: 'bg-slate-800 text-slate-300',
+  ir: 'line-through bg-slate-900 text-slate-400',
 };
 
 function Chip({ className, title, children }: { className: string; title: string; children: string }) {
@@ -41,7 +41,7 @@ export function PlayersView({ players }: { players: PlayerExposure[] }) {
   const counts = Object.fromEntries(FILTERS.map((f) => [f.value, players.filter(f.test).length]));
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <section className="rounded-xl border p-5 shadow-sm border-slate-800 bg-slate-900">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-1">
           {FILTERS.map((f) => (
@@ -51,8 +51,8 @@ export function PlayersView({ players }: { players: PlayerExposure[] }) {
               onClick={() => setFilter(f.value)}
               className={`rounded-md px-3 py-1 text-sm font-medium transition ${
                 filter === f.value
-                  ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                  ? 'bg-slate-100 text-slate-900'
+                  : 'text-slate-300 hover:bg-slate-800'
               }`}
             >
               {f.label} <span className="font-normal">{counts[f.value]}</span>
@@ -64,28 +64,28 @@ export function PlayersView({ players }: { players: PlayerExposure[] }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search players"
-          className="w-full rounded-lg border border-slate-300 bg-transparent px-3 py-1.5 text-sm sm:w-56 dark:border-slate-700"
+          className="w-full rounded-lg border bg-transparent px-3 py-1.5 text-sm sm:w-56 border-slate-700"
         />
       </div>
 
       {visible.length === 0 ? (
-        <p className="py-6 text-center text-sm text-slate-600 dark:text-slate-400">No players match.</p>
+        <p className="py-6 text-center text-sm text-slate-400">No players match.</p>
       ) : (
-        <ul className="divide-y divide-slate-200 dark:divide-slate-800">
+        <ul className="divide-y divide-slate-800">
           {visible.map((p) => (
             <li key={p.key} className="grid gap-2 py-3 sm:grid-cols-[14rem_1fr_1fr] sm:items-center">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="truncate font-medium">{p.player.name}</span>
                   {isConflict(p) && (
-                    <span className="shrink-0 rounded bg-amber-100 px-1.5 text-[10px] font-semibold uppercase text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                    <span className="shrink-0 rounded px-1.5 text-[10px] font-semibold uppercase bg-amber-950 text-amber-300">
                       Conflict
                     </span>
                   )}
                 </div>
-                <div className="text-xs text-slate-600 dark:text-slate-400">
+                <div className="text-xs text-slate-400">
                   {p.player.position} · {p.player.nflTeam ?? 'FA'}
-                  {p.player.injuryStatus && <span className="ml-1 font-medium text-amber-700 dark:text-amber-400">{p.player.injuryStatus}</span>}
+                  {p.player.injuryStatus && <span className="ml-1 font-medium text-amber-400">{p.player.injuryStatus}</span>}
                 </div>
               </div>
               <div className="flex flex-wrap gap-1">
@@ -99,7 +99,7 @@ export function PlayersView({ players }: { players: PlayerExposure[] }) {
                 {p.facing.map((f) => (
                   <Chip
                     key={f.leagueId}
-                    className="bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                    className="bg-rose-950 text-rose-300"
                     title={`Your ${f.leagueName} opponent is starting him`}
                   >
                     {`vs ${f.leagueName}`}
@@ -111,7 +111,7 @@ export function PlayersView({ players }: { players: PlayerExposure[] }) {
         </ul>
       )}
 
-      <p className="mt-4 flex flex-wrap gap-3 text-xs text-slate-600 dark:text-slate-400">
+      <p className="mt-4 flex flex-wrap gap-3 text-xs text-slate-400">
         <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-500" />Starting</span>
         <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-slate-400" />Bench / IR</span>
         <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-rose-500" />Opponent starting him this week</span>

@@ -37,18 +37,18 @@ function WeekTooltip({ active, payload }: { active?: boolean; payload?: { payloa
   if (!w) return null; // weeks with no data have nothing to show
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-md dark:border-slate-700 dark:bg-slate-900">
-      <div className="mb-1 text-xs text-slate-600 dark:text-slate-400">
+    <div className="rounded-lg border px-3 py-2 text-sm shadow-md border-slate-700 bg-slate-900">
+      <div className="mb-1 text-xs text-slate-400">
         Week {w.week}
         {w.result && ` · ${RESULT_TEXT[w.result]}`}
       </div>
       <div className="flex items-center gap-2">
         <span className="h-0.5 w-3 rounded" style={{ background: 'var(--chart-series)' }} />
         <span className="font-semibold tabular-nums">{pts(w.points)}</span>
-        <span className="text-slate-600 dark:text-slate-400">you</span>
+        <span className="text-slate-400">you</span>
       </div>
       {w.allPlay ? (
-        <div className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+        <div className="mt-1 text-xs text-slate-400">
           All-play: {ordinal(w.allPlay.rank)} of {w.allPlay.teams} (top {w.allPlay.winSlots} win)
         </div>
       ) : (
@@ -56,7 +56,7 @@ function WeekTooltip({ active, payload }: { active?: boolean; payload?: { payloa
           <div className="flex items-center gap-2">
             <span className="h-0.5 w-3 rounded" style={{ background: 'var(--chart-ink)' }} />
             <span className="font-semibold tabular-nums">{pts(w.opponentPoints)}</span>
-            <span className="max-w-40 truncate text-slate-600 dark:text-slate-400">{w.opponentName ?? 'opponent'}</span>
+            <span className="max-w-40 truncate text-slate-400">{w.opponentName ?? 'opponent'}</span>
           </div>
         )
       )}

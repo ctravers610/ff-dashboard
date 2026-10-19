@@ -71,11 +71,20 @@ export interface Matchup {
 
 export type AlertReason = 'empty' | 'injury';
 
+// A healthy bench player who could fill a slot with a problem.
+export interface BenchSuggestion {
+  playerName: string;
+  position: string;
+  projected: number | null; // Sleeper's PPR projection, for ranking only (not your league's scoring)
+}
+
 export interface LineupAlert {
   slot: string;
+  playerId?: string | null; // the starter the alert is about; null for an empty slot
   playerName: string | null;
   reason: AlertReason;
   detail: string;
+  suggestion?: BenchSuggestion | null;
 }
 
 export type RosterStatus = 'starter' | 'bench' | 'ir';

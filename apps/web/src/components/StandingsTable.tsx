@@ -4,7 +4,7 @@ import { pts, record } from '../format';
 export function StandingsTable({ standings, myTeamId }: { standings: TeamStanding[]; myTeamId: string }) {
   return (
     <table className="w-full text-sm">
-      <thead className="text-xs text-slate-600 dark:text-slate-400">
+      <thead className="text-xs text-slate-400">
         <tr>
           <th className="py-1 text-left font-medium">#</th>
           <th className="py-1 text-left font-medium">Team</th>
@@ -17,7 +17,7 @@ export function StandingsTable({ standings, myTeamId }: { standings: TeamStandin
         {standings.map((t) => (
           <tr
             key={t.teamId}
-            className={t.teamId === myTeamId ? 'bg-sky-50 font-semibold dark:bg-sky-950/50' : ''}
+            className={t.teamId === myTeamId ? 'font-semibold bg-sky-950/50' : ''}
           >
             <td className="py-1 pr-2 tabular-nums">{t.rank}</td>
             <td className="max-w-0 truncate py-1 pr-2">{t.teamName}</td>

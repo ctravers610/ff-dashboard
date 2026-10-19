@@ -17,8 +17,8 @@ export function YahooConnect() {
   if (!data?.configured || data.connected) return null;
 
   return (
-    <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 dark:border-violet-900 dark:bg-violet-950/40">
-      <p className="text-sm text-violet-900 dark:text-violet-200">
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 border-violet-900 bg-violet-950/40">
+      <p className="text-sm text-violet-200">
         {denied
           ? 'Yahoo access was declined. Connect again to see your Yahoo leagues.'
           : 'Connect your Yahoo account to add your Yahoo leagues.'}

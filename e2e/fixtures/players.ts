@@ -38,6 +38,8 @@ export const PLAYERS = {
   higgins: p('1008', 'Tee Higgins', 'WR', 'CIN'),
   olave: p('1015', 'Chris Olave', 'WR', 'NO'),
   rice: p('1016', 'Rashee Rice', 'WR', 'KC'),
+  reed: p('1017', 'Jayden Reed', 'WR', 'GB', 'Questionable'),
+  doubs: p('1018', 'Romeo Doubs', 'WR', 'GB'),
   bowers: p('9487', 'Brock Bowers', 'TE', 'LV'),
   kelce: p('1009', 'Travis Kelce', 'TE', 'KC'),
   little: p('3451', 'Cam Little', 'K', 'JAX'),
@@ -49,8 +51,8 @@ export const PLAYERS = {
 export type PlayerKey = keyof typeof PLAYERS;
 export const ALL_PLAYERS = Object.values(PLAYERS);
 
-// NFL games for the fixture week, every one of them final, so live scores and
-// projections have a single deterministic answer. [home, homeScore, away, awayScore]
+// NFL games for the fixture week. Every game a scored player is in is final, so
+// live scores and projections have a single deterministic answer. [home, homeScore, away, awayScore]
 export const GAMES: [string, number, string, number][] = [
   ['BUF', 24, 'MIA', 17],
   ['NE', 20, 'NYJ', 10],
@@ -64,6 +66,11 @@ export const GAMES: [string, number, string, number][] = [
   ['PHI', 24, 'WAS', 17],
   ['CAR', 13, 'TB', 20],
 ];
+
+// Games that haven't kicked off: lineup advice treats their players as still
+// swappable. Only the ESPN team's GB players are in one, and ESPN supplies its
+// own scores, so no expected total depends on these. [home, away]
+export const UPCOMING_GAMES: [string, string][] = [['GB', 'CHI']];
 
 export const SEASON = '2026';
 export const WEEK = 6;

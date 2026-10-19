@@ -5,6 +5,7 @@ import { fetchSleeperLeagues, sleeperNflState } from './adapters/sleeper/index.j
 import { backfillHistory } from './backfill.js';
 import { config } from './config.js';
 import { buildExposure } from './exposure.js';
+import { adviseLeagues } from './lineupAdvice.js';
 import { recordSnapshots } from './snapshots.js';
 
 export async function getDashboard(): Promise<DashboardResponse> {
@@ -19,7 +20,7 @@ export async function getDashboard(): Promise<DashboardResponse> {
 
   // The same league can show up under two of your accounts; keep it once.
   const seen = new Set<string>();
-  const leagues = results
+  const unique = results
     .flatMap((r) => r.leagues)
     .filter((l) => {
       const key = `${l.platform}:${l.leagueId}`;
@@ -27,6 +28,8 @@ export async function getDashboard(): Promise<DashboardResponse> {
       seen.add(key);
       return true;
     });
+  // Drop alerts that can't be acted on any more and suggest bench swaps for the rest.
+  const leagues = await adviseLeagues(unique, nfl);
 
   // Record history in the background: a database problem must never break the dashboard.
   recordSnapshots(leagues).catch((e) => console.error('Could not save league snapshots:', e));

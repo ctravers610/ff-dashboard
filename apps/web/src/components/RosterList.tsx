@@ -15,14 +15,14 @@ export function RosterList({ roster }: { roster: RosterEntry[] }) {
         if (players.length === 0) return null;
         return (
           <div key={status}>
-            <div className="mb-1 text-xs font-medium uppercase text-slate-600 dark:text-slate-400">{label}</div>
-            <ul className="divide-y divide-slate-200 dark:divide-slate-800">
+            <div className="mb-1 text-xs font-medium uppercase text-slate-400">{label}</div>
+            <ul className="divide-y divide-slate-800">
               {players.map(({ player }) => (
                 <li key={player.playerId} className="flex items-baseline justify-between gap-2 py-1">
                   <span className="truncate">{player.name}</span>
-                  <span className="shrink-0 text-xs text-slate-600 dark:text-slate-400">
+                  <span className="shrink-0 text-xs text-slate-400">
                     {player.position} · {player.nflTeam ?? 'FA'}
-                    {player.injuryStatus && <span className="ml-1 font-medium text-amber-700 dark:text-amber-400">{player.injuryStatus}</span>}
+                    {player.injuryStatus && <span className="ml-1 font-medium text-amber-400">{player.injuryStatus}</span>}
                   </span>
                 </li>
               ))}

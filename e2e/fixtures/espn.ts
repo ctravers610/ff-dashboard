@@ -15,7 +15,7 @@ export const ESPN_OPP_TEAM = 'Sunday Scaries';
 const POSITION_ID = { QB: 1, RB: 2, WR: 3, TE: 4, K: 5, DEF: 16 } as const;
 const TEAM_ID: Record<string, number> = {
   ATL: 1, BUF: 2, CIN: 4, DEN: 7, KC: 12, LV: 13, LAR: 14, NE: 17, NO: 18, NYG: 19,
-  NYJ: 20, PHI: 21, SEA: 26, SF: 25, CAR: 29, JAX: 30, BAL: 33,
+  NYJ: 20, PHI: 21, SEA: 26, SF: 25, CAR: 29, JAX: 30, BAL: 33, GB: 9, CHI: 3,
 };
 // ESPN lineup slot ids
 const SLOT = { QB: 0, RB: 2, WR: 4, TE: 6, FLEX: 23, K: 17, DST: 16, BN: 20, IR: 21 } as const;
@@ -45,12 +45,14 @@ const MY_LINEUP: Lineup = [
   [P.bijan, SLOT.RB, 15.2],
   [P.najee, SLOT.RB, 7.1],
   [P.nabers, SLOT.WR, 14.3],
-  [P.evans, SLOT.WR, 10.6],
+  [P.reed, SLOT.WR, 10.6], // questionable, and his game hasn't started: an alert with a bench swap
   [P.kelce, SLOT.TE, 9.8],
   [P.puka, SLOT.FLEX, 12.2],
   [P.pineiro, SLOT.K, 8],
   [P.seaDef, SLOT.DST, 5],
   [P.higgins, SLOT.BN, 0],
+  [P.evans, SLOT.BN, 0], // healthy, but his game is over: can't be swapped in
+  [P.doubs, SLOT.BN, 0], // healthy and his game hasn't started: the suggested swap
 ];
 const OPP_LINEUP: Lineup = [
   [P.allen, SLOT.QB, 21],

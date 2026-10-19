@@ -1,28 +1,49 @@
 @import 'tailwindcss';
 
-body {
-  @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+/* The app is dark-only: a navy "scoreboard" palette. Rather than invent new
+   class names, Tailwind's slate scale is retuned to navy and emerald to teal,
+   so slate-950 is the page, slate-900 a card, slate-800 a raised surface or
+   border, slate-400 secondary text, and emerald the "winning" color. Every
+   text/surface pair used was checked for WCAG AA contrast. */
+@theme {
+  --color-slate-50: #f4f7fb;
+  --color-slate-100: #e8edf5; /* primary text */
+  --color-slate-200: #d3dbe7;
+  --color-slate-300: #b6c2d4;
+  --color-slate-400: #8fa0b8; /* secondary text */
+  --color-slate-500: #6b7c99;
+  --color-slate-600: #4a5a78;
+  --color-slate-700: #2c3b5a; /* strong borders */
+  --color-slate-800: #1b2740; /* raised surfaces, hairlines */
+  --color-slate-900: #101a2e; /* cards */
+  --color-slate-950: #0b1220; /* page */
+
+  --color-emerald-300: #8fdcc0;
+  --color-emerald-400: #5dcaa5; /* winning scores */
+  --color-emerald-500: #1d9e75; /* bars */
+  --color-emerald-600: #0f6e56;
+  --color-emerald-900: #0b3a2e;
+  --color-emerald-950: #082a22;
+
+  --color-hero: #13213a; /* the week summary banner */
+  --color-track: #24324d; /* empty part of a margin bar */
 }
 
-/* Chart colors, defined once as roles so light/dark swap in one place. The
-   series color and the neutral inks were checked against the card surfaces
-   (white / slate-900) with the dataviz palette validator. */
 :root {
-  --chart-series: #2a78d6; /* the one data series: your points */
-  --chart-ink: #475569; /* opponent marker; secondary text */
-  --chart-muted: #64748b; /* axis labels */
-  --chart-grid: #e2e8f0; /* hairline gridlines */
-  --chart-axis: #cbd5e1; /* baseline */
-  --chart-surface: #ffffff; /* card surface, used for gaps and rings */
+  color-scheme: dark; /* native controls and scrollbars match */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --chart-series: #3987e5;
-    --chart-ink: #cbd5e1;
-    --chart-muted: #94a3b8;
-    --chart-grid: #1e293b;
-    --chart-axis: #334155;
-    --chart-surface: #0f172a;
-  }
+body {
+  @apply bg-slate-950 text-slate-100 antialiased;
+}
+
+/* Chart colors as roles. The series color and the neutral inks were checked
+   against the card surface with the dataviz palette validator. */
+:root {
+  --chart-series: #3987e5; /* the one data series: your points */
+  --chart-ink: #b6c2d4; /* opponent marker; secondary text */
+  --chart-muted: #8fa0b8; /* axis labels */
+  --chart-grid: #1b2740; /* hairline gridlines */
+  --chart-axis: #2c3b5a; /* baseline */
+  --chart-surface: #101a2e; /* card surface, used for gaps and rings */
 }

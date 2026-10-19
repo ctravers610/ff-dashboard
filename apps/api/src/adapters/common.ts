@@ -61,9 +61,9 @@ export function buildAlerts(starters: StarterSlot[]): LineupAlert[] {
   const alerts: LineupAlert[] = [];
   for (const { slot, player } of starters) {
     if (!player) {
-      alerts.push({ slot, playerName: null, reason: 'empty', detail: `Empty ${slot} slot` });
+      alerts.push({ slot, playerId: null, playerName: null, reason: 'empty', detail: `Empty ${slot} slot` });
     } else if (player.injuryStatus) {
-      alerts.push({ slot, playerName: player.name, reason: 'injury', detail: player.injuryStatus });
+      alerts.push({ slot, playerId: player.playerId, playerName: player.name, reason: 'injury', detail: player.injuryStatus });
     }
   }
   return alerts;

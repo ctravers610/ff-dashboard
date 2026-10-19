@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import * as espn from '../fixtures/espn.js';
 import * as ffpc from '../fixtures/ffpc.js';
 import { GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_USERS, type GithubUserKey } from '../fixtures/github.js';
-import { ALL_PLAYERS, GAMES, SEASON, WEEK } from '../fixtures/players.js';
+import { ALL_PLAYERS, GAMES, SEASON, UPCOMING_GAMES, WEEK } from '../fixtures/players.js';
 import * as sleeper from '../fixtures/sleeper.js';
 import { UPSTREAM_PORT } from './env.js';
 
@@ -21,8 +21,20 @@ const projectionRows = () =>
     stats: { rec: 4, rec_yd: 50, pass_yd: 200, pass_td: 1, rush_yd: 40, fgm: 1.5, xpm: 2, sack: 2, pts_allow: 20 },
   }));
 
+const upcoming = ([home, away]: [string, string]) => ({
+  competitions: [
+    {
+      status: { clock: 900, period: 0, type: { state: 'pre' } },
+      competitors: [
+        { score: '0', team: { abbreviation: home } },
+        { score: '0', team: { abbreviation: away } },
+      ],
+    },
+  ],
+});
+
 const scoreboard = () => ({
-  events: GAMES.map(([home, homeScore, away, awayScore]) => ({
+  events: [...UPCOMING_GAMES.map(upcoming), ...GAMES.map(([home, homeScore, away, awayScore]) => ({
     competitions: [
       {
         status: { clock: 0, period: 4, type: { state: 'post' } },
@@ -32,7 +44,7 @@ const scoreboard = () => ({
         ],
       },
     ],
-  })),
+  }))],
 });
 
 function route(url: URL, headers: http.IncomingHttpHeaders): Reply | null {

@@ -6,10 +6,10 @@ import { SignIn } from './components/SignIn';
 export default function Root() {
   const { data: me, isPending, error } = useMe();
 
-  if (isPending) return <p className="mx-auto max-w-6xl px-4 py-8 text-slate-600 dark:text-slate-400">Loading…</p>;
+  if (isPending) return <p className="mx-auto max-w-6xl px-4 py-8 text-slate-400">Loading…</p>;
   if (error) {
     return (
-      <p role="alert" className="mx-auto max-w-6xl px-4 py-8 text-rose-700 dark:text-rose-300">
+      <p role="alert" className="mx-auto max-w-6xl px-4 py-8 text-rose-300">
         Couldn't reach the server: {error.message}
       </p>
     );

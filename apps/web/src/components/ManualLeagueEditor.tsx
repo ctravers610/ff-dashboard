@@ -122,14 +122,14 @@ export function ManualLeagueEditor({ leagueId, onClose }: { leagueId: string | n
     save.mutate();
   };
   const field =
-    'w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700';
+    'w-full rounded-lg border bg-transparent px-3 py-2 text-sm border-slate-700';
 
   return (
     <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <form
         onSubmit={submit}
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-full w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-xl bg-white p-6 shadow-xl dark:bg-slate-900"
+        className="flex max-h-full w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-xl p-6 shadow-xl bg-slate-900"
       >
         <h2 className="text-lg font-semibold">{leagueId ? 'Edit FFPC roster' : 'Add FFPC league'}</h2>
 
@@ -154,7 +154,7 @@ export function ManualLeagueEditor({ leagueId, onClose }: { leagueId: string | n
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Roster
-          <span className="text-xs font-normal text-slate-600 dark:text-slate-400">
+          <span className="text-xs font-normal text-slate-400">
             Filled in automatically by the Live Scoring paste below. You can also paste your FFPC team page here (Ctrl+A,
             Ctrl+C) or type one player per line, with a slot (QB, RB, WR, TE, FLEX, SF, K, DEF) for starters, BN for
             bench, IR for injured reserve.
@@ -168,20 +168,20 @@ export function ManualLeagueEditor({ leagueId, onClose }: { leagueId: string | n
             className={`${field} font-mono`}
           />
         </label>
-        {importNotice && <p className="text-sm text-emerald-700 dark:text-emerald-400">{importNotice}</p>}
+        {importNotice && <p className="text-sm text-emerald-400">{importNotice}</p>}
 
         <div className="flex flex-col gap-1 text-sm font-medium">
-          Weekly Live Scoring paste <span className="font-normal text-slate-600 dark:text-slate-400">(recommended)</span>
-          <span className="text-xs font-normal text-slate-600 dark:text-slate-400">
+          Weekly Live Scoring paste <span className="font-normal text-slate-400">(recommended)</span>
+          <span className="text-xs font-normal text-slate-400">
             Once a week, after lineups lock: on FFPC's Live Scoring page press Ctrl+A, Ctrl+C, then paste below. It
             fills in the league, your roster and both lineups; scores then update live from real-time stats.
           </span>
           {form.matchup ? (
-            <div className="flex items-center justify-between gap-3 rounded-lg bg-slate-100 px-3 py-2 font-normal dark:bg-slate-800">
+            <div className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 font-normal bg-slate-800">
               <span>
                 Week {form.matchup.week}: {form.matchup.me.teamName} {form.matchup.me.points.toFixed(2)} vs{' '}
                 {form.matchup.opponent.teamName} {form.matchup.opponent.points.toFixed(2)}
-                <span className="ml-1 text-xs text-slate-600 dark:text-slate-400">
+                <span className="ml-1 text-xs text-slate-400">
                   ({form.matchup.me.starters.length} + {form.matchup.opponent.starters.length} starters)
                 </span>
               </span>
@@ -225,14 +225,14 @@ export function ManualLeagueEditor({ leagueId, onClose }: { leagueId: string | n
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-slate-800"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={save.isPending}
-              className="rounded-lg bg-slate-900 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
+              className="rounded-lg px-4 py-1.5 text-sm font-medium disabled:opacity-50 bg-slate-100 text-slate-900"
             >
               {save.isPending ? 'Saving…' : 'Save'}
             </button>
