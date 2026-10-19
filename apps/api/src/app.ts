@@ -15,6 +15,7 @@ import { getDashboard } from './dashboard.js';
 import { db, type Db } from './db/client.js';
 import { historyRoutes } from './routes/history.js';
 import { getWaivers } from './waivers/index.js';
+import { getRecap } from './recap/index.js';
 import { reminderRoutes } from './reminders/routes.js';
 import { sourceRoutes } from './sources/routes.js';
 import { liveRoutes } from './live/routes.js';
@@ -73,6 +74,11 @@ export async function buildApp({ logger = true, webDist = config.webDist, auth, 
   });
   app.get('/api/dashboard', async () => getDashboard());
   app.get('/api/waivers', async () => getWaivers());
+  app.get<{ Querystring: { week?: number } }>(
+    '/api/recap',
+    { schema: { querystring: { type: 'object', properties: { week: { type: 'integer', minimum: 1, maximum: 18 } } } } },
+    async (req) => getRecap(req.query.week),
+  );
   await app.register(yahooAuthRoutes);
   await app.register(manualLeagueRoutes());
   await app.register(historyRoutes);

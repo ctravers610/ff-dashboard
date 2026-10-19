@@ -33,7 +33,7 @@ test.describe('Accessibility', () => {
   });
 
   test('Matchups with lineups and all-play open', async ({ page }) => {
-    await (await openLeague(page, SLEEPER_LEAGUE_NAME)).getByRole('button', { name: 'Lineups' }).click();
+    await openLeague(page, SLEEPER_LEAGUE_NAME); // opens on its lineups
     await (await openLeague(page, FFPC_TEAM)).getByRole('button', { name: 'All-play', exact: true }).click();
     await expectNoViolations(page, 'the Matchups tab (open rows)');
   });

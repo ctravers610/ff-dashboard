@@ -6,7 +6,9 @@ import type { WaiverLeague } from '@ffd/shared';
 import webpush from 'web-push';
 import { getDashboard } from '../dashboard.js';
 import { nflGames } from '../scoring/games.js';
+import { getRecap } from '../recap/index.js';
 import { dueLineupIssues, lineupIssues, lineupMessage } from './lineup.js';
+import { isRecapTime, recapKey, recapMessage } from './recap.js';
 import { dueReminders, reminderMessage, type ReminderMessage } from './plan.js';
 import type { PushSubscriptionInput, ReminderStore } from './store.js';
 
@@ -62,4 +64,16 @@ export async function sendLineupCheck(store: ReminderStore, sender: Sender, now 
   await sendToAll(store, sender, lineupMessage(due));
   await store.markSent(due.map((i) => i.key));
   return due.length;
+}
+
+/** The Tuesday recap of the week just finished, once. Returns whether it went out. */
+export async function sendWeeklyRecap(store: ReminderStore, sender: Sender, now = new Date()): Promise<boolean> {
+  if (!isRecapTime(now)) return false;
+  const recap = await getRecap();
+  if (!recap.week || recap.leagues.length === 0) return false;
+  const key = recapKey(recap.season, recap.week);
+  if ((await store.sentKeys([key])).size) return false;
+  await sendToAll(store, sender, recapMessage(recap));
+  await store.markSent([key]);
+  return true;
 }

@@ -56,6 +56,8 @@ export interface SleeperMatchup {
   points: number;
   starters: string[];
   starters_points: number[];
+  players?: string[]; // the whole roster that week
+  players_points?: Record<string, number>; // everyone's points, bench included
 }
 
 // Trimmed version of the ~5 MB /players/nfl payload, keyed by player id.

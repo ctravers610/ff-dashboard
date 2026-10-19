@@ -65,13 +65,17 @@ test.describe('Matchups', () => {
     await expect(card.getByRole('button', { name: 'Standings' })).toHaveCount(0);
   });
 
-  test('opens lineups side by side, with a projection under each score', async ({ page }) => {
+  test('opening a league shows lineups side by side, with a projection under each score', async ({ page }) => {
     const card = await openLeague(page, SLEEPER_LEAGUE_NAME);
-    await card.getByRole('button', { name: 'Lineups' }).click();
+    await expect(card.getByRole('button', { name: 'Lineups' })).toHaveAttribute('aria-pressed', 'true'); // open from the start
     await expect(card).toContainText('Josh Allen');
     await expect(card).toContainText('Patrick Mahomes'); // the opponent's quarterback
     await expect(card).toContainText('Points, with live projection underneath.');
     await expect(card.getByText('Questionable').first()).toBeVisible();
+
+    // The Lineups button now closes them.
+    await card.getByRole('button', { name: 'Lineups' }).click();
+    await expect(card).not.toContainText('Points, with live projection underneath.');
   });
 
   test('opens standings with my team highlighted', async ({ page }) => {

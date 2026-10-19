@@ -56,7 +56,7 @@ test.describe('FFPC league import', () => {
     await expect(card).toContainText('Live from real-time stats scored with FFPC rules');
     await expect(card).toContainText(pts(FFPC_ME_POINTS)); // 146.70, worked out by hand in fixtures/ffpc.ts
 
-    await card.getByRole('button', { name: 'Lineups' }).click();
+    // Opening the league shows its lineups.
     const rows = card.locator('div.divide-y > div.grid');
     await expect(rows).toHaveCount(ME.length);
     for (const [i, mine] of ME.entries()) {

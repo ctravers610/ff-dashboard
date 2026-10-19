@@ -327,3 +327,40 @@ export interface LiveFeedResponse {
   lastCheckedAt: string | null;
   events: LiveEvent[]; // newest first
 }
+
+// ── Lineup recap ───────────────────────────────────────────────────────
+
+// A start/sit call that cost points: who you started, and the bench player
+// who would have scored more in that spot.
+export interface CostlyCall {
+  slot: string;
+  started: { name: string; points: number };
+  better: { name: string; points: number };
+  cost: number;
+}
+
+export interface LineupRecap {
+  platform: Platform;
+  leagueId: string;
+  leagueName: string;
+  week: number;
+  points: number; // what your starters scored
+  best: number; // the best legal lineup from your roster that week
+  leftOnBench: number; // best − points
+  opponentPoints: number | null;
+  result: 'win' | 'loss' | 'tie' | null;
+  bestWouldWin: boolean; // a loss the best lineup would have won
+  calls: CostlyCall[]; // biggest first
+  // Players on no team in the league that week who outscored a starter of
+  // yours (better.name is the free agent). Null where the platform can't say.
+  missedPickups: CostlyCall[] | null;
+  pickupsNote: string | null; // how "available" was judged, when it's approximate
+}
+
+export interface RecapResponse {
+  season: string;
+  week: number; // the week shown
+  weeks: number[]; // every finished week, newest first
+  leagues: LineupRecap[];
+  errors: SourceError[];
+}

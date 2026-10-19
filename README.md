@@ -12,6 +12,7 @@ One place to follow all of my fantasy football teams across platforms, instead o
 - **Lineup check:** a push 90 minutes before a lineup problem locks: a starter who's out or doubtful (before his game), questionable with a healthy swap available, on bye, or an empty slot (before the week's first game)
 - **Waiver reminders:** browser push notifications at 9 PM ET before overnight runs and 2 hours before the rest, skipped once your claims are in (ESPN shows you your own pending claims; elsewhere you mark them set, from the tab or the notification)
 - **Players:** where each player sits across all my leagues, who I'm facing this week, and "start and face" conflicts
+- **Lineup recap:** for each finished week, your score against the best lineup your roster could have fielded, the start/sit calls that cost points, whether the best lineup would have flipped a loss, and free agents who'd have beaten your starters; plus a Tuesday-morning push summing up the week
 - **History:** weekly results and points for every league, as charts or a table
 - **All-play weeks:** ranks my score against the whole league (FFPC week 6: top half wins)
 

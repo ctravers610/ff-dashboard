@@ -102,6 +102,24 @@ export function matchups(week: number): SleeperMatchup[] {
   }
   const past = SLEEPER_PAST[week - 1];
   if (!past) return [];
+  if (week === RECAP_WEEK) {
+    // The whole lineup and bench, for the lineup recap (see RECAP_* below).
+    const points = RECAP_STARTER_POINTS;
+    return [
+      {
+        roster_id: 1,
+        matchup_id: 1,
+        points: past[0],
+        starters: ids(MY_STARTERS),
+        starters_points: points,
+        players: ids([...MY_STARTERS, ...MY_BENCH]),
+        players_points: Object.fromEntries([...ids(MY_STARTERS).map((id, i) => [id, points[i]!]), ...MY_BENCH.map((p) => [p.id, RECAP_BENCH_POINTS[p.id]!])]),
+      },
+      { roster_id: 2, matchup_id: 1, points: past[1], starters: ids(OPP_STARTERS), starters_points: [], players: ids(OPP_STARTERS) },
+      { roster_id: 3, matchup_id: 2, points: 90, starters: [], starters_points: [] },
+      { roster_id: 4, matchup_id: 2, points: 80, starters: [], starters_points: [] },
+    ];
+  }
   return [
     { roster_id: 1, matchup_id: 1, points: past[0], starters: [], starters_points: [] },
     { roster_id: 2, matchup_id: 1, points: past[1], starters: [], starters_points: [] },
@@ -121,3 +139,12 @@ export const playersRaw = Object.fromEntries(
     { full_name: x.name, position: x.position, team: x.team, injury_status: x.injury ?? null },
   ]),
 );
+
+// Week 5, the latest finished week (week 6's GB game hasn't kicked off), in full
+// for the lineup recap: the same starters with Josh Allen at 27.7, so they add up
+// to the week's official 101.1, and Najee Harris scoring 26 on the bench. With
+// him in for Jaylen Waddle (6.4) at FLEX, the best lineup is 120.7, which would
+// have beaten the opponent's 118.8.
+export const RECAP_WEEK = 5;
+export const RECAP_STARTER_POINTS = [27.7, 14, 9.5, 12.3, 8.2, 11, 6.4, 7, 5];
+export const RECAP_BENCH_POINTS: Record<string, number> = { [P.najee.id]: 26, [P.maye.id]: 3 };

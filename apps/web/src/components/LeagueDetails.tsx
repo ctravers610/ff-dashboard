@@ -11,7 +11,8 @@ type Tab = 'allplay' | 'lineup' | 'standings' | 'roster' | null;
 
 // Everything about one league, shown when its row in the matchup table is opened.
 export function LeagueDetails({ league, onEdit }: { league: LeagueSummary; onEdit?: () => void }) {
-  const [tab, setTab] = useState<Tab>(null);
+  // Opening a league shows its lineups straight away.
+  const [tab, setTab] = useState<Tab>(league.matchup ? 'lineup' : null);
   const me = league.standings.find((t) => t.teamId === league.myTeamId);
 
   const tabButton = (value: Exclude<Tab, null>, label: string) => (

@@ -7,7 +7,7 @@ import { sessionStore } from './auth/sessions.js';
 import { config, configProblems } from './config.js';
 import { db, pool, runMigrations } from './db/client.js';
 import { defaultSender } from './reminders/routes.js';
-import { sendDueReminders, sendLineupCheck } from './reminders/send.js';
+import { sendDueReminders, sendLineupCheck, sendWeeklyRecap } from './reminders/send.js';
 import { reminderRepo } from './reminders/store.js';
 import { getWaivers } from './waivers/index.js';
 import { sleeperNflState } from './adapters/sleeper/index.js';
@@ -59,6 +59,9 @@ if (sender) {
     await sendLineupCheck(reminderRepo, sender)
       .then((n) => n > 0 && app.log.info(`Sent a lineup check covering ${n} starter(s)`))
       .catch((e) => app.log.warn(e, 'Could not run the lineup check'));
+    await sendWeeklyRecap(reminderRepo, sender)
+      .then((sent) => sent && app.log.info('Sent the weekly lineup recap'))
+      .catch((e) => app.log.warn(e, 'Could not send the weekly recap'));
   };
   setTimeout(checkReminders, 30_000).unref(); // shortly after startup, once caches are warm
   setInterval(checkReminders, 5 * 60 * 1000).unref();
