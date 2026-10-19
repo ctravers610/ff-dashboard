@@ -1,4 +1,4 @@
-import type { LeagueSummary } from '@ffd/shared';
+import { winProbability, type LeagueSummary } from '@ffd/shared';
 import { useState } from 'react';
 import { CLOSE_MARGIN, matchupMargin, matchupStatus, ordinal, PLATFORM_LABEL, pts, signed } from '../format';
 import { ChevronIcon } from './icons';
@@ -13,7 +13,9 @@ function opponentCell(l: LeagueSummary): string {
   return m.opponent ? pts(m.opponent.points) : 'Bye';
 }
 
-// Every league on one screen, biggest lead first. Each row opens to the
+// Every league on one screen, the most uncertain matchup first: closest to a
+// 50/50 chance to win, from the live projections and how much of the week is
+// left, since that's where your attention matters most. Each row opens to the
 // league's details (lineups, standings, roster).
 export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; onEdit: (leagueId: string) => void }) {
   const [open, setOpen] = useState<Set<string>>(new Set());
@@ -26,12 +28,19 @@ export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; on
     });
 
   const rows = leagues
-    .map((league) => ({ league, key: leagueKey(league), margin: matchupMargin(league.matchup), status: matchupStatus(league.matchup) }))
-    .sort((a, b) => (b.margin ?? -Infinity) - (a.margin ?? -Infinity));
+    .map((league) => ({
+      league,
+      key: leagueKey(league),
+      margin: matchupMargin(league.matchup),
+      status: matchupStatus(league.matchup),
+      odds: winProbability(league.matchup),
+    }))
+    .sort((a, b) => (a.odds == null ? Infinity : Math.abs(a.odds - 0.5)) - (b.odds == null ? Infinity : Math.abs(b.odds - 0.5)));
   const widest = Math.max(1, ...rows.map((r) => Math.abs(r.margin ?? 0)));
 
   // Shared column layout for the header and every row; the opponent and bar columns appear from sm up.
-  const columns = 'grid grid-cols-[minmax(0,1fr)_auto_auto_1rem] items-center gap-x-3 sm:grid-cols-[minmax(0,1.7fr)_5rem_6rem_minmax(0,1fr)_1rem]';
+  const columns =
+    'grid grid-cols-[minmax(0,1fr)_auto_auto_2.75rem_1rem] items-center gap-x-3 sm:grid-cols-[minmax(0,1.7fr)_5rem_6rem_minmax(0,1fr)_3.5rem_1rem]';
 
   return (
     <section aria-label="Matchups" className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
@@ -40,9 +49,10 @@ export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; on
         <span className="text-right">Me</span>
         <span className="hidden text-right sm:block">Opponent</span>
         <span>Margin</span>
+        <span className="text-right">Win %</span>
         <span />
       </div>
-      {rows.map(({ league, key, margin, status }) => {
+      {rows.map(({ league, key, margin, status, odds }) => {
         const isOpen = open.has(key);
         const nameId = `league-${key.replace(/\W/g, '-')}`;
         const close = margin != null && Math.abs(margin) < CLOSE_MARGIN;
@@ -88,6 +98,11 @@ export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; on
                 <span className="sr-only">
                   {tone === 'none' ? 'no matchup' : `${status.leading ? 'winning' : 'losing'}${close ? ', close' : ''}`}
                 </span>
+              </span>
+              {/* Chance to win from the live projections and how much of the week is left. */}
+              <span className="text-right text-sm tabular-nums text-slate-300">
+                {odds != null ? `${Math.round(odds * 100)}%` : '—'}
+                <span className="sr-only"> to win</span>
               </span>
               <ChevronIcon className={`text-slate-400 transition ${isOpen ? 'rotate-180' : ''}`} />
             </button>

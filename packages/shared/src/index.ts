@@ -6,6 +6,7 @@ export * from './ffpc';
 export * from './ffpcLive';
 export * from './ffpcWaivers';
 export * from './waiverSchedule';
+export * from './winProbability';
 
 export type Platform ='sleeper' | 'espn' | 'yahoo' | 'ffpc';
 

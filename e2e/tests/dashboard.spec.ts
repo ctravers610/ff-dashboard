@@ -30,15 +30,19 @@ test.describe('Matchups', () => {
     await expect(hero).toContainText('projected 2 of 2');
   });
 
-  test('lists every league with my score, the opponent’s and the margin, biggest lead first', async ({ page }) => {
+  test('lists every league with scores, margin and chance to win, the most uncertain first', async ({ page }) => {
     const rows = page.getByRole('region', { name: 'Matchups' }).getByRole('article');
     await expect(rows).toHaveCount(2);
-    await expect(rows.nth(0)).toHaveAccessibleName(SLEEPER_LEAGUE_NAME);
-    await expect(rows.nth(0)).toContainText(pts(SLEEPER_ME_POINTS));
-    await expect(rows.nth(0)).toContainText(pts(SLEEPER_OPP_POINTS));
-    await expect(rows.nth(0)).toContainText(`+${(SLEEPER_ME_POINTS - SLEEPER_OPP_POINTS).toFixed(1)}`);
-    await expect(rows.nth(1)).toHaveAccessibleName(ESPN_LEAGUE_NAME);
-    await expect(rows.nth(1)).toContainText(`+${(ESPN_ME_POINTS - ESPN_OPP_POINTS).toFixed(1)}`);
+    // Sleeper's games are all final (decided: 100%); ESPN still has projected
+    // points to come, so its 15.5-point projected lead is 99%, the less certain.
+    await expect(rows.nth(0)).toHaveAccessibleName(ESPN_LEAGUE_NAME);
+    await expect(rows.nth(0)).toContainText('99%');
+    await expect(rows.nth(1)).toContainText('100%');
+    await expect(rows.nth(0)).toContainText(`+${(ESPN_ME_POINTS - ESPN_OPP_POINTS).toFixed(1)}`);
+    await expect(rows.nth(1)).toHaveAccessibleName(SLEEPER_LEAGUE_NAME);
+    await expect(rows.nth(1)).toContainText(pts(SLEEPER_ME_POINTS));
+    await expect(rows.nth(1)).toContainText(pts(SLEEPER_OPP_POINTS));
+    await expect(rows.nth(1)).toContainText(`+${(SLEEPER_ME_POINTS - SLEEPER_OPP_POINTS).toFixed(1)}`);
   });
 
   test('opening the Sleeper league shows team, rank and projections', async ({ page }) => {
