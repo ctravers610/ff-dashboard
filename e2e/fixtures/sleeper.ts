@@ -24,6 +24,10 @@ export const state = { season: SEASON, week: WEEK, season_type: 'regular' };
 
 export const user: SleeperUser = { user_id: 'u1', username: SLEEPER_USERNAME, display_name: 'E2E Manager', avatar: null };
 
+// A second real account with no leagues this season, for adding accounts in the app.
+export const FRIEND_USERNAME = 'e2e_friend';
+export const friend: SleeperUser = { user_id: 'u9', username: FRIEND_USERNAME, display_name: 'E2E Friend', avatar: null };
+
 export const league: SleeperLeague = {
   league_id: SLEEPER_LEAGUE_ID,
   name: SLEEPER_LEAGUE_NAME,

@@ -60,6 +60,10 @@ function route(url: URL, headers: http.IncomingHttpHeaders): Reply | null {
   if (p === '/sleeper/v1/state/nfl') return { body: sleeper.state };
   if (p === `/sleeper/v1/user/${sleeper.SLEEPER_USERNAME}` || p === `/sleeper/v1/user/${sleeper.user.user_id}`) return { body: sleeper.user };
   if (p === `/sleeper/v1/user/${sleeper.user.user_id}/leagues/nfl/${SEASON}`) return { body: [sleeper.league] };
+  if (p === `/sleeper/v1/user/${sleeper.FRIEND_USERNAME}`) return { body: sleeper.friend };
+  if (p === `/sleeper/v1/user/${sleeper.friend.user_id}/leagues/nfl/${SEASON}`) return { body: [] };
+  // Like the real API, an unknown username is a 200 with null, not a 404.
+  if (/^\/sleeper\/v1\/user\/[^/]+$/.test(p)) return { body: null };
   if (p === `/sleeper/v1/league/${sleeper.SLEEPER_LEAGUE_ID}/users`) return { body: sleeper.users };
   if (p === `/sleeper/v1/league/${sleeper.SLEEPER_LEAGUE_ID}/rosters`) return { body: sleeper.rosters };
   const tx = /^\/sleeper\/v1\/league\/[^/]+\/transactions\/(\d+)$/.exec(p);

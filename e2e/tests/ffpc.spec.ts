@@ -5,7 +5,13 @@ import { leagueCard, openDashboard, openLeague, paste, pts } from './helpers.js'
 
 // FFPC has no usable API, so its leagues come from pasting the Live Scoring page.
 // Scores are then worked out live from real-time stats using FFPC's own rules.
-const addButton = (page: Page) => page.getByRole('button', { name: '+ Add FFPC league (manual roster)' });
+// Add league → FFPC opens the paste-based editor.
+const addButton = (page: Page) => ({
+  click: async () => {
+    await page.getByRole('button', { name: '+ Add league' }).click();
+    await page.getByRole('dialog', { name: 'Add a league' }).getByRole('button', { name: /^FFPC/ }).click();
+  },
+});
 const dialog = (page: Page) => page.locator('form').filter({ has: page.getByRole('heading', { name: /FFPC (league|roster)/ }) });
 const rosterBox = (page: Page) => dialog(page).getByPlaceholder(/^QB Josh Allen/);
 const livePasteBox = (page: Page) => dialog(page).getByPlaceholder(/Live Scoring page here|Paste again/);

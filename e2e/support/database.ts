@@ -32,12 +32,13 @@ export async function withDb<T>(fn: (db: pg.Client) => Promise<T>): Promise<T> {
   }
 }
 
-// What tests create: FFPC leagues (with their history) and waiver reminder
-// state. Cleared between tests so none depends on another.
+// What tests create: FFPC leagues (with their history), waiver reminder
+// state, and accounts or leagues added in the app. Cleared between tests so none depends on another.
 export const resetFfpc = () =>
   withDb(async (db) => {
     await db.query('DELETE FROM manual_leagues');
     await db.query("DELETE FROM league_snapshots WHERE platform = 'ffpc'");
     await db.query('DELETE FROM waiver_reminders');
     await db.query('DELETE FROM push_subscriptions');
+    await db.query('DELETE FROM league_sources');
   });

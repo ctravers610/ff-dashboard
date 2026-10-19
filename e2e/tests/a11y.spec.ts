@@ -63,10 +63,19 @@ test.describe('Accessibility', () => {
     await expectNoViolations(page, 'the History tab (tables)');
   });
 
-  test('Add/edit league dialog', async ({ page }) => {
-    await page.getByRole('button', { name: '+ Add FFPC league (manual roster)' }).click();
-    await expect(page.getByRole('heading', { name: 'Add FFPC league' })).toBeVisible();
+  test('Add league dialog, and the FFPC editor it leads to', async ({ page }) => {
+    await page.getByRole('button', { name: '+ Add league' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Add a league' });
+    await expect(dialog.getByRole('heading', { name: 'On your dashboard' })).toBeVisible();
     await expectNoViolations(page, 'the add-league dialog');
+    await dialog.getByRole('button', { name: /^Sleeper/ }).click();
+    await expectNoViolations(page, 'the add-league dialog (Sleeper)');
+    await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
+
+    await page.getByRole('button', { name: '+ Add league' }).click();
+    await page.getByRole('dialog', { name: 'Add a league' }).getByRole('button', { name: /^FFPC/ }).click();
+    await expect(page.getByRole('heading', { name: 'Add FFPC league' })).toBeVisible();
+    await expectNoViolations(page, 'the FFPC editor');
   });
 });
 

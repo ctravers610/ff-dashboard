@@ -284,3 +284,19 @@ export interface WaiversResponse {
   leagues: WaiverLeague[];
   errors: SourceError[];
 }
+
+// ── Accounts and leagues ───────────────────────────────────────────────
+
+// A Sleeper account (all its leagues) or one ESPN league the dashboard follows.
+export interface LeagueSource {
+  id: number | null; // null for ones from .env, which can't be removed in the app
+  platform: 'sleeper' | 'espn';
+  value: string; // Sleeper username or ESPN league id
+  label: string | null; // e.g. "BoyntonBoy · 1 league" or the ESPN league's name
+  fromEnv: boolean;
+}
+
+export interface SourcesResponse {
+  sources: LeagueSource[];
+  espnCookies: boolean; // ESPN leagues need your ESPN cookies (set in .env)
+}

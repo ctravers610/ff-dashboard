@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState, type ComponentType, type SVGProps } from 'react';
 import { signOut, useDashboard, useWaivers, type Me } from './api';
+import { AddLeagueDialog } from './components/AddLeagueDialog';
 import { AlertList } from './components/AlertList';
 import { Hero } from './components/Hero';
 import { ChartIcon, FootballIcon, RefreshIcon, ScoreboardIcon, SwapIcon, UsersIcon } from './components/icons';
@@ -32,6 +33,7 @@ export default function App({ user }: { user: Me['user'] }) {
     return VIEWS.some((v) => v.id === requested) ? (requested as View) : 'matchups';
   });
   const [editing, setEditing] = useState<string | null>(null); // 'new' or a manual league id
+  const [adding, setAdding] = useState(false);
 
   return (
     // Bottom padding on phones leaves room for the tab bar.
@@ -123,10 +125,10 @@ export default function App({ user }: { user: Me['user'] }) {
             {data.leagues.length > 0 && <MatchupTable leagues={data.leagues} onEdit={setEditing} />}
             <button
               type="button"
-              onClick={() => setEditing('new')}
+              onClick={() => setAdding(true)}
               className="mt-3 w-full rounded-xl border border-dashed border-slate-700 py-3 text-sm font-medium text-slate-400 hover:border-slate-500 hover:text-slate-200"
             >
-              + Add FFPC league (manual roster)
+              + Add league
             </button>
           </main>
         )
@@ -148,6 +150,15 @@ export default function App({ user }: { user: Me['user'] }) {
         </main>
       )}
 
+      {adding && (
+        <AddLeagueDialog
+          onClose={() => setAdding(false)}
+          onFfpc={() => {
+            setAdding(false);
+            setEditing('new'); // FFPC has its own paste-based editor
+          }}
+        />
+      )}
       {editing && <ManualLeagueEditor leagueId={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
     </div>
   );

@@ -8,6 +8,7 @@ import { reminderRepo } from '../reminders/store.js';
 import { sleeperClient } from '../adapters/sleeper/client.js';
 import { toPlayer } from '../adapters/sleeper/mapper.js';
 import { config } from '../config.js';
+import { activeSources } from '../sources/store.js';
 import { playerKey } from '../exposure.js';
 import { nflGames } from '../scoring/games.js';
 import type { WaiverContext } from './context.js';
@@ -44,9 +45,10 @@ export async function getWaivers(): Promise<WaiversResponse> {
     trendingAdds: trending,
   };
 
+  const sources = await activeSources();
   const results = await Promise.all([
-    fetchSleeperWaivers(config.sleeperUsernames, ctx),
-    fetchEspnWaivers(config.espnLeagueIds, config.espnAuth, ctx),
+    fetchSleeperWaivers(sources.sleeperUsernames, ctx),
+    fetchEspnWaivers(sources.espnLeagueIds, config.espnAuth, ctx),
     fetchFfpcWaivers(ctx),
   ]);
   const [, espn] = results;

@@ -120,3 +120,17 @@ export const waiverReminders = pgTable(
   },
   (t) => [primaryKey({ columns: [t.platform, t.leagueId, t.runAt] })],
 );
+
+// Accounts and leagues added in the app: a Sleeper username (all its leagues)
+// or an ESPN league id. Ones in .env are added on top and aren't stored here.
+export const leagueSources = pgTable(
+  'league_sources',
+  {
+    id: serial('id').primaryKey(),
+    platform: text('platform').notNull(), // 'sleeper' | 'espn'
+    value: text('value').notNull(), // username or league id
+    label: text('label'), // what the platform calls it, shown in the list
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique('league_sources_platform_value').on(t.platform, t.value)],
+);

@@ -4,6 +4,7 @@ import { fetchManualLeagues } from './adapters/manual/index.js';
 import { fetchSleeperLeagues, sleeperNflState } from './adapters/sleeper/index.js';
 import { backfillHistory } from './backfill.js';
 import { config } from './config.js';
+import { activeSources } from './sources/store.js';
 import { buildExposure } from './exposure.js';
 import { adviseLeagues } from './lineupAdvice.js';
 import { recordSnapshots } from './snapshots.js';
@@ -12,9 +13,11 @@ export async function getDashboard(): Promise<DashboardResponse> {
   // Sleeper's /state/nfl doubles as our "what season/week is it" clock for all platforms.
   const nfl = await sleeperNflState();
 
+  // Accounts and leagues from .env plus any added in the app.
+  const sources = await activeSources();
   const results = await Promise.all([
-    fetchSleeperLeagues(config.sleeperUsernames),
-    fetchEspnLeagues(config.espnLeagueIds, nfl.season, config.espnAuth),
+    fetchSleeperLeagues(sources.sleeperUsernames),
+    fetchEspnLeagues(sources.espnLeagueIds, nfl.season, config.espnAuth),
     fetchManualLeagues(nfl),
   ]);
 
