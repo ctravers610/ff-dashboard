@@ -18,5 +18,10 @@ const list = (value: string | undefined) =>
 export const config = {
   port: Number(process.env.API_PORT ?? 3001),
   sleeperUsernames: list(process.env.SLEEPER_USERNAMES),
+  espnLeagueIds: list(process.env.ESPN_LEAGUE_IDS),
+  espnAuth:
+    process.env.ESPN_S2 && process.env.ESPN_SWID
+      ? { espnS2: process.env.ESPN_S2.trim(), swid: process.env.ESPN_SWID.trim() }
+      : null,
   cacheDir: path.join(rootDir, 'apps', 'api', '.cache'),
 };

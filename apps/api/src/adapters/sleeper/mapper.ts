@@ -4,12 +4,12 @@
 import type {
   InjuryStatus,
   LeagueSummary,
-  LineupAlert,
   MatchupSide,
   Player,
   StarterSlot,
   TeamStanding,
 } from '@ffd/shared';
+import { buildAlerts, rankStandings } from '../common.js';
 import type {
   SleeperLeague,
   SleeperMatchup,
@@ -59,7 +59,7 @@ export function toPlayer(playerId: string, players: SleeperPlayerMap): Player | 
 export function buildStandings(rosters: SleeperRoster[], users: SleeperUser[]): TeamStanding[] {
   const usersById = new Map(users.map((u) => [u.user_id, u]));
 
-  const teams = rosters.map((r) => {
+  const teams = rosters.map((r): TeamStanding => {
     const owner = r.owner_id ? usersById.get(r.owner_id) : undefined;
     return {
       teamId: String(r.roster_id),
@@ -75,13 +75,7 @@ export function buildStandings(rosters: SleeperRoster[], users: SleeperUser[]): 
     };
   });
 
-  const winPct = (t: TeamStanding) => {
-    const games = t.wins + t.losses + t.ties;
-    return games ? (t.wins + t.ties / 2) / games : 0;
-  };
-  teams.sort((a, b) => winPct(b) - winPct(a) || b.pointsFor - a.pointsFor);
-  teams.forEach((t, i) => (t.rank = i + 1));
-  return teams;
+  return rankStandings(teams);
 }
 
 function buildStarters(
@@ -95,18 +89,6 @@ function buildStarters(
     player: toPlayer(starterIds[i] ?? EMPTY_SLOT_ID, players),
     points: starterPoints[i] ?? 0,
   }));
-}
-
-export function buildAlerts(starters: StarterSlot[]): LineupAlert[] {
-  const alerts: LineupAlert[] = [];
-  for (const { slot, player } of starters) {
-    if (!player) {
-      alerts.push({ slot, playerName: null, reason: 'empty', detail: `Empty ${slot} slot` });
-    } else if (player.injuryStatus) {
-      alerts.push({ slot, playerName: player.name, reason: 'injury', detail: player.injuryStatus });
-    }
-  }
-  return alerts;
 }
 
 // Returns null when none of the league's rosters belong to this account.

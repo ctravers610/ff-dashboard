@@ -1,15 +1,16 @@
 import type { DashboardResponse } from '@ffd/shared';
+import { fetchEspnLeagues } from './adapters/espn/index.js';
 import { fetchSleeperLeagues, sleeperNflState } from './adapters/sleeper/index.js';
 import { config } from './config.js';
 
 export async function getDashboard(): Promise<DashboardResponse> {
-  // Sleeper's /state/nfl doubles as our "what week is it" clock for all platforms.
-  const [nfl, sleeper] = await Promise.all([
-    sleeperNflState(),
-    fetchSleeperLeagues(config.sleeperUsernames),
-  ]);
+  // Sleeper's /state/nfl doubles as our "what season/week is it" clock for all platforms.
+  const nfl = await sleeperNflState();
 
-  const results = [sleeper];
+  const results = await Promise.all([
+    fetchSleeperLeagues(config.sleeperUsernames),
+    fetchEspnLeagues(config.espnLeagueIds, nfl.season, config.espnAuth),
+  ]);
 
   // The same league can show up under two of your accounts; keep it once.
   const seen = new Set<string>();

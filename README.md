@@ -24,7 +24,7 @@ Each platform has an **adapter** in `apps/api/src/adapters/<platform>/` that fet
 | Platform | Status |
 |---|---|
 | Sleeper | ✅ Done (public API) |
-| ESPN | Planned |
+| ESPN | ✅ Done (unofficial API, cookie auth for private leagues) |
 | Yahoo | Planned (OAuth 2.0) |
 | FFPC | Planned |
 
@@ -34,8 +34,18 @@ Requires Node 20.12+.
 
 ```bash
 npm install
-cp .env.example .env   # then set your usernames
+cp .env.example .env   # then fill in your accounts
 npm run dev            # API on :3001, web on http://localhost:5173
 ```
 
 Other scripts: `npm test`, `npm run typecheck`.
+
+### ESPN cookies
+
+Private ESPN leagues need two cookies from a browser where you're logged in to ESPN:
+
+1. Open fantasy.espn.com and log in.
+2. Open DevTools (F12) → **Application** tab → **Cookies** → `https://fantasy.espn.com`.
+3. Copy the values of `espn_s2` and `SWID` into `ESPN_S2` and `ESPN_SWID` in `.env`.
+
+The SWID (with its curly braces) is also how the dashboard knows which team is yours. These cookies act like a login, so keep them in `.env` only.
