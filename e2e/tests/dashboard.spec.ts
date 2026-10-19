@@ -45,6 +45,16 @@ test.describe('Matchups', () => {
     await expect(rows.nth(1)).toContainText(`+${(SLEEPER_ME_POINTS - SLEEPER_OPP_POINTS).toFixed(1)}`);
   });
 
+  test('shows PMR for both sides of each matchup', async ({ page }) => {
+    // The default test window is 1280 wide, where the PMR columns appear.
+    const rows = page.getByRole('region', { name: 'Matchups' }).getByRole('article');
+    const espn = rows.filter({ has: page.getByText(ESPN_LEAGUE_NAME, { exact: true }) });
+    const sleeper = rows.filter({ has: page.getByText(SLEEPER_LEAGUE_NAME, { exact: true }) });
+    // Player minutes remaining: Jayden Reed's GB game hasn't started (60); every other game is final.
+    await expect(espn).toContainText('60 player minutes remaining for you0 for your opponent');
+    await expect(sleeper).toContainText('0 player minutes remaining for you0 for your opponent');
+  });
+
   test('opening the Sleeper league shows team, rank and projections', async ({ page }) => {
     const card = await openLeague(page, SLEEPER_LEAGUE_NAME);
     await expect(card).toContainText(`${SLEEPER_MY_TEAM} · @E2E Manager`);

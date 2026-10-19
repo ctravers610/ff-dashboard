@@ -7,6 +7,8 @@ import { config } from './config.js';
 import { activeSources } from './sources/store.js';
 import { buildExposure } from './exposure.js';
 import { adviseLeagues } from './lineupAdvice.js';
+import { withMinutesLeft } from './minutesLeft.js';
+import { nflGames } from './scoring/games.js';
 import { recordSnapshots } from './snapshots.js';
 
 export async function getDashboard(): Promise<DashboardResponse> {
@@ -32,7 +34,8 @@ export async function getDashboard(): Promise<DashboardResponse> {
       return true;
     });
   // Drop alerts that can't be acted on any more and suggest bench swaps for the rest.
-  const leagues = await adviseLeagues(unique, nfl);
+  const advised = await adviseLeagues(unique, nfl);
+  const leagues = withMinutesLeft(advised, nfl.week, await nflGames(nfl.season, nfl.week).catch(() => null));
 
   // Record history in the background: a database problem must never break the dashboard.
   recordSnapshots(leagues).catch((e) => console.error('Could not save league snapshots:', e));

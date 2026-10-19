@@ -6,6 +6,7 @@ import { LeagueDetails } from './LeagueDetails';
 
 const leagueKey = (l: LeagueSummary) => `${l.platform}:${l.leagueId}`;
 
+
 function opponentCell(l: LeagueSummary): string {
   const m = l.matchup;
   if (!m) return '—';
@@ -39,8 +40,10 @@ export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; on
   const widest = Math.max(1, ...rows.map((r) => Math.abs(r.margin ?? 0)));
 
   // Shared column layout for the header and every row; the opponent and bar columns appear from sm up.
+  // Phone: league, score, margin, win %. From sm: plus opponent and the margin bar.
+  // From xl (wide enough beside the live feed): plus both sides' PMR.
   const columns =
-    'grid grid-cols-[minmax(0,1fr)_auto_auto_2.75rem_1rem] items-center gap-x-3 sm:grid-cols-[minmax(0,1.7fr)_5rem_6rem_minmax(0,1fr)_3.5rem_1rem]';
+    'grid grid-cols-[minmax(0,1fr)_auto_auto_2.75rem_1rem] items-center gap-x-3 sm:grid-cols-[minmax(0,1.7fr)_5rem_6rem_minmax(0,1fr)_3.5rem_1rem] xl:grid-cols-[minmax(0,1.7fr)_5rem_5.5rem_minmax(0,1fr)_3.5rem_4.25rem_4.25rem_1rem]';
 
   return (
     <section aria-label="Matchups" className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
@@ -50,6 +53,13 @@ export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; on
         <span className="hidden text-right sm:block">Opponent</span>
         <span>Margin</span>
         <span className="text-right">Win %</span>
+        {/* Player minutes remaining: 60 per starter, ticking down as each game is played. */}
+        <span className="hidden text-right xl:block" title="Your player minutes remaining: 60 per starter, ticking down as each game is played">
+          My PMR
+        </span>
+        <span className="hidden text-right xl:block" title="Your opponent's player minutes remaining">
+          Opp. PMR
+        </span>
         <span />
       </div>
       {rows.map(({ league, key, margin, status, odds }) => {
@@ -103,6 +113,14 @@ export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; on
               <span className="text-right text-sm tabular-nums text-slate-300">
                 {odds != null ? `${Math.round(odds * 100)}%` : '—'}
                 <span className="sr-only"> to win</span>
+              </span>
+              <span className="hidden text-right text-sm tabular-nums text-slate-100 xl:block">
+                {league.matchup?.me.minutesLeft ?? '—'}
+                <span className="sr-only"> player minutes remaining for you</span>
+              </span>
+              <span className="hidden text-right text-sm tabular-nums text-slate-400 xl:block">
+                {league.matchup?.opponent?.minutesLeft ?? '—'}
+                <span className="sr-only"> for your opponent</span>
               </span>
               <ChevronIcon className={`text-slate-400 transition ${isOpen ? 'rotate-180' : ''}`} />
             </button>

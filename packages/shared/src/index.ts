@@ -46,6 +46,9 @@ export interface MatchupSide {
   points: number;
   projected?: number | null;
   starters: StarterSlot[];
+  // PMR, player minutes remaining: 60 per starter, ticking down as his game is
+  // played (0 once it's over, on a bye, or for an empty slot). Null if unknown.
+  minutesLeft?: number | null;
 }
 
 // All-play week (e.g. FFPC week 6): you win by finishing in the top half of

@@ -1,6 +1,6 @@
 import type { LeagueSummary } from '@ffd/shared';
 import { useState } from 'react';
-import { ordinal, record } from '../format';
+import { ordinal, pmr, record } from '../format';
 import { AllPlaySummary, AllPlayTable } from './AllPlay';
 import { LineupTable } from './LineupTable';
 import { RosterList } from './RosterList';
@@ -36,12 +36,19 @@ export function LeagueDetails({ league, onEdit }: { league: LeagueSummary; onEdi
             ? `${league.manual.leagueName} · entered manually, updated ${new Date(league.manual.updatedAt).toLocaleDateString()}`
             : `${me?.teamName} · @${league.account}`}
         </p>
-        {me && (
-          <p className="text-slate-400">
-            Record <span className="font-semibold tabular-nums text-slate-100">{record(me)}</span> · Rank{' '}
-            <span className="font-semibold text-slate-100">{ordinal(me.rank)}</span> of {league.standings.length}
-          </p>
-        )}
+        <p className="flex flex-wrap gap-x-3 text-slate-400">
+          {me && (
+            <span>
+              Record <span className="font-semibold tabular-nums text-slate-100">{record(me)}</span> · Rank{' '}
+              <span className="font-semibold text-slate-100">{ordinal(me.rank)}</span> of {league.standings.length}
+            </span>
+          )}
+          {league.matchup?.me.minutesLeft != null && (
+            <span title="Player minutes remaining: 60 per starter, ticking down as each game is played">
+              PMR <span className="font-semibold tabular-nums text-slate-100">{pmr(league)}</span>
+            </span>
+          )}
+        </p>
       </div>
 
       {league.matchup ? (

@@ -1,4 +1,4 @@
-import type { AllPlay, Matchup, TeamStanding } from '@ffd/shared';
+import type { AllPlay, LeagueSummary, Matchup, TeamStanding } from '@ffd/shared';
 
 // Whether you're winning this week, now and by projection. In an all-play week
 // that means being inside the top-N win line; otherwise beating your opponent.
@@ -53,3 +53,11 @@ export const PLATFORM_LABEL: Record<string, string> = {
   yahoo: 'Yahoo',
   ffpc: 'FFPC',
 };
+
+/** "120 · 60": your PMR and your opponent's (just yours in an all-play week). */
+export function pmr(l: LeagueSummary): string {
+  const mine = l.matchup?.me.minutesLeft;
+  if (mine == null) return '—';
+  const theirs = l.matchup?.opponent?.minutesLeft;
+  return theirs == null ? String(mine) : `${mine} · ${theirs}`;
+}
