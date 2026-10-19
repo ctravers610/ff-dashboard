@@ -10,6 +10,8 @@ import { defaultSender } from './reminders/routes.js';
 import { sendDueReminders } from './reminders/send.js';
 import { reminderRepo } from './reminders/store.js';
 import { getWaivers } from './waivers/index.js';
+import { sleeperNflState } from './adapters/sleeper/index.js';
+import { gamesLive, pollLive } from './live/service.js';
 
 const app = await buildApp();
 
@@ -59,6 +61,24 @@ if (sender) {
 } else {
   app.log.info('Waiver reminders are off: set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY to turn them on.');
 }
+
+// The live feed: every 30 seconds while games are on, record scoring changes.
+let polling = false;
+setInterval(async () => {
+  if (polling) return; // a slow check never overlaps the next
+  polling = true;
+  try {
+    const { season, week } = await sleeperNflState();
+    if (await gamesLive(season, week)) {
+      const events = await pollLive();
+      if (events.length) app.log.info(`Live feed: ${events.length} new scoring event(s)`);
+    }
+  } catch (e) {
+    app.log.warn(e, 'Live feed check failed');
+  } finally {
+    polling = false;
+  }
+}, 30_000).unref();
 
 // Hosts stop the old instance with SIGTERM on every deploy (and Ctrl+C sends
 // SIGINT): stop accepting requests, let in-flight ones finish, close the pool.

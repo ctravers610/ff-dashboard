@@ -134,3 +134,16 @@ export const leagueSources = pgTable(
   },
   (t) => [unique('league_sources_platform_value').on(t.platform, t.value)],
 );
+
+// The live feed: each scoring change while games are on, kept for the week.
+export const liveEvents = pgTable(
+  'live_events',
+  {
+    id: serial('id').primaryKey(),
+    season: text('season').notNull(),
+    week: integer('week').notNull(),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+    event: jsonb('event').notNull(), // player, description and per-league points
+  },
+  (t) => [index('live_events_week').on(t.season, t.week, t.id)],
+);

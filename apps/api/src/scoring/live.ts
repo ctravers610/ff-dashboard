@@ -15,7 +15,8 @@ interface StatRow {
   stats: Record<string, number>;
 }
 
-async function fetchStats(season: string, week: number): Promise<Map<string, Record<string, number>>> {
+// Uncached: the live feed reads it every 30 seconds while games are on.
+export async function fetchStats(season: string, week: number): Promise<Map<string, Record<string, number>>> {
   const res = await fetch(`${config.upstream.sleeperStats}/stats/nfl/${season}/${week}?season_type=regular`);
   if (!res.ok) throw new Error(`Sleeper stats returned HTTP ${res.status}`);
   const rows = (await res.json()) as StatRow[];

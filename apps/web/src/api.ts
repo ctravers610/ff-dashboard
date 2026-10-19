@@ -1,4 +1,4 @@
-import type { DashboardResponse, HistoryResponse, WaiversResponse } from '@ffd/shared';
+import type { DashboardResponse, HistoryResponse, LiveFeedResponse, WaiversResponse } from '@ffd/shared';
 import { useQuery } from '@tanstack/react-query';
 
 /** A 401 from the API: the session is missing or expired. The app answers it with the sign-in screen. */
@@ -53,6 +53,15 @@ export function useWaivers() {
     queryKey: ['waivers'],
     queryFn: () => api<WaiversResponse>('/api/waivers'),
     refetchInterval: 5 * 60_000,
+  });
+}
+
+// The live scoring feed; checked often since it changes play by play.
+export function useLive() {
+  return useQuery({
+    queryKey: ['live'],
+    queryFn: () => api<LiveFeedResponse>('/api/live'),
+    refetchInterval: 15_000,
   });
 }
 

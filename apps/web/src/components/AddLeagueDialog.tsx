@@ -1,4 +1,4 @@
-import type { LeagueSource, SourcesResponse } from '@ffd/shared';
+import type { LeagueSource, ManualLeague, SourcesResponse } from '@ffd/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api } from '../api';
@@ -88,8 +88,10 @@ function YahooPanel() {
   );
 }
 
-// Everything the dashboard follows, with a remove button for what was added here.
-function Connected({ data }: { data: SourcesResponse }) {
+// Everything the dashboard follows: Sleeper and ESPN can be removed here; an
+// FFPC league opens its editor, where deleting it (and its history) is confirmed.
+function Connected({ data, onEditFfpc }: { data: SourcesResponse; onEditFfpc: (id: string) => void }) {
+  const { data: ffpc } = useQuery({ queryKey: ['manual-leagues'], queryFn: () => api<ManualLeague[]>('/api/manual-leagues') });
   const queryClient = useQueryClient();
   const remove = useMutation({
     mutationFn: (id: number) => api(`/api/sources/${id}`, { method: 'DELETE' }),
@@ -97,7 +99,7 @@ function Connected({ data }: { data: SourcesResponse }) {
       for (const key of ['sources', 'dashboard', 'waivers']) void queryClient.invalidateQueries({ queryKey: [key] });
     },
   });
-  if (data.sources.length === 0) return null;
+  if (data.sources.length === 0 && !ffpc?.length) return null;
   return (
     <section aria-label="Connected accounts and leagues" className="flex flex-col gap-2 border-t border-slate-800 pt-4">
       <h3 className="text-sm font-semibold text-slate-200">On your dashboard</h3>
@@ -122,12 +124,28 @@ function Connected({ data }: { data: SourcesResponse }) {
             )}
           </li>
         ))}
+        {ffpc?.map((l) => (
+          <li key={l.id} className="flex items-center justify-between gap-3 py-2">
+            <span className="min-w-0">
+              <span className="font-medium">FFPC</span> <span className="text-slate-300">{l.teamName || l.name}</span>
+              {l.teamName && <span className="text-slate-400"> · {l.name}</span>}
+            </span>
+            <button
+              type="button"
+              onClick={() => onEditFfpc(l.id)}
+              aria-label={`Edit ${l.teamName || l.name}`}
+              className="shrink-0 rounded-md px-2 py-0.5 text-violet-300 hover:bg-violet-950"
+            >
+              Edit
+            </button>
+          </li>
+        ))}
       </ul>
     </section>
   );
 }
 
-export function AddLeagueDialog({ onClose, onFfpc }: { onClose: () => void; onFfpc: () => void }) {
+export function AddLeagueDialog({ onClose, onFfpc, onEditFfpc }: { onClose: () => void; onFfpc: () => void; onEditFfpc: (id: string) => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [platform, setPlatform] = useState<Platform | null>(null);
   const { data } = useQuery({ queryKey: ['sources'], queryFn: () => api<SourcesResponse>('/api/sources') });
@@ -179,7 +197,7 @@ export function AddLeagueDialog({ onClose, onFfpc }: { onClose: () => void; onFf
           </>
         )}
 
-        {data && <Connected data={data} />}
+        {data && <Connected data={data} onEditFfpc={onEditFfpc} />}
       </div>
     </dialog>
   );

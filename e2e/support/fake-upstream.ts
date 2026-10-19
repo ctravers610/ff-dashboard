@@ -74,7 +74,7 @@ function route(url: URL, headers: http.IncomingHttpHeaders): Reply | null {
   if (p === '/sleeper/v1/players/nfl/trending/add') return { body: waivers.trendingAdds };
 
   // ── Sleeper stats and projections ────────────────────────────────────
-  if (p === `/sleeper-stats/stats/nfl/${SEASON}/${WEEK}`) return { body: ffpc.statsRows() };
+  if (p === `/sleeper-stats/stats/nfl/${SEASON}/${WEEK}`) return { body: withPlays(ffpc.statsRows()) };
   if (p === `/sleeper-stats/projections/nfl/${SEASON}/${WEEK}`) return { body: projectionRows() };
   // Later weeks, for waivers: the claim week and the rest of the season.
   if (p.startsWith(`/sleeper-stats/projections/nfl/${SEASON}/`)) return { body: waivers.sleeperProjectionRows(ALL_PLAYERS) };
@@ -93,6 +93,36 @@ function route(url: URL, headers: http.IncomingHttpHeaders): Reply | null {
     }
   }
 
+  return null;
+}
+
+// ── Live plays ──────────────────────────────────────────────────────────
+// Tests "score" a play by adding stats to a player's line (POST /_live/play),
+// so the live feed has something new on its next look; /_live/reset clears them.
+let plays: Record<string, Record<string, number>> = {};
+
+function withPlays(rows: { player_id: string; stats: Record<string, number> }[]) {
+  const out = rows.map((r) => ({ player_id: r.player_id, stats: { ...r.stats } }));
+  for (const [id, add] of Object.entries(plays)) {
+    let row = out.find((r) => r.player_id === id);
+    if (!row) out.push((row = { player_id: id, stats: {} }));
+    for (const [k, v] of Object.entries(add)) row.stats[k] = (row.stats[k] ?? 0) + v;
+  }
+  return out;
+}
+
+function livePlays(req: http.IncomingMessage, url: URL): Reply | null {
+  if (req.method !== 'POST') return null;
+  if (url.pathname === '/_live/reset') {
+    plays = {};
+    return { body: { ok: true } };
+  }
+  if (url.pathname === '/_live/play') {
+    const id = url.searchParams.get('player')!;
+    const add = plays[id] ?? (plays[id] = {});
+    for (const [k, v] of url.searchParams) if (k !== 'player') add[k] = (add[k] ?? 0) + Number(v);
+    return { body: { ok: true } };
+  }
   return null;
 }
 
@@ -146,7 +176,7 @@ export function createFakeUpstream() {
     req.on('data', (chunk) => (body += chunk));
     req.on('end', () => {
       const url = new URL(req.url ?? '/', 'http://fake');
-      const reply = github(req, url, body) ?? route(url, req.headers);
+      const reply = livePlays(req, url) ?? github(req, url, body) ?? route(url, req.headers);
       if (reply && 'redirect' in reply) {
         res.writeHead(302, { Location: reply.redirect });
         return res.end();

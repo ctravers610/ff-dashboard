@@ -1,8 +1,10 @@
 import type { Page } from '@playwright/test';
 import { ESPN_LEAGUE_ID, ESPN_LEAGUE_NAME } from '../fixtures/espn.js';
 import { FRIEND_USERNAME, SLEEPER_USERNAME } from '../fixtures/sleeper.js';
+import { FFPC_LEAGUE, FFPC_TEAM } from '../fixtures/ffpc.js';
 import { expect, test } from './fixtures.js';
 import { openDashboard } from './helpers.js';
+import { seedFfpcLeague } from './seed.js';
 
 // Adding Sleeper accounts and ESPN leagues from the dashboard. Each is checked
 // against the platform before it's saved.
@@ -65,6 +67,16 @@ test.describe('Adding leagues', () => {
     await field.fill('not a league');
     await dialog(page).getByRole('button', { name: 'Add', exact: true }).click();
     await expect(dialog(page).getByRole('alert')).toContainText('it contains leagueId=');
+  });
+
+  test('lists FFPC leagues by team, and Edit opens that league’s editor', async ({ page, request }) => {
+    await seedFfpcLeague(request);
+    await page.reload();
+    await page.getByRole('button', { name: '+ Add league' }).click();
+    const row = connected(page).filter({ hasText: FFPC_TEAM });
+    await expect(row).toContainText(`FFPC ${FFPC_TEAM} · ${FFPC_LEAGUE}`);
+    await row.getByRole('button', { name: `Edit ${FFPC_TEAM}` }).click();
+    await expect(page.getByRole('heading', { name: 'Edit FFPC roster' })).toBeVisible();
   });
 
   test('Escape closes the dialog', async ({ page }) => {

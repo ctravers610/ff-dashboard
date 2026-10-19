@@ -300,3 +300,30 @@ export interface SourcesResponse {
   sources: LeagueSource[];
   espnCookies: boolean; // ESPN leagues need your ESPN cookies (set in .env)
 }
+
+// ── Live feed ──────────────────────────────────────────────────────────
+
+// One player's scoring since the last look, and what it's worth in each league he's in.
+export interface LiveEvent {
+  id: number;
+  at: string;
+  week: number;
+  player: Player;
+  description: string; // "1 catch, 14 rec yds" or "now 17 points allowed"
+  leagues: LiveEventLeague[];
+}
+
+export interface LiveEventLeague {
+  leagueKey: string; // "sleeper:123"
+  leagueName: string;
+  platform: Platform;
+  role: 'starter' | 'bench' | 'opponent'; // opponent = starting against you this week
+  points: number | null; // null when that platform hasn't caught up yet
+}
+
+export interface LiveFeedResponse {
+  week: number;
+  live: boolean; // games are being played and the feed is watching
+  lastCheckedAt: string | null;
+  events: LiveEvent[]; // newest first
+}

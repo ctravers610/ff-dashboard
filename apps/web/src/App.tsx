@@ -3,7 +3,8 @@ import { signOut, useDashboard, useWaivers, type Me } from './api';
 import { AddLeagueDialog } from './components/AddLeagueDialog';
 import { AlertList } from './components/AlertList';
 import { Hero } from './components/Hero';
-import { ChartIcon, FootballIcon, RefreshIcon, ScoreboardIcon, SwapIcon, UsersIcon } from './components/icons';
+import { ChartIcon, FootballIcon, PulseIcon, RefreshIcon, ScoreboardIcon, SwapIcon, UsersIcon } from './components/icons';
+import { LatestScoring, LiveFeed } from './components/live/LiveFeed';
 import { ManualLeagueEditor } from './components/ManualLeagueEditor';
 import { MatchupTable } from './components/MatchupTable';
 import { PlayersView } from './components/PlayersView';
@@ -15,9 +16,10 @@ const HistoryView = lazy(() =>
   import('./components/history/HistoryView').then((m) => ({ default: m.HistoryView })),
 );
 
-type View = 'matchups' | 'waivers' | 'players' | 'history';
+type View = 'matchups' | 'live' | 'waivers' | 'players' | 'history';
 const VIEWS: { id: View; label: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
   { id: 'matchups', label: 'Matchups', Icon: ScoreboardIcon },
+  { id: 'live', label: 'Live', Icon: PulseIcon },
   { id: 'waivers', label: 'Waivers', Icon: SwapIcon },
   { id: 'players', label: 'Players', Icon: UsersIcon },
   { id: 'history', label: 'History', Icon: ChartIcon },
@@ -121,6 +123,7 @@ export default function App({ user }: { user: Me['user'] }) {
         data && (
           <main>
             {data.leagues.length > 0 && <Hero data={data} />}
+            <LatestScoring onSeeAll={() => setView('live')} />
             <AlertList leagues={data.leagues} />
             {data.leagues.length > 0 && <MatchupTable leagues={data.leagues} onEdit={setEditing} />}
             <button
@@ -132,6 +135,10 @@ export default function App({ user }: { user: Me['user'] }) {
             </button>
           </main>
         )
+      ) : view === 'live' ? (
+        <main>
+          <LiveFeed />
+        </main>
       ) : view === 'waivers' ? (
         <main>
           <WaiversView />
@@ -156,6 +163,10 @@ export default function App({ user }: { user: Me['user'] }) {
           onFfpc={() => {
             setAdding(false);
             setEditing('new'); // FFPC has its own paste-based editor
+          }}
+          onEditFfpc={(id) => {
+            setAdding(false);
+            setEditing(id);
           }}
         />
       )}
