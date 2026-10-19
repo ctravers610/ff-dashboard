@@ -1,12 +1,14 @@
 # Fantasy Dashboard
 
+[![CI](https://github.com/ctravers610/ff-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/ctravers610/ff-dashboard/actions/workflows/ci.yml)
+
 One place to follow all of my fantasy football teams across platforms: live matchups, standings, and lineup alerts.
 
 ## Stack
 
 - **Frontend:** React 19, TypeScript, Vite, TanStack Query, Tailwind CSS
 - **Backend:** Node.js, TypeScript, Fastify
-- **Testing:** Vitest
+- **Testing & CI:** Vitest, GitHub Actions (typecheck, tests, build on every push)
 - **Repo:** npm workspaces monorepo
 
 ```
@@ -25,7 +27,7 @@ Each platform has an **adapter** in `apps/api/src/adapters/<platform>/` that fet
 |---|---|
 | Sleeper | ✅ Done (public API) |
 | ESPN | ✅ Done (unofficial API, cookie auth for private leagues) |
-| Yahoo | Planned (OAuth 2.0) |
+| Yahoo | OAuth 2.0 sign-in done; data pending Yahoo API approval |
 | FFPC | Planned |
 
 ## Running locally
