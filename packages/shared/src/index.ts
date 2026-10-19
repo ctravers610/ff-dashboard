@@ -3,6 +3,7 @@
 // needs to know which platform a league came from.
 
 export * from './ffpc';
+export * from './ffpcLive';
 
 export type Platform ='sleeper' | 'espn' | 'yahoo' | 'ffpc';
 
@@ -76,7 +77,8 @@ export interface LeagueSummary {
   matchup: Matchup | null;
   alerts: LineupAlert[];
   roster: RosterEntry[]; // every player on your team
-  manual?: { teamName: string; updatedAt: string; unmatched: string[] }; // set for hand-entered leagues
+  // Set for hand-entered leagues.
+  manual?: { teamName: string; updatedAt: string; unmatched: string[]; matchupCapturedAt: string | null };
 }
 
 // A league you maintain by hand (e.g. FFPC, which has no API we can use).
@@ -84,6 +86,20 @@ export interface ManualLeagueInput {
   name: string;
   teamName: string;
   rosterText: string; // one player per line, optional slot prefix: "WR Puka Nacua"
+  matchup?: ManualMatchup | null; // optional weekly snapshot pasted from a live scoring page
+}
+
+export interface ManualMatchupSide {
+  teamName: string;
+  points: number;
+  starters: { slot: string; name: string; points: number }[];
+}
+
+export interface ManualMatchup {
+  week: number;
+  capturedAt: string; // when it was pasted; scores are a snapshot, not live
+  me: ManualMatchupSide;
+  opponent: ManualMatchupSide;
 }
 
 export interface ManualLeague extends ManualLeagueInput {

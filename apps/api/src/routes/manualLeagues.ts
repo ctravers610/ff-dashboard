@@ -7,6 +7,30 @@ import {
   updateManualLeague,
 } from '../adapters/manual/store.js';
 
+const sideSchema = {
+  type: 'object',
+  required: ['teamName', 'points', 'starters'],
+  additionalProperties: false,
+  properties: {
+    teamName: { type: 'string', maxLength: 80 },
+    points: { type: 'number' },
+    starters: {
+      type: 'array',
+      maxItems: 30,
+      items: {
+        type: 'object',
+        required: ['slot', 'name', 'points'],
+        additionalProperties: false,
+        properties: {
+          slot: { type: 'string', maxLength: 12 },
+          name: { type: 'string', maxLength: 80 },
+          points: { type: 'number' },
+        },
+      },
+    },
+  },
+} as const;
+
 // Fastify validates request bodies against this JSON schema before our handler
 // runs, and responds 400 automatically when they don't match.
 const inputSchema = {
@@ -17,6 +41,22 @@ const inputSchema = {
     name: { type: 'string', minLength: 1, maxLength: 80 },
     teamName: { type: 'string', maxLength: 80 },
     rosterText: { type: 'string', maxLength: 50000 }, // room for a whole pasted FFPC page
+    matchup: {
+      anyOf: [
+        { type: 'null' },
+        {
+          type: 'object',
+          required: ['week', 'capturedAt', 'me', 'opponent'],
+          additionalProperties: false,
+          properties: {
+            week: { type: 'integer', minimum: 0, maximum: 25 },
+            capturedAt: { type: 'string', format: 'date-time' },
+            me: sideSchema,
+            opponent: sideSchema,
+          },
+        },
+      ],
+    },
   },
 } as const;
 

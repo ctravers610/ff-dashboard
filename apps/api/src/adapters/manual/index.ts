@@ -3,6 +3,8 @@ import {
   looksLikeFfpcPage,
   type LeagueSummary,
   type ManualLeague,
+  type ManualMatchupSide,
+  type MatchupSide,
   type RosterEntry,
   type StarterSlot,
 } from '@ffd/shared';
@@ -35,6 +37,21 @@ export function toManualSummary(
     if (status === 'starter') starters.push({ slot: line.slot ?? player.position, player, points: 0 });
   }
 
+  // A pasted matchup is only shown during the week it was captured.
+  const snapshot = league.matchup?.week === nfl.week ? league.matchup : null;
+  const toSide = (side: ManualMatchupSide, teamId: string): MatchupSide => ({
+    teamId,
+    teamName: side.teamName,
+    points: side.points,
+    starters: side.starters.map((s) => {
+      // Reuse the roster parser so slots and names are normalized the same way.
+      const line = parseRosterText(`${s.slot} ${s.name}`)[0] ?? { slot: s.slot, name: s.name };
+      const player = resolvePlayer(line, index);
+      if (!player) unmatched.push(s.name);
+      return { slot: line.slot ?? s.slot, player, points: s.points };
+    }),
+  });
+
   return {
     leagueId: league.id,
     platform: league.platform,
@@ -44,10 +61,17 @@ export function toManualSummary(
     week: nfl.week,
     myTeamId: 'me',
     standings: [],
-    matchup: null,
+    matchup: snapshot
+      ? { week: snapshot.week, me: toSide(snapshot.me, 'me'), opponent: toSide(snapshot.opponent, 'opponent') }
+      : null,
     alerts: buildAlerts(starters),
     roster,
-    manual: { teamName: league.teamName, updatedAt: league.updatedAt, unmatched },
+    manual: {
+      teamName: league.teamName,
+      updatedAt: league.updatedAt,
+      unmatched: [...new Set(unmatched)],
+      matchupCapturedAt: snapshot?.capturedAt ?? null,
+    },
   };
 }
 

@@ -58,10 +58,23 @@ export function LeagueCard({ league, onEdit }: { league: LeagueSummary; onEdit?:
       )}
 
       {league.matchup ? (
-        <Scoreboard matchup={league.matchup} />
+        <div className="flex flex-col gap-1">
+          <Scoreboard matchup={league.matchup} />
+          {league.manual?.matchupCapturedAt && (
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Snapshot as of{' '}
+              {new Date(league.manual.matchupCapturedAt).toLocaleString([], {
+                weekday: 'short',
+                hour: 'numeric',
+                minute: '2-digit',
+              })}
+              , not live. Re-paste the Live Scoring page in Edit roster to update.
+            </p>
+          )}
+        </div>
       ) : league.manual ? (
         <p className="text-sm text-slate-500">
-          {league.roster.length} players · no live scores or standings for manually entered leagues.
+          {league.roster.length} players · paste this week's Live Scoring page in Edit roster to see your matchup.
         </p>
       ) : (
         <p className="text-sm text-slate-500">No matchup this week.</p>
