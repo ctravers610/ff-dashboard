@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from './app.js';
+import { createDb } from './db/client.js';
 
 // A stand-in for the built web app: an index.html plus one fingerprinted asset.
 let webDist: string;
@@ -23,6 +24,15 @@ describe('health', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ ok: true, commit: 'dev' });
     expect(new Date(res.json().startedAt).getTime()).not.toBeNaN();
+  });
+
+  it('with ?deep=1, answers 503 when the database is unreachable', async () => {
+    const { db, pool } = createDb('postgres://nobody:none@127.0.0.1:1/none'); // nothing listens on port 1
+    const app = await buildApp({ logger: false, webDist: null, database: db });
+    const res = await app.inject({ url: '/api/health?deep=1' });
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({ ok: false, database: 'unavailable' });
+    await pool.end();
   });
 });
 

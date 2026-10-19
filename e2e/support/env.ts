@@ -3,6 +3,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ESPN_FAILING_LEAGUE_ID, ESPN_LEAGUE_ID, ESPN_S2, ESPN_SWID } from '../fixtures/espn.js';
+import { GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, OWNER } from '../fixtures/github.js';
 import { SLEEPER_USERNAME } from '../fixtures/sleeper.js';
 
 export const e2eDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -41,4 +42,14 @@ export const apiEnv: Record<string, string> = {
   ESPN_FANTASY_URL: `${up}/espn/fantasy`,
   ESPN_SCOREBOARD_URL: `${up}/espn/scoreboard`,
   CACHE_DIR: path.join(e2eDir, '.tmp', 'cache'),
+  // Sign-in is on, as in production, against the fake GitHub.
+  PUBLIC_URL: `http://127.0.0.1:${WEB_PORT}`,
+  GITHUB_CLIENT_ID,
+  GITHUB_CLIENT_SECRET,
+  GITHUB_ALLOWED_USER_IDS: String(OWNER.id),
+  GITHUB_OAUTH_URL: `${up}/github`,
+  GITHUB_API_URL: `${up}/github-api`,
 };
+
+/** The signed-in browser state (session cookie) that most tests start from. */
+export const OWNER_STATE = path.join(e2eDir, '.tmp', 'auth', 'owner.json');

@@ -3,23 +3,19 @@
 //   2. Yahoo redirects back to our callback with a one-time `code` and that `state`.
 //   3. exchangeCode() trades the code for an access token (1 hour) + refresh token.
 //   4. getAccessToken() hands out the access token, refreshing it when it's about to expire.
-// Tokens are saved under apps/api/.cache (git-ignored) so you only log in once.
+// Tokens are stored encrypted in Postgres (see auth/tokens.ts), so you only connect once.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { parseKey } from '../../auth/crypto.js';
+import { oauthTokenStore, type StoredTokens } from '../../auth/tokens.js';
 import { MINUTE } from '../../cache.js';
 import { config } from '../../config.js';
+import { db } from '../../db/client.js';
 
 const AUTH_URL = 'https://api.login.yahoo.com/oauth2/request_auth';
 const TOKEN_URL = 'https://api.login.yahoo.com/oauth2/get_token';
-const tokenFile = () => path.join(config.cacheDir, 'yahoo-tokens.json');
-
-interface StoredTokens {
-  accessToken: string;
-  refreshToken: string;
-  expiresAt: number; // epoch ms
-}
 
 interface TokenResponse {
   access_token?: string;
@@ -33,6 +29,13 @@ function yahooConfig() {
   if (!config.yahoo) throw new Error('Set YAHOO_CLIENT_ID and YAHOO_CLIENT_SECRET in .env');
   return config.yahoo;
 }
+
+function encryptionKey(): Buffer {
+  if (!config.tokenKey) throw new Error('Set TOKEN_ENCRYPTION_KEY so Yahoo tokens can be stored encrypted');
+  return parseKey(config.tokenKey);
+}
+
+const store = oauthTokenStore(db, encryptionKey, 'yahoo');
 
 export const yahooConfigured = () => config.yahoo != null;
 
@@ -60,24 +63,6 @@ export function consumeState(state: string): boolean {
   return expires != null && expires > Date.now();
 }
 
-let memoryTokens: StoredTokens | null | undefined; // undefined = not loaded from disk yet
-
-async function loadTokens(): Promise<StoredTokens | null> {
-  if (memoryTokens !== undefined) return memoryTokens;
-  try {
-    memoryTokens = JSON.parse(await fs.readFile(tokenFile(), 'utf8')) as StoredTokens;
-  } catch {
-    memoryTokens = null;
-  }
-  return memoryTokens;
-}
-
-async function saveTokens(tokens: StoredTokens) {
-  memoryTokens = tokens;
-  await fs.mkdir(config.cacheDir, { recursive: true });
-  await fs.writeFile(tokenFile(), JSON.stringify(tokens));
-}
-
 async function requestTokens(params: Record<string, string>): Promise<StoredTokens> {
   const { clientId, clientSecret, redirectUri } = yahooConfig();
   const res = await fetch(TOKEN_URL, {
@@ -97,7 +82,7 @@ async function requestTokens(params: Record<string, string>): Promise<StoredToke
     refreshToken: body.refresh_token ?? params.refresh_token ?? '',
     expiresAt: Date.now() + (body.expires_in ?? 3600) * 1000,
   };
-  await saveTokens(tokens);
+  await store.save(tokens);
   return tokens;
 }
 
@@ -107,7 +92,7 @@ let refreshing: Promise<StoredTokens> | null = null;
 
 // Returns null when you haven't connected Yahoo yet.
 export async function getAccessToken(): Promise<string | null> {
-  const tokens = await loadTokens();
+  const tokens = await store.load();
   if (!tokens) return null;
   if (tokens.expiresAt - Date.now() > MINUTE) return tokens.accessToken;
 
@@ -118,9 +103,25 @@ export async function getAccessToken(): Promise<string | null> {
   return (await refreshing).accessToken;
 }
 
-export const isConnected = async () => (await loadTokens()) != null;
+export const isConnected = async () => (await store.load()) != null;
 
-export async function disconnect() {
-  memoryTokens = null;
-  await fs.rm(tokenFile(), { force: true });
-}
+export const disconnect = () => store.remove();
+
+export const yahooTokenRepo = {
+  /**
+   * Before the database, tokens were kept in plaintext in apps/api/.cache/yahoo-tokens.json.
+   * Move them into the database (encrypted) once, then delete the file.
+   */
+  async importLegacyFile(file = path.join(config.cacheDir, 'yahoo-tokens.json')): Promise<boolean> {
+    if (!config.tokenKey) return false; // reported as a configuration problem at startup
+    let legacy: StoredTokens;
+    try {
+      legacy = JSON.parse(await fs.readFile(file, 'utf8')) as StoredTokens;
+    } catch {
+      return false; // no legacy file
+    }
+    await store.save(legacy);
+    await fs.rm(file, { force: true });
+    return true;
+  },
+};

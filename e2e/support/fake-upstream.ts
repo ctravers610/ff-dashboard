@@ -1,10 +1,11 @@
-// A stand-in for every outside service the app talks to (Sleeper, ESPN), serving
+// A stand-in for every outside service the app talks to (Sleeper, ESPN, GitHub), serving
 // the fixtures. Run on its own: `tsx support/fake-upstream.ts`.
 
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import * as espn from '../fixtures/espn.js';
 import * as ffpc from '../fixtures/ffpc.js';
+import { GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_USERS, type GithubUserKey } from '../fixtures/github.js';
 import { ALL_PLAYERS, GAMES, SEASON, WEEK } from '../fixtures/players.js';
 import * as sleeper from '../fixtures/sleeper.js';
 import { UPSTREAM_PORT } from './env.js';
@@ -64,12 +65,65 @@ function route(url: URL, headers: http.IncomingHttpHeaders): Reply | null {
   return null;
 }
 
+// ── GitHub OAuth ───────────────────────────────────────────────────────
+// Who the next sign-in is, or 'cancel' to act as if the user clicked Cancel on
+// GitHub's page. Tests set it through /github/_next; it applies once, then goes
+// back to the owner, so one test can't leave the next one signed in as someone else.
+let next: GithubUserKey | 'cancel' = 'owner';
+
+function github(req: http.IncomingMessage, url: URL, body: string): { redirect: string } | Reply | null {
+  const p = url.pathname;
+
+  if (p === '/github/_next' && req.method === 'POST') {
+    const who = url.searchParams.get('as');
+    if (who !== 'cancel' && !(who && who in GITHUB_USERS)) return { status: 400, body: { error: `unknown user ${who}` } };
+    next = who as typeof next;
+    return { body: { ok: true } };
+  }
+
+  // The authorize page: GitHub would ask the user, we answer straight away.
+  if (p === '/github/login/oauth/authorize') {
+    if (url.searchParams.get('client_id') !== GITHUB_CLIENT_ID) return { status: 400, body: { error: 'bad client_id' } };
+    const back = new URL(url.searchParams.get('redirect_uri')!);
+    back.searchParams.set('state', url.searchParams.get('state') ?? '');
+    if (next === 'cancel') back.searchParams.set('error', 'access_denied');
+    else back.searchParams.set('code', `code-${next}`);
+    next = 'owner';
+    return { redirect: back.toString() };
+  }
+
+  if (p === '/github/login/oauth/access_token' && req.method === 'POST') {
+    const { client_id, client_secret, code } = JSON.parse(body || '{}') as Record<string, string>;
+    const who = code?.replace(/^code-/, '');
+    if (client_id !== GITHUB_CLIENT_ID || client_secret !== GITHUB_CLIENT_SECRET) return { body: { error: 'incorrect_client_credentials' } };
+    if (!who || !(who in GITHUB_USERS)) return { body: { error: 'bad_verification_code' } }; // GitHub answers 200 with an error
+    return { body: { access_token: `token-${who}`, token_type: 'bearer', scope: '' } };
+  }
+
+  if (p === '/github-api/user') {
+    const who = req.headers.authorization?.replace(/^Bearer token-/, '');
+    if (!who || !(who in GITHUB_USERS)) return { status: 401, body: { message: 'Bad credentials' } };
+    return { body: GITHUB_USERS[who as GithubUserKey] };
+  }
+
+  return null;
+}
+
 export function createFakeUpstream() {
   return http.createServer((req, res) => {
-    const reply = route(new URL(req.url ?? '/', 'http://fake'), req.headers);
-    const { status = 200, body } = reply ?? { status: 404, body: { error: `no fixture for ${req.url}` } };
-    res.writeHead(status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(body));
+    let body = '';
+    req.on('data', (chunk) => (body += chunk));
+    req.on('end', () => {
+      const url = new URL(req.url ?? '/', 'http://fake');
+      const reply = github(req, url, body) ?? route(url, req.headers);
+      if (reply && 'redirect' in reply) {
+        res.writeHead(302, { Location: reply.redirect });
+        return res.end();
+      }
+      const { status = 200, body: json } = reply ?? { status: 404, body: { error: `no fixture for ${req.url}` } };
+      res.writeHead(status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(json));
+    });
   });
 }
 

@@ -36,6 +36,13 @@ services:
     environment:
       DATABASE_URL: postgres://ffd:${POSTGRES_PASSWORD:-ffd_dev_password}@db:5432/ffd
       API_PORT: '3001'
+      PUBLIC_URL: http://localhost:8080
+      # Sign-in needs https, which this local preview doesn't have, so it runs open.
+      # That's safe only because the port below is bound to this computer alone.
+      AUTH_DISABLED: '1'
+      GITHUB_CLIENT_ID: ''
+      GITHUB_CLIENT_SECRET: ''
+      GITHUB_ALLOWED_USER_IDS: ''
     ports:
       - '127.0.0.1:8080:3001'
 

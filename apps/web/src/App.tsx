@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from 'react';
-import { useDashboard } from './api';
+import { signOut, useDashboard, type Me } from './api';
 import { LeagueCard } from './components/LeagueCard';
 import { ManualLeagueEditor } from './components/ManualLeagueEditor';
 import { PlayersView } from './components/PlayersView';
@@ -11,7 +11,7 @@ const HistoryView = lazy(() =>
   import('./components/history/HistoryView').then((m) => ({ default: m.HistoryView })),
 );
 
-export default function App() {
+export default function App({ user }: { user: Me['user'] }) {
   const { data, error, isPending, isFetching, refetch } = useDashboard();
   const [view, setView] = useState<'leagues' | 'players' | 'history'>('leagues');
   const [editing, setEditing] = useState<string | null>(null); // 'new' or a manual league id
@@ -42,14 +42,29 @@ export default function App() {
             {data && ` · updated ${new Date(data.updatedAt).toLocaleTimeString()}`}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
-        >
-          {isFetching ? 'Refreshing…' : 'Refresh'}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
+          >
+            {isFetching ? 'Refreshing…' : 'Refresh'}
+          </button>
+          {user && (
+            <div className="flex items-center gap-2 text-sm">
+              {user.avatarUrl && <img src={user.avatarUrl} alt="" className="h-7 w-7 rounded-full" />}
+              <span className="text-slate-600 dark:text-slate-400">{user.login}</span>
+              <button
+                type="button"
+                onClick={() => void signOut()}
+                className="rounded-lg px-2 py-1.5 font-medium hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
       </header>
 
       <YahooConnect />

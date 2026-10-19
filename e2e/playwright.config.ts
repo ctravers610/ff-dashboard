@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import { API_PORT, apiEnv, e2eDir, repoRoot, UPSTREAM_PORT, WEB_PORT } from './support/env.js';
+import { API_PORT, apiEnv, e2eDir, OWNER_STATE, repoRoot, UPSTREAM_PORT, WEB_PORT } from './support/env.js';
 
 const baseURL = `http://127.0.0.1:${WEB_PORT}`;
 
@@ -17,7 +17,12 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'sign-in', testMatch: /auth\.setup\.ts/ },
+    // Starts every test signed in as the owner (page and API requests alike);
+    // auth.spec.ts opts out to test signing in itself.
+    { name: 'chromium', use: { ...devices['Desktop Chrome'], storageState: OWNER_STATE }, dependencies: ['sign-in'] },
+  ],
 
   // The whole stack, for real: fixtures server → API (+ Postgres) → production web build.
   webServer: [

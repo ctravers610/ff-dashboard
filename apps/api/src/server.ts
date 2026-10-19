@@ -1,21 +1,44 @@
-// Starts the API: bring the database up to date, then listen.
+// Starts the API: check the configuration, bring the database up to date, then listen.
 
 import { manualLeagueRepo } from './adapters/manual/store.js';
+import { yahooTokenRepo } from './adapters/yahoo/auth.js';
 import { buildApp } from './app.js';
-import { config } from './config.js';
-import { pool, runMigrations } from './db/client.js';
+import { sessionStore } from './auth/sessions.js';
+import { config, configProblems } from './config.js';
+import { db, pool, runMigrations } from './db/client.js';
 
 const app = await buildApp();
+
+// Fail closed: in production a configuration problem (above all, sign-in not set
+// up) stops the server, because running open to the internet is worse than not running.
+const problems = configProblems(config);
+for (const problem of problems) app.log[process.env.NODE_ENV === 'production' ? 'error' : 'warn'](problem);
+if (problems.length > 0 && process.env.NODE_ENV === 'production') {
+  app.log.error('Refusing to start until the configuration problems above are fixed.');
+  process.exit(1);
+}
+if (config.auth.mode === 'off') app.log.warn('Sign-in is off: anyone who can reach this server can use it. Fine for local development only.');
 
 // Bring the database schema up to date before taking requests.
 try {
   await runMigrations();
   const imported = await manualLeagueRepo.importLegacyJson();
   if (imported > 0) app.log.info(`Imported ${imported} manual league(s) from the old JSON file into Postgres`);
+  if (await yahooTokenRepo.importLegacyFile()) app.log.info('Moved the Yahoo tokens from the old file into the database, encrypted');
 } catch (e) {
   app.log.error(e, 'Could not reach the database. Is it running? Start it with: docker compose up -d');
   process.exit(1);
 }
+
+// Housekeeping: drop expired sessions now and once a day.
+const sessions = sessionStore(db);
+const purge = () =>
+  sessions
+    .removeExpired()
+    .then((n) => n > 0 && app.log.info(`Removed ${n} expired session(s)`))
+    .catch((e) => app.log.warn(e, 'Could not remove expired sessions'));
+await purge();
+setInterval(purge, 24 * 60 * 60 * 1000).unref();
 
 // Hosts stop the old instance with SIGTERM on every deploy (and Ctrl+C sends
 // SIGINT): stop accepting requests, let in-flight ones finish, close the pool.
@@ -28,4 +51,15 @@ for (const signal of ['SIGTERM', 'SIGINT'] as const) {
   });
 }
 
-await app.listen({ port: config.port, host: config.host });
+// When `tsx watch` restarts the dev server, the new process can start while the
+// old one is still finishing its graceful shutdown, so the port is briefly
+// taken. Retry for a few seconds instead of crashing.
+for (let attempt = 1; ; attempt++) {
+  try {
+    await app.listen({ port: config.port, host: config.host });
+    break;
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'EADDRINUSE' || attempt >= 20) throw e;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+}

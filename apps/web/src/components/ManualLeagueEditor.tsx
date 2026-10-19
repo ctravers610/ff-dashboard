@@ -8,6 +8,7 @@ import {
 } from '@ffd/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ClipboardEvent, type FormEvent } from 'react';
+import { api } from '../api';
 
 const PLACEHOLDER = `QB Josh Allen
 RB Bijan Robinson
@@ -18,12 +19,11 @@ BN Najee Harris
 IR Jonathon Brooks`;
 
 async function request(method: string, url: string, body?: ManualLeagueInput) {
-  const res = await fetch(url, {
+  await api<unknown>(url, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (!res.ok) throw new Error((await res.json().catch(() => null))?.message ?? `HTTP ${res.status}`);
 }
 
 // leagueId = null → creating a new league.
@@ -31,7 +31,7 @@ export function ManualLeagueEditor({ leagueId, onClose }: { leagueId: string | n
   const queryClient = useQueryClient();
   const { data: leagues } = useQuery({
     queryKey: ['manual-leagues'],
-    queryFn: async (): Promise<ManualLeague[]> => (await fetch('/api/manual-leagues')).json(),
+    queryFn: () => api<ManualLeague[]>('/api/manual-leagues'),
   });
   const existing = leagues?.find((l) => l.id === leagueId);
 

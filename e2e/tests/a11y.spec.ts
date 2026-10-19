@@ -66,3 +66,16 @@ for (const colorScheme of ['light', 'dark'] as const) {
     });
   });
 }
+
+test.describe('Accessibility of the sign-in screen', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`sign-in screen with the "not allowed" message (${colorScheme} mode)`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme });
+      await page.goto('/?login=denied');
+      await expect(page.getByRole('alert')).toBeVisible();
+      await expectNoViolations(page, `the sign-in screen (${colorScheme})`);
+    });
+  }
+});

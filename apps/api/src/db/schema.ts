@@ -1,5 +1,6 @@
 import type { ManualMatchup } from '@ffd/shared';
 import {
+  bigint,
   doublePrecision,
   index,
   integer,
@@ -63,6 +64,32 @@ export const leagueSnapshots = pgTable(
   ],
 );
 
+// Signed-in browser sessions. The cookie holds a random token; only its SHA-256
+// hash is stored, so a copy of this table can't be used to impersonate anyone.
+export const sessions = pgTable(
+  'sessions',
+  {
+    tokenHash: text('token_hash').primaryKey(),
+    githubId: bigint('github_id', { mode: 'number' }).notNull(),
+    login: text('login').notNull(),
+    name: text('name'),
+    avatarUrl: text('avatar_url'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [index('sessions_expires_idx').on(t.expiresAt)],
+);
+
+// OAuth tokens for connected services (Yahoo), encrypted with TOKEN_ENCRYPTION_KEY.
+export const oauthTokens = pgTable('oauth_tokens', {
+  provider: text('provider').primaryKey(),
+  accessToken: text('access_token').notNull(),
+  refreshToken: text('refresh_token').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type ManualLeagueRow = typeof manualLeagues.$inferSelect;
+export type SessionRow = typeof sessions.$inferSelect;
 export type NewSnapshot = typeof leagueSnapshots.$inferInsert;
 export type SnapshotRow = typeof leagueSnapshots.$inferSelect;

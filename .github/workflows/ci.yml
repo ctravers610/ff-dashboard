@@ -136,7 +136,16 @@ jobs:
 
       - name: Run the container
         run: |
-          docker run -d --name app --network host             -e DATABASE_URL=postgres://ffd:ffd_dev_password@127.0.0.1:5432/ffd             -e API_PORT=3001             fantasy-dashboard:ci
+          # Sign-in on, as in production. These GitHub values are placeholders:
+          # the smoke test checks the redirect to GitHub but never follows it.
+          docker run -d --name app --network host \
+            -e DATABASE_URL=postgres://ffd:ffd_dev_password@127.0.0.1:5432/ffd \
+            -e API_PORT=3001 \
+            -e PUBLIC_URL=https://ffd.example.com \
+            -e GITHUB_CLIENT_ID=ci-client-id \
+            -e GITHUB_CLIENT_SECRET=ci-client-secret \
+            -e GITHUB_ALLOWED_USER_IDS=1 \
+            fantasy-dashboard:ci
 
       - name: Smoke test (must be running this exact commit)
         run: node scripts/smoke-test.mjs http://127.0.0.1:3001 ${{ github.sha }}

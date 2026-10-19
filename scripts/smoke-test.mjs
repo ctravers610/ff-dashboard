@@ -8,7 +8,7 @@
 // Waits for the app to come up (free hosts can take a minute to wake), then
 // checks the things that only break in a production build: the bundle starts,
 // the database is reachable, the web app and its assets are served with the
-// right caching, and API errors stay JSON.
+// right caching, sign-in guards the data, and API errors stay JSON.
 
 const [baseUrl, expectedCommit] = process.argv.slice(2);
 if (!baseUrl) {
@@ -81,16 +81,46 @@ await check('a bookmarked page address still loads the app', async () => {
   assert(res.status === 200 && (await res.text()).includes('<div id="root">'), `HTTP ${res.status}`);
 });
 
-await check('unknown API paths answer with a JSON 404', async () => {
+let me;
+await check('/api/auth/me says whether sign-in is on', async () => {
+  const res = await fetch(url('/api/auth/me'));
+  assert(res.status === 200, `HTTP ${res.status}`);
+  me = await res.json();
+  assert(typeof me.authEnabled === 'boolean', 'no authEnabled field');
+  assert(me.user === null, 'a request without a cookie should not be signed in');
+});
+
+if (me?.authEnabled) {
+  await check('signed out, the data routes refuse with a JSON 401', async () => {
+    for (const path of ['/api/dashboard', '/api/manual-leagues', '/api/history']) {
+      const res = await fetch(url(path));
+      assert(res.status === 401, `${path}: HTTP ${res.status}`);
+      assert(res.headers.get('content-type')?.includes('application/json'), `${path}: content-type ${res.headers.get('content-type')}`);
+    }
+  });
+
+  await check('the GitHub sign-in starts with a redirect and a state cookie', async () => {
+    const res = await fetch(url('/api/auth/github/login'), { redirect: 'manual' });
+    assert(res.status === 302, `HTTP ${res.status}`);
+    assert(res.headers.get('location')?.includes('/login/oauth/authorize?'), `location ${res.headers.get('location')}`);
+    const cookie = res.headers.get('set-cookie') ?? '';
+    assert(/HttpOnly/i.test(cookie) && /SameSite=Lax/i.test(cookie), `state cookie ${cookie.split(';')[0]}… lacks HttpOnly/SameSite`);
+  });
+} else {
+  console.warn('! Sign-in is off on this deployment: anyone who can reach it can see the data.');
+}
+
+// Signed out, the guard answers before routing (401), so either is fine, as long as it's JSON.
+await check('unknown API paths answer with JSON, never the HTML page', async () => {
   const res = await fetch(url('/api/this-route-does-not-exist'));
-  assert(res.status === 404, `HTTP ${res.status}`);
+  assert(res.status === (me?.authEnabled ? 401 : 404), `HTTP ${res.status}`);
   assert(res.headers.get('content-type')?.includes('application/json'), `content-type ${res.headers.get('content-type')}`);
 });
 
 await check('the database is reachable and migrated', async () => {
-  const res = await fetch(url('/api/manual-leagues'));
-  assert(res.status === 200, `HTTP ${res.status}`);
-  assert(Array.isArray(await res.json()), 'expected a JSON array of leagues');
+  const res = await fetch(url('/api/health?deep=1'));
+  const body = await res.json().catch(() => ({}));
+  assert(res.status === 200 && body.database === 'ok', `HTTP ${res.status}, database ${body.database}`);
 });
 
 for (const r of results) console.log(`${r.ok ? '✔' : '✘'} ${r.name}${r.ok ? '' : `\n    ${r.why}`}`);

@@ -9,6 +9,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { manualLeagueStore } from '../adapters/manual/store.js';
+import { buildApp } from '../app.js';
+import crypto from 'node:crypto';
+import { hashToken } from '../auth/crypto.js';
+import { sessionStore } from '../auth/sessions.js';
+import { oauthTokenStore } from '../auth/tokens.js';
 import { manualLeagueRoutes } from '../routes/manualLeagues.js';
 import { snapshotStore, toSnapshot } from '../snapshots.js';
 import type { NewSnapshot } from './schema.js';
@@ -36,6 +41,13 @@ describe.skipIf(!enabled)('Postgres', () => {
   });
 
   const input: ManualLeagueInput ={ name: 'League A', teamName: 'Team A', rosterText: 'QB Josh Allen', matchup: null };
+
+  it('the deep health check reports a reachable, migrated database', async () => {
+    const app = await buildApp({ logger: false, webDist: null, database: testDb.db });
+    const res = await app.inject({ url: '/api/health?deep=1' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ok: true, database: 'ok' });
+  });
 
   describe('manual league store', () => {
     it('creates, lists, updates and removes a league', async () => {
@@ -147,6 +159,110 @@ describe.skipIf(!enabled)('Postgres', () => {
 
       const { id } = (await app.inject({ method: 'POST', url: '/api/manual-leagues', payload: input })).json();
       expect((await app.inject({ method: 'DELETE', url: `/api/manual-leagues/${id}` })).statusCode).toBe(204);
+    });
+  });
+
+  describe('session store', () => {
+    const user = { githubId: 344820607, login: 'owner', name: 'The Owner', avatarUrl: null };
+    const DAY = 24 * 60 * 60 * 1000;
+    // A controllable clock, so tests can move days ahead instantly.
+    const clock = (start = Date.parse('2026-10-19T12:00:00Z')) => {
+      let t = start;
+      return { now: () => new Date(t), advance: (ms: number) => (t += ms) };
+    };
+
+    it('finds the user for a session token and never stores the token itself', async () => {
+      const store = sessionStore(testDb.db);
+      const token = await store.create(user);
+      expect(await store.find(token)).toEqual(user);
+
+      const rows = await testDb.db.execute(sql`select * from sessions`);
+      expect(JSON.stringify(rows.rows)).not.toContain(token);
+    });
+
+    it('rejects an unknown token', async () => {
+      expect(await sessionStore(testDb.db).find('made-up-token')).toBeNull();
+    });
+
+    it('expires after 30 days without use', async () => {
+      const c = clock();
+      const store = sessionStore(testDb.db, { now: c.now });
+      const token = await store.create(user);
+      c.advance(29 * DAY);
+      expect(await store.find(token)).toEqual(user); // still valid on day 29 (and renewed)
+      c.advance(31 * DAY);
+      expect(await store.find(token)).toBeNull(); // 31 idle days after that renewal
+    });
+
+    it('keeps renewing while in use, writing at most once a day', async () => {
+      const c = clock();
+      const store = sessionStore(testDb.db, { now: c.now });
+      const token = await store.create(user);
+      // Raw SQL through Drizzle returns timestamps as strings.
+      const expiresAt = async () =>
+        new Date(
+          (await testDb.db.execute(sql`select expires_at from sessions where token_hash = ${hashToken(token)}`)).rows[0]!
+            .expires_at as string,
+        );
+
+      const first = (await expiresAt()).getTime();
+      c.advance(60 * 60 * 1000); // an hour later: no rewrite
+      await store.find(token);
+      expect((await expiresAt()).getTime()).toBe(first);
+
+      c.advance(2 * DAY); // two days later: renewed to 30 days from now
+      await store.find(token);
+      expect((await expiresAt()).getTime()).toBe(c.now().getTime() + 30 * DAY);
+    });
+
+    it('signing out makes the token stop working immediately', async () => {
+      const store = sessionStore(testDb.db);
+      const token = await store.create(user);
+      await store.remove(token);
+      expect(await store.find(token)).toBeNull();
+    });
+
+    it('clears out expired sessions, keeping live ones', async () => {
+      const c = clock();
+      const store = sessionStore(testDb.db, { now: c.now });
+      await testDb.db.execute(sql`delete from sessions`);
+      const old = await store.create(user);
+      c.advance(20 * DAY);
+      const recent = await store.create(user);
+      c.advance(15 * DAY); // the first is now 35 days old, the second 15
+
+      expect(await store.removeExpired()).toBe(1);
+      expect(await store.find(old)).toBeNull();
+      expect(await store.find(recent)).toEqual(user);
+    });
+  });
+
+  describe('encrypted OAuth token store', () => {
+    const key = crypto.randomBytes(32);
+    const tokens = { accessToken: 'yahoo-access-abc', refreshToken: 'yahoo-refresh-xyz', expiresAt: Date.parse('2026-10-19T13:00:00Z') };
+
+    it('saves and loads tokens, keeping only ciphertext in the table', async () => {
+      const store = oauthTokenStore(testDb.db, () => key, 'yahoo');
+      await store.save(tokens);
+      expect(await store.load()).toEqual(tokens);
+
+      const raw = JSON.stringify((await testDb.db.execute(sql`select * from oauth_tokens`)).rows);
+      expect(raw).not.toContain('yahoo-access-abc');
+      expect(raw).not.toContain('yahoo-refresh-xyz');
+    });
+
+    it('replaces the stored tokens on refresh, and removes them on disconnect', async () => {
+      const store = oauthTokenStore(testDb.db, () => key, 'yahoo');
+      await store.save(tokens);
+      await store.save({ ...tokens, accessToken: 'refreshed' });
+      expect((await store.load())?.accessToken).toBe('refreshed');
+      await store.remove();
+      expect(await store.load()).toBeNull();
+    });
+
+    it('cannot be read with a different key', async () => {
+      await oauthTokenStore(testDb.db, () => key, 'yahoo').save(tokens);
+      await expect(oauthTokenStore(testDb.db, () => crypto.randomBytes(32), 'yahoo').load()).rejects.toThrow();
     });
   });
 

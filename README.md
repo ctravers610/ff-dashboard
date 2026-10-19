@@ -14,6 +14,7 @@ One place to follow all of my fantasy football teams across platforms, instead o
 - **Frontend:** React 19, TypeScript, Vite, TanStack Query, Tailwind CSS, Recharts
 - **Backend:** Node.js, TypeScript, Fastify
 - **Database:** PostgreSQL 17, Drizzle ORM, versioned SQL migrations
+- **Security:** Sign in with GitHub (OAuth 2.0) limited to an allow-list, server-side sessions, AES-256-GCM encryption for stored OAuth tokens
 - **Deployment:** one Docker image (the API also serves the built web app), API bundled with esbuild
 - **Testing & CI:** Vitest (unit tests plus tests against a real Postgres), Playwright end-to-end tests with axe-core accessibility scans, GitHub Actions
 - **Repo:** npm workspaces monorepo
@@ -62,18 +63,20 @@ Other scripts: `npm test`, `npm run typecheck`, `npm run build`, `npm run e2e`.
 - `npm test` runs the fast tests: unit tests for the mappers, parsers and scoring engine, plus tests against a throwaway Postgres.
 - `npm run e2e` runs Playwright end to end. It boots the real stack (the production web build, the real API, a real Postgres database `ffd_e2e` that it creates and drops) and drives it in Chromium. Run `npx playwright install chromium` once first.
 
-The e2e tests never touch Sleeper, ESPN or your accounts. The API's upstream URLs are configurable, so the tests point it at a small fake server (`e2e/support/fake-upstream.ts`) that serves fixture data shaped like the real APIs, and `NODE_ENV=test` keeps your `.env` out of the run. Expected scores in the FFPC tests are worked out by hand from FFPC's published rules, so they check the scoring engine independently of its own code. A separate spec scans every screen with axe-core for WCAG 2.1 AA violations, in light and dark mode.
+The e2e tests never touch Sleeper, ESPN or your accounts. The API's upstream URLs are configurable, so the tests point it at a small fake server (`e2e/support/fake-upstream.ts`) that serves fixture data shaped like the real APIs, and `NODE_ENV=test` keeps your `.env` out of the run. Expected scores in the FFPC tests are worked out by hand from FFPC's published rules, so they check the scoring engine independently of its own code. GitHub sign-in is tested the same way, against a fake GitHub: the full redirect flow, a refused account, a forged callback, sign-out and session expiry. A separate spec scans every screen with axe-core for WCAG 2.1 AA violations, in light and dark mode.
 
 ### Production build in Docker
 
 The deployable image runs the bundled API, which also serves the built web app, so the whole app is one container on one origin.
 
 ```bash
-docker compose --profile app up --build    # http://localhost:8080, using your .env accounts
+docker compose --profile app up --build    # http://localhost:8080, using your .env accounts, sign-in off
 node scripts/smoke-test.mjs http://localhost:8080
 ```
 
-The image runs as a non-root user, contains no secrets (they come from environment variables), and reports its commit at `/api/health`. It shuts down cleanly on `SIGTERM`, finishing in-flight requests first. `scripts/smoke-test.mjs` checks a running deployment: health and commit, the database, the web app and its caching, and JSON errors. CI builds the image and runs it on every push.
+The image runs as a non-root user, contains no secrets (they come from environment variables), and reports its commit at `/api/health`. It shuts down cleanly on `SIGTERM`, finishing in-flight requests first. `scripts/smoke-test.mjs` checks a running deployment: health and commit, the database (`/api/health?deep=1`), the web app and its caching, that signed-out requests get a 401, and JSON errors. CI builds the image and runs it, with sign-in on, on every push.
+
+In production (`NODE_ENV=production`) the server refuses to start if sign-in isn't configured, if `PUBLIC_URL` isn't https, or if Yahoo is set up without a `TOKEN_ENCRYPTION_KEY`. The local compose preview runs with `AUTH_DISABLED=1` because it is only reachable from your own computer.
 
 ### Database
 
@@ -87,6 +90,15 @@ CI fails if the schema and migrations disagree. Tests that need Postgres create 
 
 The dashboard saves a snapshot of every league each time it loads (at most every 5 minutes per league), plus past weeks reconstructed from Sleeper and ESPN history, which feeds the History tab. Snapshots are only recorded while the API is running.
 
+### Sign-in
+
+Locally, sign-in is off unless you configure it. A deployment requires it:
+
+1. Create an OAuth app at [github.com/settings/developers](https://github.com/settings/developers) with the callback URL `<your site>/api/auth/github/callback`. It needs no permissions; only your public profile is read.
+2. Set `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `PUBLIC_URL` and `GITHUB_ALLOWED_USER_IDS` (your numeric GitHub id, from `https://api.github.com/users/<username>`; ids never change, unlike usernames).
+
+How it works: the sign-in uses the OAuth authorization-code flow with a one-time `state` checked against a cookie, so a forged callback can't sign you in as someone else. The GitHub token is used once to look up who you are, then discarded. A session is a random token in an `HttpOnly`, `SameSite=Lax` cookie (`Secure` and `__Host-` over https); the database stores only its SHA-256 hash, so a database leak doesn't hand out live sessions. Sessions last 30 days, renewed as you use them, and sign-out deletes them on the server. A guard in front of every `/api` route returns 401 unless the route is deliberately public, and refuses state-changing requests from other sites' origins.
+
 ### ESPN cookies
 
 Private ESPN leagues need two cookies from a browser where you're logged in to ESPN:
@@ -99,4 +111,4 @@ The SWID (with its curly braces) is also how the dashboard knows which team is y
 
 ### Yahoo
 
-Create an app at [developer.yahoo.com/apps](https://developer.yahoo.com/apps/create/) (Confidential Client, Fantasy Sports Read, redirect URI `https://localhost:5173/api/auth/yahoo/callback`), put the Client ID and Secret in `.env`, then click **Connect Yahoo** in the dashboard. Yahoo only serves Fantasy data to approved apps; apply at [sports.yahoo.com/developer](https://sports.yahoo.com/developer).
+Create an app at [developer.yahoo.com/apps](https://developer.yahoo.com/apps/create/) (Confidential Client, Fantasy Sports Read, redirect URI `https://localhost:5173/api/auth/yahoo/callback`), put the Client ID and Secret in `.env`, then click **Connect Yahoo** in the dashboard. Yahoo's tokens are stored in the database encrypted with `TOKEN_ENCRYPTION_KEY`, so set one first (see `.env.example`). Yahoo only serves Fantasy data to approved apps; apply at [sports.yahoo.com/developer](https://sports.yahoo.com/developer).

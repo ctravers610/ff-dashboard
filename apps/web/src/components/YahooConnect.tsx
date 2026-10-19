@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { api } from '../api';
 
 interface YahooStatus {
   configured: boolean;
@@ -9,7 +10,7 @@ interface YahooStatus {
 export function YahooConnect() {
   const { data } = useQuery({
     queryKey: ['yahoo-status'],
-    queryFn: async (): Promise<YahooStatus> => (await fetch('/api/auth/yahoo/status')).json(),
+    queryFn: () => api<YahooStatus>('/api/auth/yahoo/status'),
   });
 
   const denied = new URLSearchParams(window.location.search).get('yahoo') === 'denied';
