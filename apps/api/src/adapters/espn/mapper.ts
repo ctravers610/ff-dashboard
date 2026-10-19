@@ -5,6 +5,7 @@ import type {
   LeagueSummary,
   MatchupSide,
   Player,
+  RosterEntry,
   StarterSlot,
   TeamStanding,
 } from '@ffd/shared';
@@ -16,8 +17,10 @@ const SLOT_NAMES: Record<number, string> = {
   0: 'QB', 2: 'RB', 3: 'RB/WR', 4: 'WR', 5: 'WR/TE', 6: 'TE', 7: 'OP',
   16: 'D/ST', 17: 'K', 18: 'P', 19: 'HC', 23: 'FLEX',
 };
-// Display order for starter slots (bench = 20, IR = 21 are never starters).
+// Display order for starter slots (bench and IR are never starters).
 const SLOT_ORDER = [0, 2, 4, 3, 6, 5, 23, 7, 16, 17, 18, 19];
+const BENCH_SLOT = 20;
+const IR_SLOT = 21;
 
 const POSITIONS: Record<number, string> = { 1: 'QB', 2: 'RB', 3: 'WR', 4: 'TE', 5: 'K', 16: 'DEF' };
 
@@ -82,6 +85,18 @@ export function buildStarters(
     }
   }
   return starters;
+}
+
+export function buildRoster(entries: EspnRosterEntry[]): RosterEntry[] {
+  const roster: RosterEntry[] = [];
+  for (const entry of entries) {
+    const player = toPlayer(entry);
+    if (!player) continue;
+    const status =
+      entry.lineupSlotId === BENCH_SLOT ? 'bench' : entry.lineupSlotId === IR_SLOT ? 'ir' : 'starter';
+    roster.push({ player, status });
+  }
+  return roster;
 }
 
 export interface EspnLeagueData {
@@ -159,5 +174,6 @@ export function toLeagueSummary({ league, myTeamId, account }: EspnLeagueData): 
       ? { week: matchupPeriod, me: toSide(mine), opponent: theirs ? toSide(theirs) : null }
       : null,
     alerts: buildAlerts(buildStarters(myEntries, slotCounts, scoringPeriod)),
+    roster: buildRoster(myEntries),
   };
 }

@@ -29,6 +29,7 @@ export interface SleeperRoster {
   co_owners: string[] | null;
   starters: string[];
   players: string[] | null;
+  reserve?: string[] | null; // IR slots
   settings: {
     wins: number;
     losses: number;

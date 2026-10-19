@@ -2,6 +2,7 @@ import type { DashboardResponse } from '@ffd/shared';
 import { fetchEspnLeagues } from './adapters/espn/index.js';
 import { fetchSleeperLeagues, sleeperNflState } from './adapters/sleeper/index.js';
 import { config } from './config.js';
+import { buildExposure } from './exposure.js';
 
 export async function getDashboard(): Promise<DashboardResponse> {
   // Sleeper's /state/nfl doubles as our "what season/week is it" clock for all platforms.
@@ -28,6 +29,7 @@ export async function getDashboard(): Promise<DashboardResponse> {
     week: nfl.week,
     updatedAt: new Date().toISOString(),
     leagues,
+    players: buildExposure(leagues),
     errors: results.flatMap((r) => r.errors),
   };
 }

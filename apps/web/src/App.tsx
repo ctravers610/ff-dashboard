@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { useDashboard } from './api';
 import { LeagueCard } from './components/LeagueCard';
+import { PlayersView } from './components/PlayersView';
 import { YahooConnect } from './components/YahooConnect';
 
 export default function App() {
   const { data, error, isPending, isFetching, refetch } = useDashboard();
+  const [view, setView] = useState<'leagues' | 'players'>('leagues');
 
   const totals = data?.leagues.reduce(
     (acc, l) => {
@@ -77,9 +80,32 @@ export default function App() {
 
       {isPending && <p className="text-slate-500">Loading your leagues…</p>}
 
-      <main className="grid gap-5 lg:grid-cols-2">
-        {data?.leagues.map((l) => <LeagueCard key={`${l.platform}:${l.leagueId}`} league={l} />)}
-      </main>
+      {data && data.leagues.length > 0 && (
+        <nav className="mb-4 flex gap-1 border-b border-slate-200 dark:border-slate-800">
+          {(['leagues', 'players'] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setView(v)}
+              className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium capitalize transition ${
+                view === v
+                  ? 'border-slate-900 text-slate-900 dark:border-slate-100 dark:text-slate-100'
+                  : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              {v}
+            </button>
+          ))}
+        </nav>
+      )}
+
+      {view === 'leagues' ? (
+        <main className="grid gap-5 lg:grid-cols-2">
+          {data?.leagues.map((l) => <LeagueCard key={`${l.platform}:${l.leagueId}`} league={l} />)}
+        </main>
+      ) : (
+        data && <PlayersView players={data.players} />
+      )}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import type {
   LeagueSummary,
   MatchupSide,
   Player,
+  RosterEntry,
   StarterSlot,
   TeamStanding,
 } from '@ffd/shared';
@@ -91,6 +92,18 @@ function buildStarters(
   }));
 }
 
+export function buildRoster(roster: SleeperRoster, players: SleeperPlayerMap): RosterEntry[] {
+  const starters = new Set(roster.starters ?? []);
+  const reserve = new Set(roster.reserve ?? []);
+  const entries: RosterEntry[] = [];
+  for (const id of roster.players ?? []) {
+    const player = toPlayer(id, players);
+    if (!player) continue;
+    entries.push({ player, status: starters.has(id) ? 'starter' : reserve.has(id) ? 'ir' : 'bench' });
+  }
+  return entries;
+}
+
 // Returns null when none of the league's rosters belong to this account.
 export function toLeagueSummary(data: SleeperLeagueData): LeagueSummary | null {
   const { league, rosters, users, matchups, players, myUserId } = data;
@@ -134,5 +147,6 @@ export function toLeagueSummary(data: SleeperLeagueData): LeagueSummary | null {
       ? { week: data.week, me: toSide(mine), opponent: theirs ? toSide(theirs) : null }
       : null,
     alerts: buildAlerts(currentLineup),
+    roster: buildRoster(myRoster, players),
   };
 }

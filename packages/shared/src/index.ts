@@ -55,6 +55,13 @@ export interface LineupAlert {
   detail: string;
 }
 
+export type RosterStatus = 'starter' | 'bench' | 'ir';
+
+export interface RosterEntry {
+  player: Player;
+  status: RosterStatus;
+}
+
 export interface LeagueSummary {
   leagueId: string;
   platform: Platform;
@@ -66,6 +73,21 @@ export interface LeagueSummary {
   standings: TeamStanding[];
   matchup: Matchup | null;
   alerts: LineupAlert[];
+  roster: RosterEntry[]; // every player on your team
+}
+
+export interface LeagueRef {
+  leagueId: string;
+  leagueName: string;
+  platform: Platform;
+}
+
+// One real-world player and every league he touches you in.
+export interface PlayerExposure {
+  key: string; // cross-platform identity, e.g. "WR:jaylenwaddle" or "DEF:SF"
+  player: Player;
+  owned: (LeagueRef & { status: RosterStatus })[];
+  facing: LeagueRef[]; // your opponent is starting him this week
 }
 
 export interface SourceError {
@@ -78,5 +100,6 @@ export interface DashboardResponse {
   week: number;
   updatedAt: string;
   leagues: LeagueSummary[];
+  players: PlayerExposure[];
   errors: SourceError[];
 }

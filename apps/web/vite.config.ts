@@ -5,8 +5,9 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   // basicSsl serves the dev site over HTTPS with a self-signed certificate,
-  // because Yahoo only accepts https:// OAuth redirect URIs.
-  plugins: [react(), tailwindcss(), basicSsl()],
+  // because Yahoo only accepts https:// OAuth redirect URIs. DEV_HTTP=1 opts
+  // out for tools that can't accept a self-signed certificate.
+  plugins: [react(), tailwindcss(), ...(process.env.DEV_HTTP ? [] : [basicSsl()])],
   server: {
     port: 5173,
     strictPort: true, // the Yahoo redirect URI is registered for this exact port
