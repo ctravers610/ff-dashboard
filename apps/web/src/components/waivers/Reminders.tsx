@@ -64,38 +64,43 @@ export function Reminders() {
   });
 
   if (!key) return null;
-  const box = 'flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm';
+  // Compact, to sit on one line beside the page's note; the details are in the tooltip.
+  const box = 'flex flex-wrap items-center gap-2 text-sm';
+  const explain = '9 PM ET before overnight waiver runs, 2 hours before the rest, unless your claims are set';
 
   if (!key.publicKey) return null; // not set up on this server
   if (!supported()) {
-    return <p className={box}>This browser can't show reminders. On an iPhone, add the dashboard to your home screen first, then open it from there.</p>;
+    return <p className={`${box} text-slate-400`}>Reminders need the dashboard added to your home screen on an iPhone.</p>;
   }
 
   return (
     <section aria-label="Waiver reminders" className={box}>
-      <p className="text-slate-300">
-        {subscribed
-          ? 'Reminders are on for this browser: 9 PM ET before overnight runs, 2 hours before the rest, unless your claims are set.'
-          : 'Get a reminder before each waiver run that still needs your claims.'}
-      </p>
-      <div className="flex gap-1">
+      <span className="text-slate-400" title={explain}>
         {subscribed ? (
           <>
-            <button type="button" onClick={() => test.mutate()} disabled={test.isPending} className="rounded-md px-3 py-1 font-medium text-slate-200 hover:bg-slate-800">
-              {test.isSuccess ? 'Test sent' : 'Send a test'}
-            </button>
-            <button type="button" onClick={() => turnOff.mutate()} className="rounded-md px-3 py-1 font-medium text-slate-400 hover:bg-slate-800">
-              Turn off
-            </button>
+            <span aria-hidden="true" className="mr-1.5 inline-block h-2 w-2 rounded-full bg-emerald-400 align-middle" />
+            Reminders on
           </>
         ) : (
-          subscribed === false && (
-            <button type="button" onClick={() => turnOn.mutate()} disabled={turnOn.isPending} className="rounded-md bg-slate-100 px-3 py-1 font-medium text-slate-900">
-              Turn on reminders
-            </button>
-          )
+          'Reminders before each waiver run'
         )}
-      </div>
+      </span>
+      {subscribed ? (
+        <>
+          <button type="button" onClick={() => test.mutate()} disabled={test.isPending} className="rounded-md px-2 py-0.5 font-medium text-slate-200 hover:bg-slate-800">
+            {test.isSuccess ? 'Test sent' : 'Send a test'}
+          </button>
+          <button type="button" onClick={() => turnOff.mutate()} className="rounded-md px-2 py-0.5 font-medium text-slate-400 hover:bg-slate-800">
+            Turn off
+          </button>
+        </>
+      ) : (
+        subscribed === false && (
+          <button type="button" onClick={() => turnOn.mutate()} disabled={turnOn.isPending} className="rounded-md bg-slate-100 px-2.5 py-0.5 font-medium text-slate-900">
+            Turn on
+          </button>
+        )
+      )}
       {(problem || test.error) && (
         <p role="alert" className="w-full text-rose-300">
           {problem ?? test.error?.message}

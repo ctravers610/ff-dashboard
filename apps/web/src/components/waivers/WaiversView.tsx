@@ -1,6 +1,6 @@
 import { friendlyRun, friendlyRunWithTime, nextRun, type WaiverLeague, type WaiverMove, type WaiverPlayer, type WaiverRules } from '@ffd/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { api, useWaivers } from '../../api';
 import { PLATFORM_LABEL } from '../../format';
 import { FfpcWaiverPaste } from './FfpcWaiverPaste';
@@ -18,21 +18,12 @@ const REASON_LABEL: Record<WaiverMove['reason'], string> = {
 
 const fmt = (n: number | null) => (n == null ? '—' : n.toFixed(1));
 const adds = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
-
-function rulesText(r: WaiverRules): string {
-  const priority = r.priority != null ? `priority ${r.priority} of ${r.teams}` : null;
-  if (r.type === 'faab') {
-    const budget = r.faabTotal != null ? `$${r.faabLeft ?? '?'} of $${r.faabTotal} FAAB left` : `$${r.faabLeft ?? '?'} FAAB left`;
-    return [budget, priority].filter(Boolean).join(' · ');
-  }
-  const kind = r.type === 'rolling' ? 'Rolling waivers' : 'Reverse-standings waivers';
-  return [kind, priority].filter(Boolean).join(' · ');
-}
+const keyOf = (l: WaiverLeague) => `${l.platform}:${l.leagueId}`;
 
 const SOURCE_NOTE: Record<NonNullable<WaiverLeague['runsSource']>, string> = {
-  history: "learned from this league's processed claims",
-  ffpc: "from FFPC's page",
-  settings: 'estimated from league settings',
+  history: "Learned from this league's processed claims",
+  ffpc: "From FFPC's add/drop page",
+  settings: 'Estimated from league settings',
 };
 
 function countdown(to: Date, now = new Date()): string {
@@ -42,6 +33,93 @@ function countdown(to: Date, now = new Date()): string {
   if (days > 0) return `in ${days} day${days > 1 ? 's' : ''}${hours ? ` ${hours} hr` : ''}`;
   if (hours > 0) return `in ${hours} hr ${minutes % 60} min`;
   return `in ${minutes} min`;
+}
+
+/** "$85 of $100 FAAB" or "Reverse standings", for the league list and the budget tile. */
+function budget(r: WaiverRules | null): string | null {
+  if (!r) return null;
+  if (r.type === 'faab') return r.faabTotal != null ? `$${r.faabLeft ?? '?'} of $${r.faabTotal} FAAB` : `$${r.faabLeft ?? '?'} FAAB`;
+  return r.type === 'rolling' ? 'Rolling waivers' : 'Reverse-standings waivers';
+}
+
+// ── Choosing a league ───────────────────────────────────────────────────
+
+interface Entry {
+  league: WaiverLeague;
+  next: Date | null;
+  label: string | null; // "Tue night", "Wed 11:00 PM"
+}
+
+function ClaimsMark({ league }: { league: WaiverLeague }) {
+  if (league.claims?.reminderDue) {
+    return (
+      <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-rose-300">
+        <span aria-hidden="true" className="h-2 w-2 rounded-full bg-rose-500" />
+        claims not set
+      </span>
+    );
+  }
+  if (league.claims?.set) return <span className="shrink-0 text-xs font-medium text-emerald-300">claims set</span>;
+  return null;
+}
+
+// Every league, the one whose waivers run soonest first: a list beside the
+// league on wide screens, a dropdown above it on phones.
+function LeaguePicker({ entries, value, onChange }: { entries: Entry[]; value: string; onChange: (key: string) => void }) {
+  return (
+    <>
+      <label className="flex items-center gap-2 text-sm text-slate-300 lg:hidden">
+        League
+        <select value={value} onChange={(e) => onChange(e.target.value)} className="min-w-0 flex-1 rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-slate-100">
+          {entries.map(({ league, label }) => (
+            <option key={keyOf(league)} value={keyOf(league)}>
+              {league.name}
+              {label ? ` · ${label}` : ''}
+              {league.claims?.reminderDue ? ' · claims not set' : ''}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div role="group" aria-label="League" className="hidden flex-col gap-1 lg:flex">
+        {entries.map(({ league, next, label }) => {
+          const selected = keyOf(league) === value;
+          const alert = league.claims?.reminderDue;
+          return (
+            <button
+              key={keyOf(league)}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => onChange(keyOf(league))}
+              className={`flex flex-col gap-0.5 rounded-lg border px-3 py-2.5 text-left transition ${
+                selected ? 'border-slate-500 bg-slate-800' : alert ? 'border-rose-800 hover:bg-slate-900' : 'border-transparent hover:bg-slate-900'
+              }`}
+            >
+              <span className="flex items-center justify-between gap-2">
+                <span className="truncate font-medium">{league.name}</span>
+                <ClaimsMark league={league} />
+              </span>
+              <span className="text-xs text-slate-400">
+                {PLATFORM_LABEL[league.platform]} · {label ? `${label}, ${countdown(next!)}` : 'schedule unknown'}
+              </span>
+              {budget(league.rules) && <span className="text-xs text-slate-400">{budget(league.rules)}</span>}
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+// ── The chosen league ───────────────────────────────────────────────────
+
+function Tile({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1 rounded-lg bg-slate-950/50 px-3 py-2.5">
+      <dt className="text-xs text-slate-400">{label}</dt>
+      <dd className="text-sm">{children}</dd>
+    </div>
+  );
 }
 
 // Whether your claims are in for the next run. ESPN shows us your pending
@@ -58,90 +136,81 @@ function Claims({ league }: { league: WaiverLeague }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['waivers'] }),
   });
   const claims = league.claims;
-  if (!claims) return null;
-
+  if (!claims) return <span className="text-slate-400">—</span>;
   if (claims.source === 'espn') {
     return (
-      <p className="text-sm text-emerald-300">
-        {claims.pending} claim{claims.pending === 1 ? '' : 's'} in for this run (seen on ESPN), so no reminder.
-      </p>
+      <span className="text-emerald-300">
+        {claims.pending} pending on ESPN
+      </span>
+    );
+  }
+  if (claims.set) {
+    return (
+      <span className="flex items-center gap-2">
+        <span className="text-emerald-300">Set for this run</span>
+        <button type="button" onClick={() => mark.mutate(false)} className="rounded px-1.5 text-xs text-slate-400 hover:bg-slate-800">
+          Undo
+        </button>
+      </span>
     );
   }
   return (
-    <div className="flex flex-wrap items-center gap-2 text-sm">
-      {claims.reminderDue && (
-        <p role="status" className="w-full rounded-md bg-rose-950/70 px-3 py-2 font-medium text-rose-200 ring-1 ring-rose-700">
-          Your claims for this run aren't set yet. Make your claims on {PLATFORM_LABEL[league.platform]}, then mark them set here.
+    <button
+      type="button"
+      onClick={() => mark.mutate(true)}
+      disabled={mark.isPending}
+      className="rounded-md border border-slate-600 px-2.5 py-0.5 font-medium text-slate-100 hover:bg-slate-800"
+    >
+      {league.platform === 'espn' ? 'Mark claims set' : 'Claims set'}
+    </button>
+  );
+}
+
+function Header({ league, next }: { league: WaiverLeague; next: Date | null }) {
+  const r = league.rules;
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900 p-5">
+      <h2 className="text-lg font-semibold">
+        {league.name} <span className="text-sm font-normal text-slate-400">· {PLATFORM_LABEL[league.platform]}</span>
+      </h2>
+
+      {league.claims?.reminderDue && (
+        <p role="status" className="rounded-md bg-rose-950/70 px-3 py-2 text-sm font-medium text-rose-200 ring-1 ring-rose-700">
+          Your claims for this run aren't set yet. Make them on {PLATFORM_LABEL[league.platform]}, then mark them set here.
         </p>
       )}
-      {claims.set ? (
-        <>
-          <span className="text-emerald-300">Claims set for this run, so no reminder.</span>
-          <button type="button" onClick={() => mark.mutate(false)} className="rounded-md px-2 py-0.5 text-slate-400 hover:bg-slate-800">
-            Undo
-          </button>
-        </>
-      ) : (
-        <button
-          type="button"
-          onClick={() => mark.mutate(true)}
-          disabled={mark.isPending}
-          className="rounded-md border border-slate-700 px-3 py-1 font-medium text-slate-200 hover:bg-slate-800"
-        >
-          {league.platform === 'espn' ? 'Mark claims set' : 'Claims set'}
-        </button>
-      )}
-    </div>
-  );
-}
 
-function Schedule({ league, next }: { league: WaiverLeague; next: Date | null }) {
-  if (!next || !league.runsSource) {
-    return <p className="-mt-3 text-sm text-slate-400">When waivers run isn't known yet: there are no processed claims to learn from.</p>;
-  }
-  return (
-    <div className="-mt-3 flex flex-col gap-2">
-      <p className="text-sm text-slate-300">
-        Waivers run {league.runs.map(friendlyRunWithTime).join(' and ')} ET · next {countdown(next)}{' '}
-        <span className="text-slate-400">({SOURCE_NOTE[league.runsSource]})</span>
-      </p>
-      <Claims league={league} />
-    </div>
-  );
-}
+      <dl className="grid gap-2 sm:grid-cols-3">
+        <Tile label="Waivers run">
+          {next && league.runsSource ? (
+            <span title={SOURCE_NOTE[league.runsSource]}>
+              {league.runs.map(friendlyRunWithTime).join(' and ')} ET
+              <span className="block text-xs text-slate-400">next {countdown(next)}</span>
+            </span>
+          ) : (
+            <span className="text-slate-400">Not known yet</span>
+          )}
+        </Tile>
+        <Tile label="Budget and priority">
+          {r ? (
+            <>
+              {budget(r)}
+              <span className="block text-xs text-slate-400">
+                {[r.priority != null ? `Priority ${r.priority} of ${r.teams}` : null, league.openRosterSpots > 0 ? `${league.openRosterSpots} open roster spot${league.openRosterSpots > 1 ? 's' : ''}` : null]
+                  .filter(Boolean)
+                  .join(' · ') || ' '}
+              </span>
+            </>
+          ) : (
+            <span className="text-slate-400">—</span>
+          )}
+        </Tile>
+        <Tile label="Your claims">
+          <Claims league={league} />
+        </Tile>
+      </dl>
 
-interface Option<T> {
-  value: T;
-  label: string;
-  alert?: string; // marks the option in red, with this as its screen-reader explanation
-}
-
-function Segmented<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: Option<T>[]; onChange: (v: T) => void }) {
-  return (
-    <div role="group" aria-label={label} className="flex flex-wrap gap-1">
-      {options.map((o) => {
-        const selected = value === o.value;
-        const style = o.alert
-          ? selected
-            ? 'bg-rose-200 text-rose-950 ring-2 ring-rose-500'
-            : 'bg-rose-950/70 text-rose-200 ring-1 ring-rose-700 hover:bg-rose-900'
-          : selected
-            ? 'bg-slate-100 text-slate-900'
-            : 'text-slate-300 hover:bg-slate-800';
-        return (
-          <button
-            key={o.value}
-            type="button"
-            aria-pressed={selected}
-            onClick={() => onChange(o.value)}
-            className={`rounded-md px-3 py-1 text-sm font-medium transition ${style}`}
-          >
-            {o.alert && <span aria-hidden="true" className="mr-1.5 inline-block h-2 w-2 rounded-full bg-rose-500 align-middle" />}
-            {o.label}
-            {o.alert && <span className="sr-only"> ({o.alert})</span>}
-          </button>
-        );
-      })}
+      {league.platform === 'ffpc' && <FfpcWaiverPaste key={league.leagueId} league={league} />}
     </div>
   );
 }
@@ -159,37 +228,45 @@ function PlayerLine({ p, note }: { p: WaiverPlayer; note?: string }) {
   );
 }
 
+const availabilityNote = (p: WaiverPlayer) => (p.availability === 'waivers' ? 'on waivers' : p.availability === 'free_agent' ? 'free agent' : undefined);
+
+// Each move on one aligned row: why, who to add, who to drop, what it's worth.
 function Moves({ league, week }: { league: WaiverLeague; week: number }) {
   if (league.moves.length === 0) {
-    return <p className="text-sm text-slate-400">No moves to suggest: your lineup for week {week} is covered by your roster.</p>;
+    return <p className="text-sm text-slate-400">Nothing to suggest: your roster covers your week {week} lineup.</p>;
   }
   return (
-    <ol className="flex flex-col gap-2">
+    <ol className="divide-y divide-slate-800">
       {league.moves.map((m) => (
-        <li key={`${m.slot}:${m.add.player.playerId}`} className="rounded-lg border border-slate-800 bg-slate-950/40 px-4 py-3 text-sm">
-          <div className="mb-1 flex items-center justify-between gap-3">
-            <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs font-medium text-slate-200">
-              {REASON_LABEL[m.reason]} · {m.slot}
-            </span>
-            <span className="font-semibold tabular-nums text-emerald-400">+{m.gain.toFixed(1)} pts in week {week}</span>
-          </div>
-          <p>
-            <span className="text-emerald-400">Add</span> <PlayerLine p={m.add} note={m.add.availability === 'waivers' ? 'on waivers' : m.add.availability === 'free_agent' ? 'free agent' : undefined} />
-          </p>
-          {m.replaces && (
-            <p className="text-slate-400">
-              in place of {m.replaces.player.name} ({m.reason === 'upgrade' ? `${fmt(m.replaces.week)} projected` : REASON_LABEL[m.reason].toLowerCase()})
-            </p>
-          )}
-          <p className="text-slate-400">
+        <li key={`${m.slot}:${m.add.player.playerId}`} className="grid gap-x-4 gap-y-1 py-3 text-sm sm:grid-cols-[7.5rem_minmax(0,1.3fr)_minmax(0,1fr)_5rem] sm:items-start">
+          <span className="self-start justify-self-start rounded-full bg-slate-800 px-2 py-0.5 text-xs font-medium text-slate-200">
+            {REASON_LABEL[m.reason]} · {m.slot}
+          </span>
+          <span className="min-w-0">
+            <span className="text-emerald-400">Add</span> <PlayerLine p={m.add} note={availabilityNote(m.add)} />
+            {m.replaces && (
+              <span className="block text-xs text-slate-400">
+                {m.reason === 'upgrade'
+                  ? `over ${m.replaces.player.name} (${fmt(m.replaces.week)} projected)`
+                  : `for ${m.replaces.player.name} (${REASON_LABEL[m.reason].toLowerCase()})`}
+              </span>
+            )}
+          </span>
+          <span className="min-w-0">
             {m.drop ? (
               <>
-                <span className="text-rose-300">Drop</span> {m.drop.player.name} ({m.drop.player.position}, {fmt(m.drop.restOfSeason)} rest of season; replaceable from waivers)
+                <span className="text-rose-300">Drop</span> <span className="font-medium">{m.drop.player.name}</span>{' '}
+                <span className="text-slate-400">{m.drop.player.position}</span>
+                <span className="block text-xs text-slate-400">{fmt(m.drop.restOfSeason)} rest of season, replaceable</span>
               </>
             ) : (
-              'Uses an open roster spot, no drop needed'
+              <span className="text-slate-400">No drop: open roster spot</span>
             )}
-          </p>
+          </span>
+          <span className="tabular-nums sm:text-right">
+            <span className="font-semibold text-emerald-400">+{m.gain.toFixed(1)}</span>
+            <span className="block text-xs text-slate-400">pts in week {week}</span>
+          </span>
         </li>
       ))}
     </ol>
@@ -216,17 +293,27 @@ function Available({ league }: { league: WaiverLeague }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Segmented
-          label="Rank by"
-          value={sort}
-          onChange={setSort}
-          options={[
-            { value: 'week', label: 'This week' },
-            { value: 'restOfSeason', label: 'Rest of season' },
-            { value: 'trending', label: 'Trending' },
-          ]}
-        />
-        <Segmented label="Position" value={position} onChange={setPosition} options={POSITIONS.map((p) => ({ value: p, label: p }))} />
+        <div role="group" aria-label="Position" className="flex flex-wrap gap-1">
+          {POSITIONS.map((p) => (
+            <button
+              key={p}
+              type="button"
+              aria-pressed={position === p}
+              onClick={() => setPosition(p)}
+              className={`rounded-md px-2.5 py-1 text-sm font-medium ${position === p ? 'bg-slate-100 text-slate-900' : 'text-slate-300 hover:bg-slate-800'}`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+        <label className="flex items-center gap-2 text-sm text-slate-300">
+          Rank by
+          <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100">
+            <option value="week">This week</option>
+            <option value="restOfSeason">Rest of season</option>
+            <option value="trending">Trending adds</option>
+          </select>
+        </label>
       </div>
       {groups.length === 0 ? (
         <p className="py-4 text-center text-sm text-slate-400">No available players match.</p>
@@ -241,29 +328,38 @@ function Available({ league }: { league: WaiverLeague }) {
             </tr>
           </thead>
           {groups.map(({ pos, rows }) => (
-          <tbody key={pos} className="divide-y divide-slate-800">
-            {position === 'All' && (
-              <tr>
-                <th scope="rowgroup" colSpan={4} className="pb-1 pt-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  {pos}
-                </th>
-              </tr>
-            )}
-            {rows.map((p) => (
-              <tr key={p.player.playerId}>
-                <td className="py-2 pr-2">
-                  <PlayerLine p={p} />
-                  {p.availability === 'waivers' && <span className="ml-2 rounded bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300">waivers</span>}
-                </td>
-                <td className="hidden py-2 text-right tabular-nums text-slate-400 sm:table-cell">{p.trendingAdds != null ? adds(p.trendingAdds) : ''}</td>
-                <td className={`py-2 pl-3 text-right tabular-nums ${sort === 'week' ? 'font-semibold' : 'text-slate-300'}`}>{fmt(p.week)}</td>
-                <td className={`py-2 pl-3 text-right tabular-nums ${sort === 'restOfSeason' ? 'font-semibold' : 'text-slate-300'}`}>{fmt(p.restOfSeason)}</td>
-              </tr>
-            ))}
-          </tbody>
+            <tbody key={pos} className="divide-y divide-slate-800">
+              {position === 'All' && (
+                <tr>
+                  <th scope="rowgroup" colSpan={4} className="pb-1 pt-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    {pos}
+                  </th>
+                </tr>
+              )}
+              {rows.map((p) => (
+                <tr key={p.player.playerId}>
+                  <td className="py-2 pr-2">
+                    <PlayerLine p={p} />
+                    {p.availability === 'waivers' && <span className="ml-2 rounded bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300">waivers</span>}
+                  </td>
+                  <td className="hidden py-2 text-right tabular-nums text-slate-400 sm:table-cell">{p.trendingAdds != null ? adds(p.trendingAdds) : ''}</td>
+                  <td className={`py-2 pl-3 text-right tabular-nums ${sort === 'week' ? 'font-semibold' : 'text-slate-300'}`}>{fmt(p.week)}</td>
+                  <td className={`py-2 pl-3 text-right tabular-nums ${sort === 'restOfSeason' ? 'font-semibold' : 'text-slate-300'}`}>{fmt(p.restOfSeason)}</td>
+                </tr>
+              ))}
+            </tbody>
           ))}
         </table>
       )}
+    </div>
+  );
+}
+
+function Card({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+      <h3 className="mb-2 font-semibold">{title}</h3>
+      {children}
     </div>
   );
 }
@@ -277,23 +373,23 @@ export function WaiversView() {
   if (error) return <p role="alert" className="rounded-lg bg-rose-950/60 p-4 text-sm text-rose-200">Couldn't load waivers: {error.message}</p>;
 
   // The league whose waivers run soonest comes first; leagues with no known schedule go last.
-  const ordered = data.leagues
+  const entries: Entry[] = data.leagues
     .map((l) => {
       const upcoming = nextRun(l.runs);
       return { league: l, next: upcoming?.at ?? null, label: upcoming ? friendlyRun(upcoming.run) : null };
     })
     .sort((a, b) => (a.next?.getTime() ?? Infinity) - (b.next?.getTime() ?? Infinity));
-  const current = ordered.find((o) => `${o.league.platform}:${o.league.leagueId}` === selected) ?? ordered[0];
+  const current = entries.find((e) => keyOf(e.league) === selected) ?? entries[0];
   const league = current?.league;
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-slate-400">
-        Claims made now play in week {data.week}. Projections are scored with each league's own settings; rest of season runs through week{' '}
-        {data.lastRegularWeek}. FFPC leagues use a pasted copy of FFPC's add/drop page.
-      </p>
-
-      <Reminders />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-slate-400" title={`Projections use each league's own scoring; rest of season runs through week ${data.lastRegularWeek}.`}>
+          Claims made now play in <span className="font-semibold text-slate-200">week {data.week}</span>.
+        </p>
+        <Reminders />
+      </div>
 
       {data.errors.map((e) => (
         <div key={e.source} className="rounded-lg bg-amber-950/60 p-3 text-sm text-amber-200">
@@ -301,50 +397,25 @@ export function WaiversView() {
         </div>
       ))}
 
-      {data.leagues.length > 1 && (
-        <Segmented
-          label="League"
-          value={league ? `${league.platform}:${league.leagueId}` : ''}
-          onChange={setSelected}
-          options={ordered.map(({ league: l, label }) => ({
-            value: `${l.platform}:${l.leagueId}`,
-            label: label ? `${l.name} · ${label}` : l.name,
-            alert: l.claims?.reminderDue ? 'claims not set' : undefined,
-          }))}
-        />
-      )}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[17rem_minmax(0,1fr)] lg:items-start">
+        {entries.length > 1 && <LeaguePicker entries={entries} value={league ? keyOf(league) : ''} onChange={setSelected} />}
 
-      {league && (
-        <section aria-label={`Waivers for ${league.name}`} className="flex flex-col gap-5 rounded-xl border border-slate-800 bg-slate-900 p-5">
-          <header className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-lg font-semibold">
-              {league.name} <span className="text-sm font-normal text-slate-400">· {PLATFORM_LABEL[league.platform]}</span>
-            </h2>
-            <p className="text-sm text-slate-300">
-              {league.rules ? rulesText(league.rules) : league.platform === 'ffpc' ? '' : 'Waiver rules unavailable'}
-              {league.openRosterSpots > 0 && ` · ${league.openRosterSpots} open roster spot${league.openRosterSpots > 1 ? 's' : ''}`}
-            </p>
-          </header>
-
-          <Schedule league={league} next={current?.next ?? null} />
-
-          {league.platform === 'ffpc' && <FfpcWaiverPaste key={league.leagueId} league={league} />}
-
-          {(league.platform !== 'ffpc' || league.pastedAt) && (
-            <>
-              <div>
-                <h3 className="mb-2 text-sm font-semibold text-slate-200">Suggested moves</h3>
-                <Moves league={league} week={data.week} />
-              </div>
-
-              <div>
-                <h3 className="mb-2 text-sm font-semibold text-slate-200">Best available</h3>
-                <Available key={`${league.platform}:${league.leagueId}`} league={league} />
-              </div>
-            </>
-          )}
-        </section>
-      )}
+        {league && (
+          <section aria-label={`Waivers for ${league.name}`} className="flex flex-col gap-4 lg:col-start-2">
+            <Header league={league} next={current?.next ?? null} />
+            {(league.platform !== 'ffpc' || league.pastedAt) && (
+              <>
+                <Card title="Suggested moves">
+                  <Moves league={league} week={data.week} />
+                </Card>
+                <Card title="Best available">
+                  <Available key={keyOf(league)} league={league} />
+                </Card>
+              </>
+            )}
+          </section>
+        )}
+      </div>
     </div>
   );
 }
