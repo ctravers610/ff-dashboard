@@ -5,6 +5,7 @@
 export * from './ffpc';
 export * from './ffpcLive';
 export * from './ffpcWaivers';
+export * from './slots';
 export * from './waiverSchedule';
 export * from './winProbability';
 
@@ -166,6 +167,15 @@ export interface PlayerExposure {
   player: Player;
   owned: (LeagueRef & { status: RosterStatus })[];
   facing: LeagueRef[]; // your opponent is starting him this week
+  // His NFL game this week (opponent null = bye); null when the schedule is unknown.
+  game?: PlayerGame | null;
+  projected?: number | null; // Sleeper's PPR projection for the week: for comparing, not your league's scoring
+}
+
+export interface PlayerGame {
+  opponent: string | null; // null = on bye
+  kickoff: string | null; // ISO
+  started: boolean;
 }
 
 // win/loss/tie once the week is over; live while it's still being played;
@@ -332,6 +342,14 @@ export interface LiveFeedResponse {
   events: LiveEvent[]; // newest first
 }
 
+// ── Bye weeks ──────────────────────────────────────────────────────────
+
+export interface ByeWeeksResponse {
+  season: string;
+  // From the week a waiver claim would play in to the end of the regular season.
+  weeks: { week: number; teams: string[] }[]; // teams: NFL teams with no game that week
+}
+
 // ── Lineup recap ───────────────────────────────────────────────────────
 
 // A start/sit call that cost points: who you started, and the bench player
@@ -359,6 +377,22 @@ export interface LineupRecap {
   // yours (better.name is the free agent). Null where the platform can't say.
   missedPickups: CostlyCall[] | null;
   pickupsNote: string | null; // how "available" was judged, when it's approximate
+}
+
+// The whole season so far, one line per league: the losses a better lineup
+// would have won, and the points left on the bench.
+export interface RecapSeasonLeague {
+  platform: Platform;
+  leagueId: string;
+  weeks: number[]; // finished weeks with a recap
+  winnable: number[]; // weeks lost that the best lineup would have won
+  leftOnBench: number; // total over those weeks
+}
+
+export interface RecapSeasonResponse {
+  season: string;
+  leagues: RecapSeasonLeague[];
+  errors: SourceError[];
 }
 
 export interface RecapResponse {

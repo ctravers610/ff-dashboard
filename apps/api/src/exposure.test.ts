@@ -85,4 +85,14 @@ describe('buildExposure', () => {
   it('sorts most-owned players first', () => {
     expect(buildExposure(leagues)[0]!.player.name).toBe('Jaylen Waddle');
   });
+
+  it('adds each player’s game this week and a projection, when the week is known', () => {
+    const games = new Map([['SF', { opponent: 'LAR', opponentScore: 0, started: false, progress: 0, kickoff: '2026-10-18T20:25:00Z' }]]);
+    const exposure = buildExposure(leagues, { games, projectedFor: (p) => (p.name === 'Mike Evans' ? 14.2 : null) });
+    const evansExp = exposure.find((e) => e.player.name === 'Mike Evans')!;
+    expect(evansExp.game).toEqual({ opponent: 'LAR', kickoff: '2026-10-18T20:25:00Z', started: false });
+    expect(evansExp.projected).toBe(14.2);
+    // DEN has no game on this schedule: a bye.
+    expect(exposure.find((e) => e.player.name === 'Jaylen Waddle')!.game).toEqual({ opponent: null, kickoff: null, started: false });
+  });
 });

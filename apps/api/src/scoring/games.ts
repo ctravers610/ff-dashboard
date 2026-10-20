@@ -1,7 +1,7 @@
 // This week's NFL games from ESPN's public scoreboard: scores (for defenses'
 // points allowed) and how far along each game is (for live projections).
 
-import { cached, MINUTE } from '../cache.js';
+import { cached, HOUR, MINUTE } from '../cache.js';
 import { config } from '../config.js';
 
 interface EspnScoreboard {
@@ -59,3 +59,27 @@ async function fetchGames(season: string, week: number): Promise<Map<string, Gam
 // team code → game, refreshed at most once a minute.
 export const nflGames = (season: string, week: number) =>
   cached(`games:${season}:${week}`, MINUTE, () => fetchGames(season, week));
+
+const NFL_TEAMS = [
+  'ARI', 'ATL', 'BAL', 'BUF', 'CAR', 'CHI', 'CIN', 'CLE', 'DAL', 'DEN', 'DET', 'GB', 'HOU', 'IND', 'JAX', 'KC',
+  'LAC', 'LAR', 'LV', 'MIA', 'MIN', 'NE', 'NO', 'NYG', 'NYJ', 'PHI', 'PIT', 'SEA', 'SF', 'TB', 'TEN', 'WAS',
+];
+
+/** Teams with no game in a week's schedule are on bye. */
+export function byes(games: Map<string, unknown>): Set<string> | null {
+  if (games.size === 0) return null; // no schedule: can't tell
+  const out = new Set(NFL_TEAMS.filter((t) => !games.has(t)));
+  if (out.has('WAS')) out.add('WSH'); // ESPN's code for Washington
+  return out;
+}
+
+/** Each week's bye teams (null where that week's schedule couldn't be loaded). The schedule rarely changes, so it's kept for hours. */
+export const byeWeeks = (season: string, from: number, to: number) =>
+  cached(`byes:${season}:${from}-${to}`, 6 * HOUR, () =>
+    Promise.all(
+      Array.from({ length: Math.max(0, to - from + 1) }, async (_, i) => ({
+        week: from + i,
+        teams: await fetchGames(season, from + i).then(byes, () => null),
+      })),
+    ),
+  );

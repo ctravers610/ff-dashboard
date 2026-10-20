@@ -2,7 +2,7 @@
 // lineup your roster could have fielded, the start/sit calls that cost you,
 // and free agents who'd have beaten your starters.
 
-import type { LineupRecap, Player, RecapResponse, SourceError } from '@ffd/shared';
+import type { LineupRecap, Player, RecapResponse, RecapSeasonLeague, RecapSeasonResponse, SourceError } from '@ffd/shared';
 import { espnClient, type EspnAuth } from '../adapters/espn/client.js';
 import { BENCH_SLOT, findMyTeamId, IR_SLOT, SLOT_NAMES, SLOT_ORDER, toEspnPlayer } from '../adapters/espn/mapper.js';
 import type { EspnPlayer } from '../adapters/espn/types.js';
@@ -10,7 +10,7 @@ import { buildPlayerIndex, parseRosterText, resolvePlayer } from '../adapters/ma
 import { manualLeagueRepo } from '../adapters/manual/store.js';
 import { sleeperClient } from '../adapters/sleeper/client.js';
 import { NON_STARTER_SLOTS, toPlayer } from '../adapters/sleeper/mapper.js';
-import { cached, HOUR } from '../cache.js';
+import { cached, HOUR, MINUTE } from '../cache.js';
 import { config } from '../config.js';
 import { nflGames } from '../scoring/games.js';
 import { fetchStats, liveScorer } from '../scoring/live.js';
@@ -219,4 +219,29 @@ export async function getRecap(requested?: number): Promise<RecapResponse> {
     settle('ffpc', ffpcRecaps(state.season, week)),
   ]);
   return { season: state.season, week, weeks, leagues: results.flat(), errors };
+}
+
+// A finished week's recap barely changes (an FFPC paste is the exception), so
+// the season view reuses each week's for a while instead of rebuilding them all.
+const weekRecap = (season: string, week: number) => cached(`recap:week:${season}:${week}`, 30 * MINUTE, () => getRecap(week));
+
+/** Every finished week's recap, boiled down per league. Weeks load one at a time to go easy on the platforms. */
+export async function getRecapSeason(): Promise<RecapSeasonResponse> {
+  const state = await sleeperClient.state();
+  const weeks = await finishedWeeks(state.season, state.week);
+  const byLeague = new Map<string, RecapSeasonLeague>();
+  const errors = new Map<string, SourceError>();
+  for (const week of [...weeks].reverse()) {
+    const r = await weekRecap(state.season, week);
+    for (const e of r.errors) errors.set(e.source, e);
+    for (const l of r.leagues) {
+      const key = `${l.platform}:${l.leagueId}`;
+      const entry = byLeague.get(key) ?? { platform: l.platform, leagueId: l.leagueId, weeks: [], winnable: [], leftOnBench: 0 };
+      entry.weeks.push(l.week);
+      if (l.bestWouldWin) entry.winnable.push(l.week);
+      entry.leftOnBench = round1(entry.leftOnBench + l.leftOnBench);
+      byLeague.set(key, entry);
+    }
+  }
+  return { season: state.season, leagues: [...byLeague.values()], errors: [...errors.values()] };
 }

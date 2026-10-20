@@ -1,12 +1,14 @@
 import type { HistoryWeek } from '@ffd/shared';
 import { Bar, CartesianGrid, Cell, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ordinal, pts } from '../../format';
+import type { RecapWeeks } from './LeagueHistoryCard';
 
 interface Point {
   week: number;
   points: number | null; // null = no data for that week
   opponent: number | null; // null in all-play weeks: there is no single opponent to compare with
   detail: HistoryWeek | null;
+  winnable: boolean; // a loss the best lineup would have won
 }
 
 // Round 50-point steps: 0, 50, 100, ... up to the first step above the data.
@@ -60,24 +62,43 @@ function WeekTooltip({ active, payload }: { active?: boolean; payload?: { payloa
           </div>
         )
       )}
+      {point.winnable && <div className="mt-1 text-xs font-medium text-amber-300">Your best lineup would have won</div>}
     </div>
   );
 }
 
-export function WeeklyChart({ weeks, label }: { weeks: HistoryWeek[]; label: string }) {
+export function WeeklyChart({
+  weeks,
+  label,
+  recap,
+  winnable,
+  onPickWeek,
+}: {
+  weeks: HistoryWeek[];
+  label: string;
+  recap: RecapWeeks | null;
+  winnable: number[];
+  onPickWeek: (week: number) => void;
+}) {
   // Span week 1 to the latest week so gaps read as "no data" instead of a
   // lone bar floating in the middle.
   const byWeek = new Map(weeks.map((w) => [w.week, w]));
   const lastWeek = Math.max(...weeks.map((w) => w.week), 1);
   const data: Point[] = Array.from({ length: lastWeek }, (_, i) => {
     const w = byWeek.get(i + 1) ?? null;
-    return { week: i + 1, points: w?.points ?? null, opponent: w && !w.allPlay ? w.opponentPoints : null, detail: w };
+    return { week: i + 1, points: w?.points ?? null, opponent: w && !w.allPlay ? w.opponentPoints : null, detail: w, winnable: winnable.includes(i + 1) };
   });
   const ticks = yTicks(Math.max(...weeks.map((w) => Math.max(w.points, w.opponentPoints ?? 0)), 0));
 
   return (
     // The container includes the x-axis band, so nothing scrolls or clips.
-    <div className="h-52 w-full" role="img" aria-label={`${label}: your points each week. Use the table view for exact values.`}>
+    // Clicking a finished week's column shows its lineup recap below (the Week
+    // picker and the table view do the same from the keyboard).
+    <div
+      className={`h-52 w-full ${recap ? '[&_.recharts-surface]:cursor-pointer' : ''}`}
+      role="img"
+      aria-label={`${label}: your points each week. Use the table view for exact values.`}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
@@ -97,10 +118,26 @@ export function WeeklyChart({ weeks, label }: { weeks: HistoryWeek[]; label: str
             domain={[0, ticks[ticks.length - 1]!]}
           />
           <Tooltip content={<WeekTooltip />} cursor={{ fill: 'var(--chart-grid)', opacity: 0.6 }} isAnimationActive={false} />
-          <Bar dataKey="points" maxBarSize={24} radius={[4, 4, 0, 0]} fill="var(--chart-series)" isAnimationActive={false}>
+          <Bar
+            dataKey="points"
+            maxBarSize={24}
+            radius={[4, 4, 0, 0]}
+            fill="var(--chart-series)"
+            isAnimationActive={false}
+            onClick={(_, index) => {
+              const week = data[index]?.week;
+              if (week && recap?.weeks.includes(week)) onPickWeek(week);
+            }}
+          >
             {data.map((d) => (
               // A week still being played is drawn lighter, so it doesn't read as a final score.
-              <Cell key={d.week} fillOpacity={d.detail?.result === 'live' ? 0.5 : 1} />
+              // The week the recap shows is outlined.
+              <Cell
+                key={d.week}
+                fillOpacity={d.detail?.result === 'live' ? 0.5 : 1}
+                stroke={recap?.week === d.week ? 'var(--chart-ink)' : 'none'}
+                strokeWidth={2}
+              />
             ))}
           </Bar>
           <Line dataKey="opponent" stroke="none" dot={<OpponentTick />} activeDot={false} isAnimationActive={false} legendType="none" />

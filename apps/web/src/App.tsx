@@ -10,6 +10,7 @@ import { MatchupTable } from './components/MatchupTable';
 import { PlayersView } from './components/PlayersView';
 import { WaiversView } from './components/waivers/WaiversView';
 import { YahooConnect } from './components/YahooConnect';
+import { useShortcut } from './shortcuts';
 
 // The History tab pulls in the charting library, so load it only when it's opened.
 const HistoryView = lazy(() =>
@@ -35,6 +36,13 @@ export default function App({ user }: { user: Me['user'] }) {
   });
   const [editing, setEditing] = useState<string | null>(null); // 'new' or a manual league id
   const [adding, setAdding] = useState(false);
+  // 1-4 switch tabs, in the order they're shown.
+  useShortcut((key) => {
+    const target = VIEWS[Number(key) - 1];
+    if (!target) return false;
+    setView(target.id);
+    return true;
+  });
 
   return (
     // Bottom padding on phones leaves room for the tab bar.
@@ -172,6 +180,11 @@ export default function App({ user }: { user: Me['user'] }) {
           }}
         />
       )}
+      <p className="mt-8 hidden text-center text-xs text-slate-400 lg:block">
+        Shortcuts: <kbd className="font-sans font-semibold text-slate-300">1</kbd>–<kbd className="font-sans font-semibold text-slate-300">4</kbd> switch tabs ·{' '}
+        <kbd className="font-sans font-semibold text-slate-300">j</kbd> / <kbd className="font-sans font-semibold text-slate-300">k</kbd> next / previous league ·
+        arrow keys move through a league list
+      </p>
       {editing && <ManualLeagueEditor leagueId={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
     </div>
   );

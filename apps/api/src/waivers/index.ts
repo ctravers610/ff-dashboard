@@ -2,7 +2,7 @@
 // available players, and suggested add/drop moves for the week a claim made now
 // would play in. FFPC leagues come from a pasted copy of FFPC's add/drop page.
 
-import type { WaiverLeague, WaiversResponse } from '@ffd/shared';
+import type { ByeWeeksResponse, WaiverLeague, WaiversResponse } from '@ffd/shared';
 import { claimStatus } from '../reminders/plan.js';
 import { reminderRepo } from '../reminders/store.js';
 import { sleeperClient } from '../adapters/sleeper/client.js';
@@ -10,7 +10,7 @@ import { toPlayer } from '../adapters/sleeper/mapper.js';
 import { config } from '../config.js';
 import { activeSources } from '../sources/store.js';
 import { playerKey } from '../exposure.js';
-import { nflGames } from '../scoring/games.js';
+import { byes, byeWeeks, nflGames } from '../scoring/games.js';
 import type { WaiverContext } from './context.js';
 import { fetchEspnWaivers } from './espn.js';
 import { fetchFfpcWaivers } from './ffpc.js';
@@ -71,15 +71,14 @@ async function withClaims(leagues: WaiverLeague[], espnPending: Map<string, numb
   });
 }
 
-const NFL_TEAMS = [
-  'ARI', 'ATL', 'BAL', 'BUF', 'CAR', 'CHI', 'CIN', 'CLE', 'DAL', 'DEN', 'DET', 'GB', 'HOU', 'IND', 'JAX', 'KC',
-  'LAC', 'LAR', 'LV', 'MIA', 'MIN', 'NE', 'NO', 'NYG', 'NYJ', 'PHI', 'PIT', 'SEA', 'SF', 'TB', 'TEN', 'WAS',
-];
-
-/** Teams with no game in a week's schedule are on bye. */
-export function byes(games: Map<string, unknown>): Set<string> | null {
-  if (games.size === 0) return null; // no schedule: can't tell
-  const out = new Set(NFL_TEAMS.filter((t) => !games.has(t)));
-  if (out.has('WAS')) out.add('WSH'); // ESPN's code for Washington
-  return out;
+/** GET /api/byes: who's on bye in each week from the claim week to the end of the regular season. */
+export async function getByeWeeks(): Promise<ByeWeeksResponse> {
+  const state = await sleeperClient.state();
+  const thisWeek = await nflGames(state.season, state.week).catch(() => null);
+  const from = Math.min(claimWeek(state.week, thisWeek), LAST_REGULAR_WEEK);
+  const all = await byeWeeks(state.season, from, LAST_REGULAR_WEEK);
+  return {
+    season: state.season,
+    weeks: all.flatMap(({ week, teams }) => (teams ? [{ week, teams: [...teams].filter((t) => t !== 'WSH') }] : [])),
+  };
 }

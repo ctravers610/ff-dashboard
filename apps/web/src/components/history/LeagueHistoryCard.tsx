@@ -1,4 +1,4 @@
-import type { LeagueHistory } from '@ffd/shared';
+import type { LeagueHistory, RecapSeasonLeague } from '@ffd/shared';
 import { useId } from 'react';
 import { PLATFORM_LABEL } from '../../format';
 import { ResultChip } from './ResultChip';
@@ -7,7 +7,27 @@ import { WeeklyTable } from './WeeklyTable';
 
 export type HistoryMode = 'chart' | 'table';
 
-export function LeagueHistoryCard({ history, mode, onMode }: { history: LeagueHistory; mode: HistoryMode; onMode: (m: HistoryMode) => void }) {
+// Which finished week the recap below shows, and which weeks it can show.
+export interface RecapWeeks {
+  week: number;
+  weeks: number[];
+}
+
+export function LeagueHistoryCard({
+  history,
+  mode,
+  onMode,
+  season,
+  recap,
+  onPickWeek,
+}: {
+  history: LeagueHistory;
+  mode: HistoryMode;
+  onMode: (m: HistoryMode) => void;
+  season: RecapSeasonLeague | null;
+  recap: RecapWeeks | null;
+  onPickWeek: (week: number) => void;
+}) {
   const { name, platform, weeks, record, avgPoints } = history;
   const finished = record.wins + record.losses + record.ties;
   const headingId = useId();
@@ -48,6 +68,20 @@ export function LeagueHistoryCard({ history, mode, onMode }: { history: LeagueHi
           <div className="text-xs text-slate-400">Avg points / week</div>
           <div className="text-2xl font-semibold">{avgPoints != null ? avgPoints.toFixed(1) : '—'}</div>
         </div>
+        {season && season.weeks.length > 0 && (
+          <div>
+            <div className="text-xs text-slate-400">Losses a better lineup wins</div>
+            <div className="flex items-baseline gap-2">
+              <span className={`text-2xl font-semibold ${season.winnable.length ? 'text-amber-300' : ''}`}>{season.winnable.length}</span>
+              {season.winnable.map((w) => (
+                <button key={w} type="button" onClick={() => onPickWeek(w)} className="text-xs font-medium text-slate-300 underline decoration-slate-600 hover:text-slate-100" aria-label={`Show the week ${w} recap`}>
+                  Wk {w}
+                </button>
+              ))}
+              <span className="text-xs text-slate-400">· {season.leftOnBench.toFixed(1)} pts left on the bench</span>
+            </div>
+          </div>
+        )}
         <div className="flex flex-wrap gap-1" aria-label="Weekly results">
           {weeks.map((w) => (
             <ResultChip key={w.week} result={w.result} week={w.week} />
@@ -57,7 +91,7 @@ export function LeagueHistoryCard({ history, mode, onMode }: { history: LeagueHi
 
       {mode === 'chart' ? (
         <>
-          <WeeklyChart weeks={weeks} label={name} />
+          <WeeklyChart weeks={weeks} label={name} recap={recap} winnable={season?.winnable ?? []} onPickWeek={onPickWeek} />
           <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-300">
             <li className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-sm" style={{ background: 'var(--chart-series)' }} />
@@ -75,10 +109,11 @@ export function LeagueHistoryCard({ history, mode, onMode }: { history: LeagueHi
                 Week in progress
               </li>
             )}
+            {recap && <li className="text-slate-400 sm:ml-auto">Click a week to see its lineup recap</li>}
           </ul>
         </>
       ) : (
-        <WeeklyTable weeks={weeks} />
+        <WeeklyTable weeks={weeks} recap={recap} winnable={season?.winnable ?? []} onPickWeek={onPickWeek} />
       )}
     </article>
   );

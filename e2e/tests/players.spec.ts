@@ -62,4 +62,31 @@ test.describe('Players tab', () => {
     await page.getByRole('button', { name: /^All/ }).click();
     await expect(row(page, 'Jaylen Waddle')).toContainText('Questionable');
   });
+
+  test('compares two players side by side', async ({ page }) => {
+    await page.getByRole('button', { name: /^All/ }).click();
+    await page.getByRole('button', { name: 'Compare Josh Allen' }).click();
+    const panel = page.getByRole('region', { name: 'Compare players' });
+    await expect(panel).toContainText('Pick one more player to compare with Josh Allen.');
+
+    await page.getByRole('button', { name: 'Compare Drake Maye' }).click();
+    await expect(panel).toContainText('Josh Allen');
+    await expect(panel).toContainText('Drake Maye');
+    await expect(panel).toContainText('vs MIA'); // BUF's game this week
+    // The fixture gives every player the same projection.
+    await expect(panel).toContainText('Too close to call on projections');
+
+    await panel.getByRole('button', { name: 'Clear' }).click();
+    await expect(panel).toHaveCount(0);
+  });
+
+  test('shows starters by NFL game, and narrows the list to one game', async ({ page }) => {
+    await page.getByRole('button', { name: /^All/ }).click();
+    const games = page.getByRole('region', { name: 'Starters by game' });
+    await games.getByRole('button', { name: /^BUF – MIA/ }).click();
+    await expect(row(page, 'Josh Allen')).toHaveCount(1);
+    await expect(row(page, 'Malik Nabers')).toHaveCount(0);
+    await games.getByRole('button', { name: /^BUF – MIA/ }).click(); // again to clear
+    await expect(row(page, 'Malik Nabers')).toHaveCount(1);
+  });
 });

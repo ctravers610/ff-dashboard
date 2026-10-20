@@ -9,7 +9,7 @@ import { seedFfpcLeague } from './seed.js';
 
 // The scenarios behind these numbers are spelled out in fixtures/waivers.ts.
 const leagueSection = (page: Page, name: string) => page.getByRole('region', { name: `Waivers for ${name}` });
-const moves = (page: Page, name: string) => leagueSection(page, name).getByRole('listitem');
+const moves = (page: Page, name: string) => leagueSection(page, name).getByRole('region', { name: 'Suggested moves' }).getByRole('listitem');
 const pickLeague = (page: Page, name: string) => page.getByRole('group', { name: 'League' }).getByRole('button', { name }).click();
 
 test.describe('Waivers', () => {
@@ -52,6 +52,13 @@ test.describe('Waivers', () => {
     await expect(list.nth(1)).toContainText('Add Chris Olave WR · NO · free agent');
     await expect(list.nth(1)).toContainText('+4.0pts');
     for (const i of [0, 1]) await expect(list.nth(i)).toContainText('No drop: open roster spot');
+  });
+
+  test('lists the bye weeks ahead and whether the rest of the roster covers them', async ({ page }) => {
+    // DEN is on bye in the claim week; Najee Harris can take Waddle's FLEX spot.
+    const byes = leagueSection(page, SLEEPER_LEAGUE_NAME).getByRole('region', { name: 'Bye weeks' });
+    await expect(byes.getByRole('listitem')).toHaveCount(1);
+    await expect(byes.getByRole('listitem')).toHaveText(`Week ${CLAIM_WEEK}Jaylen Waddle WRLineup covered`);
   });
 
   test('puts leagues in order of their next waiver run, learned from processed claims', async ({ page }) => {

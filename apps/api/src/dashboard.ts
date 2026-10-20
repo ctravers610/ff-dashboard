@@ -6,7 +6,7 @@ import { backfillHistory } from './backfill.js';
 import { config } from './config.js';
 import { activeSources } from './sources/store.js';
 import { buildExposure } from './exposure.js';
-import { adviseLeagues } from './lineupAdvice.js';
+import { adviseLeagues, loadWeekContext } from './lineupAdvice.js';
 import { withMinutesLeft } from './minutesLeft.js';
 import { nflGames } from './scoring/games.js';
 import { recordSnapshots } from './snapshots.js';
@@ -34,7 +34,8 @@ export async function getDashboard(): Promise<DashboardResponse> {
       return true;
     });
   // Drop alerts that can't be acted on any more and suggest bench swaps for the rest.
-  const advised = await adviseLeagues(unique, nfl);
+  const week = await loadWeekContext(nfl);
+  const advised = adviseLeagues(unique, week);
   const leagues = withMinutesLeft(advised, nfl.week, await nflGames(nfl.season, nfl.week).catch(() => null));
 
   // Record history in the background: a database problem must never break the dashboard.
@@ -46,7 +47,7 @@ export async function getDashboard(): Promise<DashboardResponse> {
     week: nfl.week,
     updatedAt: new Date().toISOString(),
     leagues,
-    players: buildExposure(leagues),
+    players: buildExposure(leagues, week),
     errors: results.flatMap((r) => r.errors),
   };
 }

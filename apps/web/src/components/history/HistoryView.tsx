@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useHistory } from '../../api';
+import { useHistory, useRecap, useRecapSeason } from '../../api';
 import { PLATFORM_LABEL } from '../../format';
 import { SideList, WithSideList } from '../SideList';
 import { LeagueHistoryCard, type HistoryMode } from './LeagueHistoryCard';
@@ -13,6 +13,8 @@ export function HistoryView() {
   const [mode, setMode] = useState<HistoryMode>('chart');
   const [selected, setSelected] = useState<string | null>(null);
   const [week, setWeek] = useState<number | null>(null); // null: the latest finished week
+  const recap = useRecap(week).data;
+  const season = useRecapSeason().data;
 
   if (isPending) return <p className="text-slate-400">Loading history…</p>;
   if (error) return <p role="alert" className="text-rose-300">Couldn't load history: {error.message}</p>;
@@ -20,7 +22,7 @@ export function HistoryView() {
     return <p className="text-slate-400">No history yet. Weeks are recorded each time the dashboard loads, so check back after a few games.</p>;
   }
 
-  const keyOf = (h: (typeof data.leagues)[number]) => `${h.platform}:${h.leagueId}`;
+  const keyOf = (h: { platform: string; leagueId: string }) => `${h.platform}:${h.leagueId}`;
   const league = data.leagues.find((h) => keyOf(h) === selected) ?? data.leagues[0]!;
   const recordText = (h: (typeof data.leagues)[number]) => {
     const { wins, losses, ties } = h.record;
@@ -54,7 +56,15 @@ export function HistoryView() {
       >
         {/* Refetching keeps the previous render, just dimmed: no skeleton, no layout jump. */}
         <section aria-label={`History for ${league.name}`} className={`flex flex-col gap-4 transition-opacity ${isFetching ? 'opacity-70' : ''}`}>
-          <LeagueHistoryCard key={keyOf(league)} history={league} mode={mode} onMode={setMode} />
+          <LeagueHistoryCard
+            key={keyOf(league)}
+            history={league}
+            mode={mode}
+            onMode={setMode}
+            season={season?.leagues.find((l) => keyOf(l) === keyOf(league)) ?? null}
+            recap={recap ? { week: recap.week, weeks: recap.weeks } : null}
+            onPickWeek={setWeek}
+          />
           <RecapPanel leagueKey={keyOf(league)} week={week} onWeek={setWeek} />
         </section>
       </WithSideList>

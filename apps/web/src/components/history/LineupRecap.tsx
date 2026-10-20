@@ -1,6 +1,5 @@
-import type { CostlyCall, LineupRecap as Recap, RecapResponse } from '@ffd/shared';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '../../api';
+import type { CostlyCall, LineupRecap as Recap } from '@ffd/shared';
+import { useRecap } from '../../api';
 
 const one = (n: number) => n.toFixed(1);
 
@@ -73,10 +72,7 @@ function RecapBody({ r }: { r: Recap }) {
  * `week` null means the latest finished week.
  */
 export function RecapPanel({ leagueKey, week, onWeek }: { leagueKey: string; week: number | null; onWeek: (w: number) => void }) {
-  const { data, error, isPending } = useQuery({
-    queryKey: ['recap', week],
-    queryFn: () => api<RecapResponse>(`/api/recap${week ? `?week=${week}` : ''}`),
-  });
+  const { data, error, isPending } = useRecap(week);
 
   let body;
   if (isPending) body = <p className="text-sm text-slate-400">Loading…</p>;

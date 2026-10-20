@@ -14,8 +14,8 @@ import { config } from './config.js';
 import { getDashboard } from './dashboard.js';
 import { db, type Db } from './db/client.js';
 import { historyRoutes } from './routes/history.js';
-import { getWaivers } from './waivers/index.js';
-import { getRecap } from './recap/index.js';
+import { getByeWeeks, getWaivers } from './waivers/index.js';
+import { getRecap, getRecapSeason } from './recap/index.js';
 import { reminderRoutes } from './reminders/routes.js';
 import { sourceRoutes } from './sources/routes.js';
 import { liveRoutes } from './live/routes.js';
@@ -74,6 +74,8 @@ export async function buildApp({ logger = true, webDist = config.webDist, auth, 
   });
   app.get('/api/dashboard', async () => getDashboard());
   app.get('/api/waivers', async () => getWaivers());
+  app.get('/api/byes', async () => getByeWeeks());
+  app.get('/api/recap/season', async () => getRecapSeason());
   app.get<{ Querystring: { week?: number } }>(
     '/api/recap',
     { schema: { querystring: { type: 'object', properties: { week: { type: 'integer', minimum: 1, maximum: 18 } } } } },

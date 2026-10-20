@@ -3,32 +3,14 @@
 // only noise), and every remaining problem gets the best healthy bench player
 // who could still fill that slot.
 
-import type { BenchSuggestion, LeagueSummary, LineupAlert, Player } from '@ffd/shared';
+import { canPlay, type BenchSuggestion, type LeagueSummary, type LineupAlert, type Player } from '@ffd/shared';
 import { sleeperClient } from './adapters/sleeper/client.js';
 import { toPlayer } from './adapters/sleeper/mapper.js';
 import { playerKey } from './exposure.js';
 import { nflGames, type GameScore } from './scoring/games.js';
 import { scoreWithSettings, weeklyProjections } from './scoring/projection.js';
 
-// Which positions each slot accepts, across Sleeper, ESPN and FFPC slot names.
-// A slot not listed here accepts only the position of the same name.
-const FLEX = ['RB', 'WR', 'TE'];
-const SUPERFLEX = ['QB', 'RB', 'WR', 'TE'];
-const DEFENSE = ['DEF', 'D/ST'];
-const ELIGIBLE: Record<string, string[]> = {
-  FLEX,
-  'W/R/T': FLEX,
-  'RB/WR': ['RB', 'WR'],
-  WRRB_FLEX: ['RB', 'WR'],
-  'WR/TE': ['WR', 'TE'],
-  REC_FLEX: ['WR', 'TE'],
-  SUPER_FLEX: SUPERFLEX,
-  SUPERFLEX,
-  OP: SUPERFLEX,
-  DEF: DEFENSE,
-  'D/ST': DEFENSE,
-};
-export const canPlay = (slot: string, position: string) => (ELIGIBLE[slot] ?? [slot]).includes(position);
+export { canPlay }; // slot eligibility lives in @ffd/shared, so the web app uses the same rules
 
 export interface AdviceContext {
   /** This week's games by NFL team, or null if the scoreboard is unavailable. */
@@ -87,9 +69,9 @@ const PPR: Record<string, number> = {
   rec: 1, rec_yd: 0.1, rec_td: 6, fum_lost: -2, fgm: 3, xpm: 1,
 };
 
-/** Loads this week's games and projections, then advises every league. */
-export async function adviseLeagues(leagues: LeagueSummary[], nfl: { season: string; week: number }): Promise<LeagueSummary[]> {
-  if (nfl.week <= 0) return leagues;
+/** This week's games and neutral projections; null before the season starts. */
+export async function loadWeekContext(nfl: { season: string; week: number }): Promise<AdviceContext | null> {
+  if (nfl.week <= 0) return null;
 
   // Advice is a bonus: if a feed is down, alerts still show, just without it.
   const [games, projections, players] = await Promise.all([
@@ -106,6 +88,10 @@ export async function adviseLeagues(leagues: LeagueSummary[], nfl: { season: str
       if (player) byKey.set(playerKey(player), stats.pts_ppr ?? scoreWithSettings(stats, PPR));
     }
   }
-  const ctx: AdviceContext = { games, projectedFor: (p) => byKey.get(playerKey(p)) ?? null };
-  return leagues.map((l) => ({ ...l, alerts: adviseLeague(l, ctx) }));
+  return { games, projectedFor: (p) => byKey.get(playerKey(p)) ?? null };
+}
+
+/** Advises every league; without this week's context the alerts are left as they are. */
+export function adviseLeagues(leagues: LeagueSummary[], ctx: AdviceContext | null): LeagueSummary[] {
+  return ctx ? leagues.map((l) => ({ ...l, alerts: adviseLeague(l, ctx) })) : leagues;
 }

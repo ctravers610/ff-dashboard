@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { useRef, type KeyboardEvent, type ReactNode } from 'react';
+import { useShortcut } from '../shortcuts';
 
 // The list on the left of a tab (Waivers, History): one row per item, the
 // chosen one highlighted. On phones it turns into a dropdown above the content.
@@ -14,6 +15,23 @@ export interface SideItem {
 }
 
 export function SideList({ label, items, value, onChange }: { label: string; items: SideItem[]; value: string; onChange: (key: string) => void }) {
+  const group = useRef<HTMLDivElement>(null);
+  const step = (by: number) => {
+    const at = items.findIndex((i) => i.key === value);
+    const next = items[Math.min(items.length - 1, Math.max(0, at + by))];
+    if (next) onChange(next.key);
+    return next;
+  };
+  // j / k anywhere on the page move to the next / previous item.
+  useShortcut((key) => (key === 'j' ? !!step(1) : key === 'k' ? !!step(-1) : false));
+  // Up / down arrows move through the list while it has focus, keeping focus on the chosen row.
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    const next = step(e.key === 'ArrowDown' ? 1 : -1);
+    if (next) group.current?.querySelector<HTMLButtonElement>(`[data-key="${CSS.escape(next.key)}"]`)?.focus();
+  };
+
   return (
     <>
       <label className="flex items-center gap-2 text-sm text-slate-300 lg:hidden">
@@ -27,12 +45,13 @@ export function SideList({ label, items, value, onChange }: { label: string; ite
         </select>
       </label>
 
-      <div role="group" aria-label={label} className="hidden flex-col gap-1 lg:flex">
+      <div ref={group} role="group" aria-label={label} onKeyDown={onKeyDown} className="hidden flex-col gap-1 lg:flex">
         {items.map((i) => {
           const selected = i.key === value;
           return (
             <button
               key={i.key}
+              data-key={i.key}
               type="button"
               aria-pressed={selected}
               onClick={() => onChange(i.key)}

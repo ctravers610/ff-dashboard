@@ -1,3 +1,4 @@
+import { ByePlanner } from './ByePlanner';
 import { friendlyRun, friendlyRunWithTime, nextRun, type WaiverLeague, type WaiverMove, type WaiverPlayer, type WaiverRules } from '@ffd/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState, type ReactNode } from 'react';
@@ -330,10 +331,10 @@ function Available({ league }: { league: WaiverLeague }) {
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+    <section aria-label={title} className="rounded-xl border border-slate-800 bg-slate-900 p-5">
       <h3 className="mb-2 font-semibold">{title}</h3>
       {children}
-    </div>
+    </section>
   );
 }
 
@@ -384,6 +385,7 @@ export function WaiversView() {
                 </Card>
               </>
             )}
+            <ByePlanner platform={league.platform} leagueId={league.leagueId} />
           </section>
         )}
       </WithSideList>

@@ -1,9 +1,21 @@
 import type { HistoryWeek } from '@ffd/shared';
 import { ordinal, pts } from '../../format';
+import type { RecapWeeks } from './LeagueHistoryCard';
 import { ResultChip } from './ResultChip';
 
-// The accessible twin of the chart: every value, no hover needed.
-export function WeeklyTable({ weeks }: { weeks: HistoryWeek[] }) {
+// The accessible twin of the chart: every value, no hover needed. A finished
+// week's number opens its lineup recap, like clicking its column in the chart.
+export function WeeklyTable({
+  weeks,
+  recap,
+  winnable,
+  onPickWeek,
+}: {
+  weeks: HistoryWeek[];
+  recap: RecapWeeks | null;
+  winnable: number[];
+  onPickWeek: (week: number) => void;
+}) {
   return (
     <table className="w-full text-sm">
       <thead className="text-xs text-slate-400">
@@ -18,9 +30,24 @@ export function WeeklyTable({ weeks }: { weeks: HistoryWeek[] }) {
       <tbody className="divide-y divide-slate-800">
         {weeks.map((w) => (
           <tr key={w.week}>
-            <td className="py-1.5 tabular-nums">{w.week}</td>
+            <td className="py-1.5 tabular-nums">
+              {recap?.weeks.includes(w.week) ? (
+                <button
+                  type="button"
+                  aria-pressed={recap.week === w.week}
+                  aria-label={`Show the week ${w.week} recap`}
+                  onClick={() => onPickWeek(w.week)}
+                  className={`rounded px-1.5 font-medium ${recap.week === w.week ? 'bg-slate-100 text-slate-900' : 'underline decoration-slate-600 hover:bg-slate-800'}`}
+                >
+                  {w.week}
+                </button>
+              ) : (
+                <span className="px-1.5">{w.week}</span>
+              )}
+            </td>
             <td className="py-1.5">
               <ResultChip result={w.result} week={w.week} />
+              {winnable.includes(w.week) && <span className="ml-2 text-xs text-amber-300">winnable</span>}
             </td>
             <td className="py-1.5 text-right tabular-nums">{pts(w.points)}</td>
             {w.allPlay ? (

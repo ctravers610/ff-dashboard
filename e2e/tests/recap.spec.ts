@@ -39,4 +39,29 @@ test.describe('Lineup recap', () => {
     await showLeague(page, ESPN_LEAGUE_NAME);
     await expect(recap.getByLabel('Week')).toHaveValue('4');
   });
+
+  test('clicking a week’s column in the chart shows that week’s recap', async ({ page }) => {
+    const card = await showLeague(page, SLEEPER_LEAGUE_NAME);
+    const recap = page.getByRole('region', { name: 'Lineup recap' });
+    await card.locator('.recharts-bar-rectangle').nth(3).click(); // week 4
+    await expect(recap.getByLabel('Week')).toHaveValue('4');
+    const [me, opp] = SLEEPER_PAST[3]!;
+    await expect(recap).toContainText(`Won ${me.toFixed(1)}–${opp.toFixed(1)}`);
+  });
+
+  test('the table view’s week numbers pick the recap week too', async ({ page }) => {
+    const card = await showLeague(page, SLEEPER_LEAGUE_NAME);
+    await card.getByRole('button', { name: 'table', exact: true }).click();
+    await card.getByRole('button', { name: 'Show the week 3 recap' }).click();
+    await expect(page.getByRole('region', { name: 'Lineup recap' }).getByLabel('Week')).toHaveValue('3');
+    await expect(card.getByRole('button', { name: 'Show the week 3 recap' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('counts the losses a better lineup would have won this season', async ({ page }) => {
+    const card = await showLeague(page, SLEEPER_LEAGUE_NAME);
+    // Week 5: lost, but the best lineup (120.7) beat the opponent.
+    await expect(card).toContainText('Losses a better lineup wins');
+    await card.getByRole('button', { name: `Show the week ${RECAP_WEEK} recap` }).click();
+    await expect(page.getByRole('region', { name: 'Lineup recap' }).getByRole('note')).toHaveText('The best lineup (120.7) would have won this one.');
+  });
 });
