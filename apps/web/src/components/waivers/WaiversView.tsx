@@ -62,6 +62,7 @@ function ClaimsMark({ league }: { league: WaiverLeague }) {
     );
   }
   if (league.claims?.set) return <span className="shrink-0 text-xs font-medium text-emerald-300">claims set</span>;
+  if (league.pasteStale) return <span className="shrink-0 text-xs font-medium text-amber-300">re-paste</span>;
   return null;
 }
 

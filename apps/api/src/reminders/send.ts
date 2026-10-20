@@ -2,11 +2,14 @@
 // via the web-push library: each message is encrypted for the browser and
 // signed with our VAPID key, then handed to that browser's push service).
 
-import type { WaiverLeague } from '@ffd/shared';
+import type { WaiversResponse, WaiverLeague } from '@ffd/shared';
 import webpush from 'web-push';
 import { getDashboard } from '../dashboard.js';
 import { nflGames } from '../scoring/games.js';
 import { getRecap } from '../recap/index.js';
+import { manualLeagueRepo } from '../adapters/manual/store.js';
+import { sleeperClient } from '../adapters/sleeper/client.js';
+import { dueFfpcPasteIssues, ffpcPasteMessage } from './ffpcPaste.js';
 import { dueLineupIssues, lineupIssues, lineupMessage } from './lineup.js';
 import { isRecapTime, recapKey, recapMessage } from './recap.js';
 import { dueReminders, reminderMessage, type ReminderMessage } from './plan.js';
@@ -62,6 +65,20 @@ export async function sendLineupCheck(store: ReminderStore, sender: Sender, now 
   const due = dueLineupIssues(issues, await store.sentKeys(issues.map((i) => i.key)), now);
   if (due.length === 0) return 0;
   await sendToAll(store, sender, lineupMessage(due));
+  await store.markSent(due.map((i) => i.key));
+  return due.length;
+}
+
+/** Nudges to paste FFPC's pages again once they're out of date, once each. Returns how many it covered. */
+export async function sendFfpcPasteReminders(waivers: WaiversResponse, store: ReminderStore, sender: Sender, now = new Date()): Promise<number> {
+  if (!waivers.leagues.some((l) => l.platform === 'ffpc')) return 0;
+  const lineups = new Map((await manualLeagueRepo.list()).map((l) => [l.id, l.matchup ? { week: l.matchup.week, capturedAt: new Date(l.matchup.capturedAt) } : null]));
+  const nfl = await sleeperClient.state(); // the lineup that matters is this week's, not the claim week's
+  const issues = dueFfpcPasteIssues(waivers.leagues, lineups, nfl.season, nfl.week, now);
+  const sent = await store.sentKeys(issues.map((i) => i.key));
+  const due = issues.filter((i) => !sent.has(i.key));
+  if (due.length === 0) return 0;
+  await sendToAll(store, sender, ffpcPasteMessage(due));
   await store.markSent(due.map((i) => i.key));
   return due.length;
 }

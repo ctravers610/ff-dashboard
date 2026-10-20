@@ -3,6 +3,7 @@
 // would play in. FFPC leagues come from a pasted copy of FFPC's add/drop page.
 
 import type { ByeWeeksResponse, WaiverLeague, WaiversResponse } from '@ffd/shared';
+import { addDropStale } from '../reminders/ffpcPaste.js';
 import { claimStatus } from '../reminders/plan.js';
 import { reminderRepo } from '../reminders/store.js';
 import { sleeperClient } from '../adapters/sleeper/client.js';
@@ -52,7 +53,10 @@ export async function getWaivers(): Promise<WaiversResponse> {
     fetchFfpcWaivers(ctx),
   ]);
   const [, espn] = results;
-  const leagues = await withClaims(results.flatMap((r) => r.leagues), espn.pendingClaims);
+  const now = new Date();
+  const leagues = (await withClaims(results.flatMap((r) => r.leagues), espn.pendingClaims)).map((l) =>
+    l.platform === 'ffpc' ? { ...l, pasteStale: addDropStale(l, now) } : l,
+  );
   return {
     season: state.season,
     week,

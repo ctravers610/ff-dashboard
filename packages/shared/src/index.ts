@@ -272,6 +272,7 @@ export interface WaiverLeague {
   // FFPC only: when its add/drop page was last pasted (null = never). Everything
   // above comes from that paste, so it is only as fresh as the paste.
   pastedAt?: string | null;
+  pasteStale?: boolean; // FFPC only: bids have processed since that paste
   // When this league's waivers process, and where that came from: its own
   // processed claims (history), FFPC's page, or (an estimate) its settings.
   runs: WaiverRun[];

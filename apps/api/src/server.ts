@@ -7,7 +7,7 @@ import { sessionStore } from './auth/sessions.js';
 import { config, configProblems } from './config.js';
 import { db, pool, runMigrations } from './db/client.js';
 import { defaultSender } from './reminders/routes.js';
-import { sendDueReminders, sendLineupCheck, sendWeeklyRecap } from './reminders/send.js';
+import { sendDueReminders, sendFfpcPasteReminders, sendLineupCheck, sendWeeklyRecap } from './reminders/send.js';
 import { reminderRepo } from './reminders/store.js';
 import { getWaivers } from './waivers/index.js';
 import { sleeperNflState } from './adapters/sleeper/index.js';
@@ -52,10 +52,15 @@ setInterval(purge, 24 * 60 * 60 * 1000).unref();
 const sender = defaultSender();
 if (sender) {
   const checkReminders = async () => {
-    await getWaivers()
-      .then((w) => sendDueReminders(w.leagues, reminderRepo, sender))
-      .then((n) => n > 0 && app.log.info(`Sent ${n} waiver reminder(s)`))
-      .catch((e) => app.log.warn(e, 'Could not check waiver reminders'));
+    const waivers = await getWaivers().catch((e) => void app.log.warn(e, 'Could not load waivers for reminders'));
+    if (waivers) {
+      await sendDueReminders(waivers.leagues, reminderRepo, sender)
+        .then((n) => n > 0 && app.log.info(`Sent ${n} waiver reminder(s)`))
+        .catch((e) => app.log.warn(e, 'Could not check waiver reminders'));
+      await sendFfpcPasteReminders(waivers, reminderRepo, sender)
+        .then((n) => n > 0 && app.log.info(`Sent an FFPC paste reminder covering ${n} page(s)`))
+        .catch((e) => app.log.warn(e, 'Could not check FFPC pastes'));
+    }
     await sendLineupCheck(reminderRepo, sender)
       .then((n) => n > 0 && app.log.info(`Sent a lineup check covering ${n} starter(s)`))
       .catch((e) => app.log.warn(e, 'Could not run the lineup check'));

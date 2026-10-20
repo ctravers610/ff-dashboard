@@ -61,6 +61,18 @@ export function nextRun(runs: WaiverRun[], now = new Date()): { run: WaiverRun; 
   return best;
 }
 
+/** The most recent run at or before `now`, within the last week; null if there are no runs. */
+export function lastRun(runs: WaiverRun[], now = new Date()): Date | null {
+  let at = nextRun(runs, new Date(now.getTime() - 7 * 86_400_000 - 1))?.at ?? null;
+  let last: Date | null = null;
+  // Step through the week's occurrences up to now.
+  while (at && at <= now) {
+    last = at;
+    at = nextRun(runs, at)?.at ?? null;
+  }
+  return last;
+}
+
 /** The next time any of these runs happens after `now`, or null if there are none. */
 export const nextWaiverRun = (runs: WaiverRun[], now = new Date()) => nextRun(runs, now)?.at ?? null;
 
