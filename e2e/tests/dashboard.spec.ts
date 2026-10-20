@@ -30,6 +30,24 @@ test.describe('Matchups', () => {
     await expect(hero).toContainText('projected 2 of 2');
   });
 
+  test('before the week’s first game, sums it up by projection instead', async ({ page }) => {
+    // The same week with nothing scored yet, as on a Tuesday.
+    await page.route('**/api/dashboard', async (route) => {
+      const res = await route.fetch();
+      const body = await res.json();
+      for (const l of body.leagues) {
+        if (!l.matchup) continue;
+        for (const side of [l.matchup.me, l.matchup.opponent]) if (side) side.points = 0;
+      }
+      await route.fulfill({ response: res, json: body });
+    });
+    await page.reload();
+    const hero = page.getByRole('region', { name: 'This week' });
+    await expect(hero).toContainText('Projected to win 2 of 2');
+    await expect(hero).toContainText('no games played yet this week');
+    await expect(hero).not.toContainText('winning');
+  });
+
   test('lists every league with scores, margin and chance to win, the most uncertain first', async ({ page }) => {
     const rows = page.getByRole('region', { name: 'Matchups' }).getByRole('article');
     await expect(rows).toHaveCount(2);
