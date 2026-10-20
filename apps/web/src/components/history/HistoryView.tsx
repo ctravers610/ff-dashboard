@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { useHistory, useRecap, useRecapSeason } from '../../api';
+import { useHistory, useOutlook, useRecap, useRecapSeason } from '../../api';
+import { percent } from '../outlook/UpNext';
 import { PLATFORM_LABEL } from '../../format';
 import { SideList, WithSideList } from '../SideList';
 import { LeagueHistoryCard, type HistoryMode } from './LeagueHistoryCard';
 import { RecapPanel } from './LineupRecap';
+import { TradesPanel } from './TradesPanel';
 import { ResultChip } from './ResultChip';
 
 // League by league: pick a league on the left; on the right, its weekly
@@ -15,6 +17,8 @@ export function HistoryView() {
   const [week, setWeek] = useState<number | null>(null); // null: the latest finished week
   const recap = useRecap(week).data;
   const season = useRecapSeason().data;
+  const outlook = useOutlook().data;
+  const oddsFor = (h: { platform: string; leagueId: string }) => outlook?.leagues.find((l) => keyOf(l) === keyOf(h)) ?? null;
 
   if (isPending) return <p className="text-slate-400">Loading history…</p>;
   if (error) return <p role="alert" className="text-rose-300">Couldn't load history: {error.message}</p>;
@@ -42,7 +46,9 @@ export function HistoryView() {
               key: keyOf(h),
               title: h.name,
               optionLabel: `${h.name} · ${recordText(h)}`,
-              meta: `${PLATFORM_LABEL[h.platform]} · ${recordText(h)}${h.avgPoints != null ? ` · ${h.avgPoints.toFixed(1)} avg` : ''}`,
+              meta: `${PLATFORM_LABEL[h.platform]} · ${recordText(h)}${h.avgPoints != null ? ` · ${h.avgPoints.toFixed(1)} avg` : ''}${
+                oddsFor(h)?.playoffChance != null ? ` · ${percent(oddsFor(h)!.playoffChance!)} playoffs` : ''
+              }`,
               extra: (
                 <span className="mt-1 flex flex-wrap gap-0.5" aria-hidden="true">
                   {h.weeks.slice(-6).map((w) => (
@@ -62,10 +68,12 @@ export function HistoryView() {
             mode={mode}
             onMode={setMode}
             season={season?.leagues.find((l) => keyOf(l) === keyOf(league)) ?? null}
+            outlook={oddsFor(league)}
             recap={recap ? { week: recap.week, weeks: recap.weeks } : null}
             onPickWeek={setWeek}
           />
           <RecapPanel leagueKey={keyOf(league)} week={week} onWeek={setWeek} />
+          <TradesPanel leagueKey={keyOf(league)} />
         </section>
       </WithSideList>
     </div>

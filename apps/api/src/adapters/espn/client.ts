@@ -60,7 +60,7 @@ export const espnClient = {
     cached(`espn:transactions:${leagueId}:${season}:${week}`, 6 * 60 * MINUTE, () => {
       const params = views('mTransactions2');
       params.set('scoringPeriodId', String(week));
-      return get<{ transactions?: { type: string; status?: string; processDate?: number }[] }>(leagueId, season, auth, params);
+      return get<{ transactions?: EspnTransaction[] }>(leagueId, season, auth, params);
     }),
   // The same, fresh: signed in as you, ESPN includes your own pending claims (and
   // nobody else's). Kept only briefly, so a claim you just made shows up within a minute.

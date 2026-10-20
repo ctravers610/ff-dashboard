@@ -1,6 +1,6 @@
 import { winProbability, type LeagueSummary } from '@ffd/shared';
 import { useState } from 'react';
-import { CLOSE_MARGIN, matchupMargin, matchupStatus, ordinal, PLATFORM_LABEL, pts, signed } from '../format';
+import { CLOSE_MARGIN, matchupMargin, matchupStatus, ordinal, PLATFORM_LABEL, pregame, pts, signed } from '../format';
 import { ChevronIcon } from './icons';
 import { LeagueDetails } from './LeagueDetails';
 
@@ -10,6 +10,8 @@ const leagueKey = (l: LeagueSummary) => `${l.platform}:${l.leagueId}`;
 function opponentCell(l: LeagueSummary): string {
   const m = l.matchup;
   if (!m) return '—';
+  const before = pregame(m);
+  if (before) return pts(before.opponent);
   if (m.allPlay) return `${ordinal(m.allPlay.myRank)} of ${m.allPlay.teams.length}`;
   return m.opponent ? pts(m.opponent.points) : 'Bye';
 }
@@ -32,7 +34,9 @@ export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; on
     .map((league) => ({
       league,
       key: leagueKey(league),
-      margin: matchupMargin(league.matchup),
+      // Before kickoff the scores are all 0, so the row shows projections instead (greyed).
+      before: pregame(league.matchup),
+      margin: pregame(league.matchup)?.margin ?? matchupMargin(league.matchup),
       status: matchupStatus(league.matchup),
       odds: winProbability(league.matchup),
     }))
@@ -62,11 +66,12 @@ export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; on
         </span>
         <span />
       </div>
-      {rows.map(({ league, key, margin, status, odds }) => {
+      {rows.map(({ league, key, before, margin, status, odds }) => {
         const isOpen = open.has(key);
         const nameId = `league-${key.replace(/\W/g, '-')}`;
         const close = margin != null && Math.abs(margin) < CLOSE_MARGIN;
-        const tone = status.leading == null ? 'none' : close ? 'close' : status.leading ? 'up' : 'down';
+        const ahead = before ? before.margin > 0 : status.leading;
+        const tone = ahead == null ? 'none' : close ? 'close' : ahead ? 'up' : 'down';
         return (
           <article key={key} aria-labelledby={nameId} className="border-b border-slate-800 last:border-b-0">
             <button
@@ -85,19 +90,26 @@ export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; on
                   {league.matchup?.allPlay ? 'all-play' : PLATFORM_LABEL[league.platform]}
                 </span>
               </span>
-              <span
-                className={`text-right text-base font-semibold tabular-nums ${
-                  tone === 'none' ? 'text-slate-100' : status.leading ? 'text-emerald-400' : 'text-rose-300'
-                }`}
-              >
-                {league.matchup ? pts(league.matchup.me.points) : '—'}
-              </span>
+              {before ? (
+                <span className="text-right tabular-nums text-slate-300" title="Projected: no one has played yet">
+                  <span className="text-base font-semibold">{pts(before.me)}</span>
+                  <span className="block text-[10px] uppercase tracking-wide text-slate-400">proj.</span>
+                </span>
+              ) : (
+                <span
+                  className={`text-right text-base font-semibold tabular-nums ${
+                    tone === 'none' ? 'text-slate-100' : status.leading ? 'text-emerald-400' : 'text-rose-300'
+                  }`}
+                >
+                  {league.matchup ? pts(league.matchup.me.points) : '—'}
+                </span>
+              )}
               <span className="hidden text-right tabular-nums text-slate-400 sm:block">{opponentCell(league)}</span>
               <span className="flex items-center gap-2">
                 <span className="hidden h-1.5 flex-1 rounded-full bg-track sm:block" aria-hidden="true">
                   {margin != null && (
                     <span
-                      className={`block h-1.5 rounded-full ${tone === 'close' ? 'bg-amber-400' : tone === 'up' ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                      className={`block h-1.5 rounded-full ${tone === 'close' ? 'bg-amber-400' : tone === 'up' ? 'bg-emerald-500' : 'bg-rose-500'} ${before ? 'opacity-50' : ''}`}
                       style={{ width: `${Math.max(4, (Math.abs(margin) / widest) * 100)}%` }}
                     />
                   )}
@@ -106,7 +118,7 @@ export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; on
                   {margin != null ? signed(margin) : ''}
                 </span>
                 <span className="sr-only">
-                  {tone === 'none' ? 'no matchup' : `${status.leading ? 'winning' : 'losing'}${close ? ', close' : ''}`}
+                  {tone === 'none' ? 'no matchup' : `${before ? 'projected to ' : ''}${ahead ? (before ? 'win' : 'winning') : before ? 'lose' : 'losing'}${close ? ', close' : ''}`}
                 </span>
               </span>
               {/* Chance to win from the live projections and how much of the week is left. */}

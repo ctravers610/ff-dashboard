@@ -1,9 +1,5 @@
-import type { DashboardResponse, Matchup } from '@ffd/shared';
-import { matchupStatus } from '../format';
-
-// Nobody has scored yet: before the week's first game, "winning" means nothing.
-const underway = (m: Matchup | null) =>
-  !!m && (m.me.points !== 0 || (m.opponent?.points ?? 0) !== 0 || (m.allPlay?.teams.some((t) => t.points !== 0) ?? false));
+import type { DashboardResponse } from '@ffd/shared';
+import { matchupStatus, underway } from '../format';
 
 // The week at a glance: how many matchups you're winning, your season record,
 // and one block per league (teal = winning, rose = losing, gray = no matchup).

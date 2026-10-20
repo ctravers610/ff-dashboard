@@ -46,6 +46,10 @@ test.describe('Matchups', () => {
     await expect(hero).toContainText('Projected to win 2 of 2');
     await expect(hero).toContainText('no games played yet this week');
     await expect(hero).not.toContainText('winning');
+    // The table shows projected scores, not 0.00 vs 0.00.
+    const espn = leagueCard(page, ESPN_LEAGUE_NAME);
+    await expect(espn).toContainText(`${pts(ESPN_ME_PROJECTED)}proj.${pts(ESPN_OPP_PROJECTED)}`);
+    await expect(espn).toContainText(`+${(ESPN_ME_PROJECTED - ESPN_OPP_PROJECTED).toFixed(1)}`);
   });
 
   test('lists every league with scores, margin and chance to win, the most uncertain first', async ({ page }) => {

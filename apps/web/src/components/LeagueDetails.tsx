@@ -6,6 +6,7 @@ import { LineupTable } from './LineupTable';
 import { RosterList } from './RosterList';
 import { Scoreboard } from './Scoreboard';
 import { StandingsTable } from './StandingsTable';
+import { percent, UpNext, useLeagueOutlook } from './outlook/UpNext';
 
 type Tab = 'allplay' | 'lineup' | 'standings' | 'roster' | null;
 
@@ -14,6 +15,7 @@ export function LeagueDetails({ league, onEdit }: { league: LeagueSummary; onEdi
   // Opening a league shows its lineups straight away.
   const [tab, setTab] = useState<Tab>(league.matchup ? 'lineup' : null);
   const me = league.standings.find((t) => t.teamId === league.myTeamId);
+  const outlook = useLeagueOutlook(league.platform, league.leagueId);
 
   const tabButton = (value: Exclude<Tab, null>, label: string) => (
     <button
@@ -43,6 +45,11 @@ export function LeagueDetails({ league, onEdit }: { league: LeagueSummary; onEdi
               <span className="font-semibold text-slate-100">{ordinal(me.rank)}</span> of {league.standings.length}
             </span>
           )}
+          {outlook?.playoffChance != null && (
+            <span title={`Chance of finishing in the top ${outlook.playoffTeams}, from simulating the rest of the regular season`}>
+              Playoffs <span className="font-semibold tabular-nums text-slate-100">{percent(outlook.playoffChance)}</span>
+            </span>
+          )}
           {league.matchup?.me.minutesLeft != null && (
             <span title="Player minutes remaining: 60 per starter, ticking down as each game is played">
               PMR <span className="font-semibold tabular-nums text-slate-100">{pmr(league)}</span>
@@ -50,6 +57,8 @@ export function LeagueDetails({ league, onEdit }: { league: LeagueSummary; onEdi
           )}
         </p>
       </div>
+
+      {outlook && <UpNext outlook={outlook} />}
 
       {league.matchup ? (
         <div className="flex flex-col gap-1">

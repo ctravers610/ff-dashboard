@@ -121,8 +121,43 @@ export function ffpcWaiverPage(leagueNumber = '#12345'): string {
 // Wednesday, so the app learns "Wed 3:00 AM". ESPN has no history in the
 // fixtures, so its schedule is unknown and it sorts last.
 const SLEEPER_RUNS = ['2026-09-16T07:05:00Z', '2026-09-23T07:05:00Z', '2026-09-30T07:05:00Z', '2026-10-07T07:05:00Z', '2026-10-14T07:05:00Z'];
+// Each week's winning claim and what it cost: median $5, most $18 (Puka Nacua, week 2).
+export const SLEEPER_WINNING_BIDS: [FxPlayer, number][] = [
+  [P.doubs, 3],
+  [P.puka, 18],
+  [P.brooks, 5],
+  [P.geno, 0],
+  [P.olave, 9],
+];
 export function sleeperTransactions(week: number) {
   const at = SLEEPER_RUNS[week - 1];
   if (!at) return [];
-  return [0, 1].map((i) => ({ type: 'waiver', status: i === 0 ? 'complete' : 'failed', status_updated: Date.parse(at) + i * 1000 }));
+  const [player, bid] = SLEEPER_WINNING_BIDS[week - 1]!;
+  const trades = week === SLEEPER_TRADE.week ? [sleeperTrade(at)] : [];
+  return [...trades, ...[0, 1].map((i) => ({
+    type: 'waiver',
+    status: i === 0 ? 'complete' : 'failed',
+    status_updated: Date.parse(at) + i * 1000,
+    leg: week,
+    settings: { waiver_bid: i === 0 ? bid : 1 },
+    adds: { [player.id]: i === 0 ? 3 : 4 },
+  }))];
+}
+
+// One trade, in week 5: you (roster 1) get Najee Harris and $10 of FAAB; the
+// rival (roster 2) gets Tee Higgins and a 2027 2nd. Najee scored 26 that week,
+// on your bench.
+export const SLEEPER_TRADE = { week: 5 };
+function sleeperTrade(at: string) {
+  return {
+    type: 'trade',
+    status: 'complete',
+    status_updated: Date.parse(at) - 86_400_000,
+    leg: SLEEPER_TRADE.week,
+    roster_ids: [1, 2],
+    adds: { [P.najee.id]: 1, [P.higgins.id]: 2 },
+    drops: { [P.najee.id]: 2, [P.higgins.id]: 1 },
+    draft_picks: [{ season: '2027', round: 2, roster_id: 1, previous_owner_id: 1, owner_id: 2 }],
+    waiver_budget: [{ sender: 2, receiver: 1, amount: 10 }],
+  };
 }

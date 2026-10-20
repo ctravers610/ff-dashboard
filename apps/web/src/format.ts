@@ -18,6 +18,19 @@ export function matchupStatus(m: Matchup | null): { leading: boolean | null; pro
 
 export const pts = (n: number) => n.toFixed(2);
 
+/** Whether anyone in the matchup has scored yet; before then, only projections mean anything. */
+export const underway = (m: Matchup | null) =>
+  !!m && (m.me.points !== 0 || (m.opponent?.points ?? 0) !== 0 || (m.allPlay?.teams.some((t) => t.points !== 0) ?? false));
+
+/**
+ * Before kickoff, a head-to-head matchup's projected scores (yours, theirs and
+ * the margin); null once it's underway, or when there's nothing to project.
+ */
+export function pregame(m: Matchup | null): { me: number; opponent: number; margin: number } | null {
+  if (!m || m.allPlay || underway(m) || !m.opponent || m.me.projected == null || m.opponent.projected == null) return null;
+  return { me: m.me.projected, opponent: m.opponent.projected, margin: m.me.projected - m.opponent.projected };
+}
+
 /** Your points minus the win line's: the first team outside it if you're in, the last team inside it if not. */
 export function allPlayGap({ teams, winSlots, myRank }: AllPlay): number | null {
   const me = teams[myRank - 1];

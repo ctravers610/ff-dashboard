@@ -26,6 +26,9 @@ export interface SleeperLeague {
     waiver_type?: number; // 0 = rolling, 1 = reverse standings, 2 = FAAB
     waiver_day_of_week?: number; // 2 = Wednesday
     waiver_budget?: number;
+    playoff_teams?: number;
+    playoff_week_start?: number; // the regular season ends the week before
+    league_average_match?: number; // 1: each week also plays the league median
   };
 }
 
@@ -37,6 +40,7 @@ export interface SleeperRoster {
   players: string[] | null;
   reserve?: string[] | null; // IR slots
   taxi?: string[] | null; // dynasty taxi squad
+  metadata?: { record?: string } | null; // results so far, e.g. "WWLWL"
   settings: {
     waiver_position?: number;
     waiver_budget_used?: number;
@@ -69,3 +73,17 @@ export interface SleeperPlayer {
 }
 
 export type SleeperPlayerMap = Record<string, SleeperPlayer>;
+
+// A league transaction (waiver claim, free-agent pickup, trade).
+export interface SleeperTransaction {
+  type: string; // 'waiver', 'free_agent', 'trade'
+  status: string; // 'complete', 'failed', 'pending'
+  status_updated: number;
+  leg?: number; // the week
+  settings?: { waiver_bid?: number } | null;
+  adds?: Record<string, number> | null; // player id -> roster id
+  drops?: Record<string, number> | null;
+  roster_ids?: number[];
+  draft_picks?: unknown[];
+  waiver_budget?: { sender: number; receiver: number; amount: number }[];
+}

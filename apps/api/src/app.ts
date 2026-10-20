@@ -15,6 +15,8 @@ import { getDashboard } from './dashboard.js';
 import { db, type Db } from './db/client.js';
 import { historyRoutes } from './routes/history.js';
 import { getByeWeeks, getWaivers } from './waivers/index.js';
+import { getOutlook } from './outlook/index.js';
+import { getTrades } from './trades/index.js';
 import { getRecap, getRecapSeason } from './recap/index.js';
 import { reminderRoutes } from './reminders/routes.js';
 import { sourceRoutes } from './sources/routes.js';
@@ -75,6 +77,12 @@ export async function buildApp({ logger = true, webDist = config.webDist, auth, 
   app.get('/api/dashboard', async () => getDashboard());
   app.get('/api/waivers', async () => getWaivers());
   app.get('/api/byes', async () => getByeWeeks());
+  app.get('/api/outlook', async () => getOutlook());
+  app.get<{ Querystring: { league: string } }>(
+    '/api/trades',
+    { schema: { querystring: { type: 'object', required: ['league'], properties: { league: { type: 'string', maxLength: 100 } } } } },
+    async (req) => getTrades(req.query.league),
+  );
   app.get('/api/recap/season', async () => getRecapSeason());
   app.get<{ Querystring: { week?: number } }>(
     '/api/recap',

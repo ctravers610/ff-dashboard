@@ -1,4 +1,4 @@
-import type { ByeWeeksResponse, DashboardResponse, HistoryResponse, RecapResponse, RecapSeasonResponse, LiveFeedResponse, WaiversResponse } from '@ffd/shared';
+import type { ByeWeeksResponse, DashboardResponse, HistoryResponse, OutlookResponse, TradesResponse, RecapResponse, RecapSeasonResponse, LiveFeedResponse, WaiversResponse } from '@ffd/shared';
 import { useQuery } from '@tanstack/react-query';
 
 /** A 401 from the API: the session is missing or expired. The app answers it with the sign-in screen. */
@@ -73,6 +73,18 @@ export const useRecap = (week: number | null) =>
 // The season so far, per league: losses a better lineup would have won.
 export const useRecapSeason = () =>
   useQuery({ queryKey: ['recap', 'season'], queryFn: () => api<RecapSeasonResponse>('/api/recap/season'), staleTime: 10 * 60_000 });
+
+// Playoff odds and next-opponent previews; they move only when games finish.
+export const useOutlook = () =>
+  useQuery({ queryKey: ['outlook'], queryFn: () => api<OutlookResponse>('/api/outlook'), staleTime: 10 * 60_000 });
+
+// One league's trades, scored; they change only when a week finishes or a trade goes through.
+export const useTrades = (leagueKey: string) =>
+  useQuery({
+    queryKey: ['trades', leagueKey],
+    queryFn: () => api<TradesResponse>(`/api/trades?league=${encodeURIComponent(leagueKey)}`),
+    staleTime: 10 * 60_000,
+  });
 
 // The live scoring feed; checked often since it changes play by play.
 export function useLive() {

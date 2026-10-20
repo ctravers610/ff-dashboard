@@ -134,7 +134,7 @@ export async function fetchEspnWaivers(
         if (myTeamId == null) throw new Error(`Couldn't find your team in ESPN league ${leagueId} (check ESPN_SWID)`);
         // The name lives in mSettings, which this request includes.
         const name = league.settings?.name ?? `ESPN league ${leagueId}`;
-        const schedule = await espnSchedule(leagueId, ctx.season, ctx.week, auth);
+        const schedule = await espnSchedule(leagueId, ctx.season, ctx.week, auth, league);
         // Your own claims for the coming run, so reminders can skip a league you've already handled.
         const pending = await espnClient.pendingTransactions(leagueId, ctx.season, ctx.week, auth).catch(() => null);
         const base = espnWaiverLeague(league, freeAgents, myTeamId, name, ctx);

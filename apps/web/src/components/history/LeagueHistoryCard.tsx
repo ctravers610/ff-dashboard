@@ -1,4 +1,5 @@
-import type { LeagueHistory, RecapSeasonLeague } from '@ffd/shared';
+import type { LeagueHistory, LeagueOutlook, RecapSeasonLeague } from '@ffd/shared';
+import { percent } from '../outlook/UpNext';
 import { useId } from 'react';
 import { PLATFORM_LABEL } from '../../format';
 import { ResultChip } from './ResultChip';
@@ -18,9 +19,11 @@ export function LeagueHistoryCard({
   mode,
   onMode,
   season,
+  outlook,
   recap,
   onPickWeek,
 }: {
+  outlook?: LeagueOutlook | null;
   history: LeagueHistory;
   mode: HistoryMode;
   onMode: (m: HistoryMode) => void;
@@ -68,6 +71,15 @@ export function LeagueHistoryCard({
           <div className="text-xs text-slate-400">Avg points / week</div>
           <div className="text-2xl font-semibold">{avgPoints != null ? avgPoints.toFixed(1) : '—'}</div>
         </div>
+        {outlook?.playoffChance != null && (
+          <div title={`Chance of finishing in the top ${outlook.playoffTeams} of ${outlook.teams}, from simulating the rest of the regular season`}>
+            <div className="text-xs text-slate-400">Playoff chance</div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-semibold">{percent(outlook.playoffChance)}</span>
+              {outlook.projectedWins != null && <span className="text-xs text-slate-400">~{outlook.projectedWins.toFixed(1)} wins</span>}
+            </div>
+          </div>
+        )}
         {season && season.weeks.length > 0 && (
           <div>
             <div className="text-xs text-slate-400">Losses a better lineup wins</div>

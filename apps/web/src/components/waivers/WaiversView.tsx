@@ -1,4 +1,5 @@
 import { ByePlanner } from './ByePlanner';
+import { FaabPacing } from './FaabPacing';
 import { friendlyRun, friendlyRunWithTime, nextRun, type WaiverLeague, type WaiverMove, type WaiverPlayer, type WaiverRules } from '@ffd/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState, type ReactNode } from 'react';
@@ -423,6 +424,7 @@ export function WaiversView() {
                 </Card>
               </>
             )}
+            <FaabPacing league={league} week={data.week} lastWeek={data.lastRegularWeek} />
             <ByePlanner platform={league.platform} leagueId={league.leagueId} />
           </section>
         )}

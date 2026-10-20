@@ -73,6 +73,7 @@ export interface EspnScheduleItem {
   matchupPeriodId: number;
   home?: EspnMatchupSide;
   away?: EspnMatchupSide;
+  winner?: 'HOME' | 'AWAY' | 'TIE' | 'UNDECIDED';
 }
 
 export interface EspnLeague {
@@ -82,6 +83,7 @@ export interface EspnLeague {
   status?: { currentMatchupPeriod?: number };
   settings?: {
     name?: string;
+    scheduleSettings?: { matchupPeriodCount?: number; playoffTeamCount?: number };
     rosterSettings?: { lineupSlotCounts?: Record<string, number> };
     acquisitionSettings?: {
       acquisitionBudget?: number;
@@ -106,5 +108,7 @@ export interface EspnTransaction {
   teamId?: number;
   bidAmount?: number;
   proposedDate?: number;
+  processDate?: number;
+  scoringPeriodId?: number;
   items?: { type: 'ADD' | 'DROP' | string; playerId: number }[];
 }

@@ -60,3 +60,14 @@ describe('recapMessage', () => {
     });
   });
 });
+
+describe('recapMessage with next week', () => {
+  it('ends on the toughest matchup coming up', () => {
+    const recap: RecapResponse = { season: '2026', week: 6, weeks: [6], errors: [], leagues: [league({})] };
+    const msg = recapMessage(recap, [
+      { leagueName: 'Massholes', teamName: 'Sunday Scaries', winChance: 0.46 },
+      { leagueName: 'BoyntonBoy', teamName: 'Easy Street', winChance: 0.81 },
+    ]);
+    expect(msg.body).toContain('Toughest next: Sunday Scaries in Massholes (46% to win).');
+  });
+});

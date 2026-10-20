@@ -54,6 +54,15 @@ test.describe('Waivers', () => {
     for (const i of [0, 1]) await expect(list.nth(i)).toContainText('No drop: open roster spot');
   });
 
+  test('FAAB pacing: budget per week left, and what winning bids have cost', async ({ page }) => {
+    const pacing = leagueSection(page, SLEEPER_LEAGUE_NAME).getByRole('region', { name: 'FAAB pacing' });
+    // $85 left, weeks 7-18.
+    await expect(pacing).toContainText('$85 left for 12 weeks: about $7 a week.');
+    await expect(pacing).toContainText('Spent 15% of your budget with 33% of the regular season gone: room to bid bigger.');
+    await expect(pacing).toContainText('median $5, most $18 (5 claims)');
+    await expect(pacing).toContainText('Biggest: Puka Nacua WR $18 (wk 2), Chris Olave WR $9 (wk 5), Jonathon Brooks RB $5 (wk 3)');
+  });
+
   test('lists the bye weeks ahead and whether the rest of the roster covers them', async ({ page }) => {
     // DEN is on bye in the claim week; Najee Harris can take Waddle's FLEX spot.
     const byes = leagueSection(page, SLEEPER_LEAGUE_NAME).getByRole('region', { name: 'Bye weeks' });

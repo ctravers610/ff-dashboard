@@ -280,9 +280,18 @@ export interface WaiverLeague {
   // ESPN only: the claims you have in, in the order ESPN lists them. Null
   // where the platform doesn't show them.
   pendingClaims?: PendingClaim[] | null;
+  bids?: WaiverBids | null; // FAAB leagues with processed claims (Sleeper, ESPN)
   // Your claims for the next run (null when there's no known next run). ESPN
   // shows you your own pending claims; elsewhere you mark them set yourself.
   claims: WaiverClaims | null;
+}
+
+// What winning FAAB bids have cost in a league this season, from its processed claims.
+export interface WaiverBids {
+  count: number;
+  median: number;
+  high: number;
+  top: { name: string; position: string; bid: number; week: number }[]; // the biggest, most expensive first
 }
 
 export interface PendingClaim {
@@ -358,6 +367,79 @@ export interface ByeWeeksResponse {
   season: string;
   // From the week a waiver claim would play in to the end of the regular season.
   weeks: { week: number; teams: string[] }[]; // teams: NFL teams with no game that week
+}
+
+// ── Season outlook ─────────────────────────────────────────────────────
+
+// Your next opponent, before the game: how they've played and who they're missing.
+export interface OpponentPreview {
+  week: number;
+  teamName: string;
+  record: string; // "4-3"
+  rank: number; // in the standings
+  avgPoints: number | null;
+  recent: ('W' | 'L' | 'T')[]; // their last few results, oldest first
+  winChance: number; // from both teams' season scoring
+  injuredStarters: { name: string; position: string; status: string }[];
+}
+
+export interface LeagueOutlook {
+  platform: Platform;
+  leagueId: string;
+  playoffTeams: number | null;
+  teams: number;
+  // From simulating the rest of the regular season; null when it's over or can't be known.
+  playoffChance: number | null;
+  projectedWins: number | null; // final regular-season wins, on average
+  next: OpponentPreview | null;
+}
+
+export interface OutlookResponse {
+  season: string;
+  leagues: LeagueOutlook[];
+  errors: SourceError[];
+}
+
+// ── Trades ─────────────────────────────────────────────────────────────
+
+// One player a team got in a trade, and what he's done for them since.
+export interface TradedPlayer {
+  name: string;
+  position: string;
+  points: number; // in weeks on the new team's roster, league scoring
+  started: number; // the part of that scored in their starting lineup
+  startedWeeks: number;
+  rosterWeeks: number;
+  overReplacement: number; // started points above a replacement-level player at his position
+  restOfSeason: number | null; // projected points still to come, if he's still on the team
+}
+
+export interface TradeSide {
+  teamName: string;
+  isMe: boolean;
+  received: TradedPlayer[];
+  picks: string[]; // e.g. "2027 round 2"
+  faab: number; // FAAB dollars received
+  overReplacement: number; // the side's total
+  restOfSeason: number;
+}
+
+export interface TradeReport {
+  id: string;
+  week: number;
+  sides: TradeSide[]; // two teams; the winner first once there is one
+  // Started points over replacement, winner minus loser, so far (or final).
+  margin: number;
+  winsSwung: number; // margin in wins, at the matchup model's points per win
+  final: boolean; // the regular season is over: this is the verdict
+  verdict: string; // the plain summary
+  roast: string | null; // for the lopsided ones
+}
+
+export interface TradesResponse {
+  leagueKey: string;
+  supported: boolean; // false where the platform's trades can't be read (ESPN, FFPC)
+  trades: TradeReport[]; // newest first
 }
 
 // ── Lineup recap ───────────────────────────────────────────────────────

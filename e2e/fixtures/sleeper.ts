@@ -36,7 +36,8 @@ export const league: SleeperLeague = {
   total_rosters: 4,
   roster_positions: ['QB', 'RB', 'RB', 'WR', 'WR', 'TE', 'FLEX', 'K', 'DEF', 'BN', 'BN', 'IR'],
   scoring_settings: { pass_yd: 0.04, pass_td: 4, rush_yd: 0.1, rush_td: 6, rec: 1, rec_yd: 0.1, rec_td: 6, fgm: 3, xpm: 1, sack: 1, int: 2 },
-  settings: { waiver_type: 2, waiver_budget: SLEEPER_FAAB.budget }, // FAAB
+  // FAAB; a short season for the playoff odds: weeks 6 and 7 left, top 2 make it.
+  settings: { waiver_type: 2, waiver_budget: SLEEPER_FAAB.budget, playoff_teams: 2, playoff_week_start: 8 },
 };
 
 const owners: SleeperUser[] = [
@@ -98,6 +99,15 @@ export function matchups(week: number): SleeperMatchup[] {
       { roster_id: 2, matchup_id: 1, points: SLEEPER_OPP_POINTS, starters: ids(OPP_STARTERS), starters_points: OPP_STARTER_POINTS },
       { roster_id: 3, matchup_id: 2, points: 88, starters: [], starters_points: [] },
       { roster_id: 4, matchup_id: 2, points: 71, starters: [], starters_points: [] },
+    ];
+  }
+  if (week === WEEK + 1) {
+    // Next week's pairings: the opponent the preview shows is the Third Wheel.
+    return [
+      { roster_id: 1, matchup_id: 1, points: 0, starters: [], starters_points: [] },
+      { roster_id: 3, matchup_id: 1, points: 0, starters: [], starters_points: [] },
+      { roster_id: 2, matchup_id: 2, points: 0, starters: [], starters_points: [] },
+      { roster_id: 4, matchup_id: 2, points: 0, starters: [], starters_points: [] },
     ];
   }
   const past = SLEEPER_PAST[week - 1];

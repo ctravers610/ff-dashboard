@@ -10,7 +10,14 @@ export function isRecapTime(now: Date): boolean {
 
 export const recapKey = (season: string, week: number) => `recap:${season}:${week}`;
 
-export function recapMessage(recap: RecapResponse) {
+/** Next week's opponent in one league, for the closing line of the recap. */
+export interface NextUp {
+  leagueName: string;
+  teamName: string;
+  winChance: number;
+}
+
+export function recapMessage(recap: RecapResponse, nextUp: NextUp[] = []) {
   const decided = recap.leagues.filter((l) => l.result);
   const wins = decided.filter((l) => l.result === 'win').length;
   const losses = decided.filter((l) => l.result === 'loss').length;
@@ -23,6 +30,8 @@ export function recapMessage(recap: RecapResponse) {
   const lines = [`${left.toFixed(1)} points left on benches.`];
   if (flips.length) lines.push(`The best lineup would have won ${flips.join(' and ')}.`);
   if (biggest) lines.push(`Biggest miss: ${biggest.better.name} over ${biggest.started.name} in ${biggest.league} (+${biggest.cost.toFixed(1)}).`);
+  const toughest = [...nextUp].sort((a, b) => a.winChance - b.winChance)[0];
+  if (toughest) lines.push(`Toughest next: ${toughest.teamName} in ${toughest.leagueName} (${Math.round(toughest.winChance * 100)}% to win).`);
   return {
     title: `Week ${recap.week} recap: ${wins}-${losses}${decided.length < recap.leagues.length ? ' (plus all-play)' : ''}`,
     body: lines.join(' '),

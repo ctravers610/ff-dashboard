@@ -101,6 +101,8 @@ export function league(): EspnLeague {
     status: { currentMatchupPeriod: WEEK },
     settings: {
       name: ESPN_LEAGUE_NAME,
+      // A short season for the playoff odds: weeks 6 and 7 left, top 2 make it.
+      scheduleSettings: { matchupPeriodCount: WEEK + 1, playoffTeamCount: 2 },
       rosterSettings: {
         lineupSlotCounts: { '0': 1, '2': 2, '4': 2, '6': 1, '23': 1, '17': 1, '16': 1, '20': 5, '21': 1 },
       },
@@ -118,7 +120,8 @@ export function league(): EspnLeague {
         const home = i % 2 === 0; // alternate sides so the app has to find mine
         const me = { teamId: 1, totalPoints: mine };
         const opp = { teamId: oppId, totalPoints: theirs };
-        return { id: i + 1, matchupPeriodId: i + 1, home: home ? me : opp, away: home ? opp : me };
+        const winner = (mine > theirs) === home ? ('HOME' as const) : ('AWAY' as const);
+        return { id: i + 1, matchupPeriodId: i + 1, home: home ? me : opp, away: home ? opp : me, winner };
       }),
       {
         id: 6,
@@ -137,7 +140,11 @@ export function league(): EspnLeague {
           totalProjectedPointsLive: ESPN_OPP_PROJECTED,
           rosterForCurrentScoringPeriod: { entries: entries(OPP_LINEUP) },
         },
+        winner: 'UNDECIDED',
       },
+      // Next week, for the playoff odds and the preview: Third Place Finish.
+      { id: 7, matchupPeriodId: WEEK + 1, home: { teamId: 3 }, away: { teamId: 1 }, winner: 'UNDECIDED' },
+      { id: 8, matchupPeriodId: WEEK + 1, home: { teamId: 2 }, away: { teamId: 4 }, winner: 'UNDECIDED' },
     ],
   };
 }

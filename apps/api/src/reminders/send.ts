@@ -6,6 +6,7 @@ import type { WaiversResponse, WaiverLeague } from '@ffd/shared';
 import webpush from 'web-push';
 import { getDashboard } from '../dashboard.js';
 import { nflGames } from '../scoring/games.js';
+import { getOutlook } from '../outlook/index.js';
 import { getRecap } from '../recap/index.js';
 import { manualLeagueRepo } from '../adapters/manual/store.js';
 import { sleeperClient } from '../adapters/sleeper/client.js';
@@ -90,7 +91,13 @@ export async function sendWeeklyRecap(store: ReminderStore, sender: Sender, now 
   if (!recap.week || recap.leagues.length === 0) return false;
   const key = recapKey(recap.season, recap.week);
   if ((await store.sentKeys([key])).size) return false;
-  await sendToAll(store, sender, recapMessage(recap));
+  // Next week's opponents are a bonus: the recap goes out without them if they can't be loaded.
+  const outlook = await getOutlook().catch(() => null);
+  const names = new Map(recap.leagues.map((l) => [`${l.platform}:${l.leagueId}`, l.leagueName]));
+  const nextUp = (outlook?.leagues ?? []).flatMap((l) =>
+    l.next ? [{ leagueName: names.get(`${l.platform}:${l.leagueId}`) ?? l.leagueId, teamName: l.next.teamName, winChance: l.next.winChance }] : [],
+  );
+  await sendToAll(store, sender, recapMessage(recap, nextUp));
   await store.markSent([key]);
   return true;
 }

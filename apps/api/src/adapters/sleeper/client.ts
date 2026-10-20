@@ -3,6 +3,7 @@ import path from 'node:path';
 import { cached, DAY, HOUR, MINUTE } from '../../cache.js';
 import { config } from '../../config.js';
 import type {
+  SleeperTransaction,
   SleeperLeague,
   SleeperMatchup,
   SleeperPlayerMap,
@@ -74,7 +75,7 @@ export const sleeperClient = {
   // A week's transactions; processed waiver claims show when the league's waivers run.
   transactions: (leagueId: string, week: number) =>
     cached(`sleeper:transactions:${leagueId}:${week}`, 6 * HOUR, () =>
-      get<{ type: string; status: string; status_updated: number }[]>(`/league/${leagueId}/transactions/${week}`),
+      get<SleeperTransaction[]>(`/league/${leagueId}/transactions/${week}`),
     ),
   // Players added (or dropped) most by all Sleeper users in the last day.
   trending: (type: 'add' | 'drop') =>
