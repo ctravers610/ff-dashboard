@@ -37,7 +37,7 @@ export function FfpcWaiverPaste({ league }: { league: WaiverLeague }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-slate-300">
           {pastedAt
-            ? `From FFPC's add/drop page as pasted ${pastedAt}. Paste again after bids process to stay current.`
+            ? `From FFPC's add/drop page as pasted ${pastedAt}: who's available and your FAAB. Projections and injury tags are live. Paste again after bids process to stay current.`
             : "FFPC has no API, so paste the league's add/drop page to see waivers here."}
         </p>
         {league.pastedAt && (

@@ -186,8 +186,12 @@ test.describe('FFPC waivers (pasted add/drop page)', () => {
     await expect(list).toHaveCount(1);
     await expect(list.first()).toContainText('Upgrade · WR');
     await expect(list.first()).toContainText('Add Jayden Reed WR · GB');
-    await expect(list.first()).toContainText('over Mike Evans (6.0 projected)');
-    await expect(list.first()).toContainText('+10.0pts');
+    // The page projects Mike Evans for 6, but the paste is a snapshot: Sleeper's
+    // live projections (scored with FFPC's rules) win, and they have Evans at 10,
+    // so Reed's 16 replaces the 10-point Malik Nabers instead.
+    await expect(list.first()).toContainText('over Malik Nabers (10.0 projected)');
+    await expect(list.first()).not.toContainText('Mike Evans');
+    await expect(list.first()).toContainText('+6.0pts');
     await expect(list.first()).toContainText('Drop Drake Maye QB36.0 rest of season');
 
     // Rest of season comes from Sleeper's projections scored with FFPC's rules: 16 a week for 12 weeks.

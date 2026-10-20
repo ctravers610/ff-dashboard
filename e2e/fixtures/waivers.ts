@@ -71,10 +71,11 @@ export const espnFreeAgents: [FxPlayer, 'WAIVERS' | 'FREEAGENT'][] = [
 ];
 
 // ── FFPC: its add/drop page, as copied from the browser ─────────────────
-// FFPC's own projections: Mike Evans is down to 6, so free agent Jayden Reed
-// (16, questionable but playing) is a +10 upgrade at WR. FFPC rosters are always
-// full, so it needs a drop: Drake Maye (36 rest of season) is replaceable by
-// free agent Geno Smith (144). Olave over Nabers (+4) finds no second safe drop.
+// FFPC's own projections on the page have Mike Evans down to 6, but the app
+// prefers Sleeper's live projections (Evans 10), so free agent Jayden Reed (16,
+// questionable but playing) is a +6 upgrade over Malik Nabers (10) at WR. FFPC
+// rosters are always full, so it needs a drop: Drake Maye (36 rest of season) is
+// replaceable by free agent Geno Smith (144). A second WR upgrade finds no safe drop.
 export const FFPC_FAAB_LEFT = 640;
 export const FFPC_BID_SCHEDULE = 'Wednesdays at 11 pm ET and Sundays at 10 am ET';
 const ffpcProjection = (p: FxPlayer) => (p === P.evans ? 6 : p === P.allen ? 20 : weekly(p));

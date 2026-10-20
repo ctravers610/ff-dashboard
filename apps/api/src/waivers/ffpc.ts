@@ -1,7 +1,9 @@
 // Waivers for FFPC leagues, from a pasted copy of FFPC's add/drop page (FFPC
-// has no API). This week's values are FFPC's own projections from the page;
-// rest of season comes from Sleeper's weekly projections scored with FFPC's
-// rules, the same engine as FFPC live scoring.
+// has no API). The page says who's available and your budget; everything that
+// changes during the week comes from live data instead, since the paste is a
+// snapshot: projections (this week and rest of season) are Sleeper's, scored
+// with FFPC's rules like FFPC live scoring, and injury tags are Sleeper's too.
+// FFPC's own numbers only fill in for players Sleeper doesn't know.
 
 import { parseFfpcBidSchedule, parseFfpcWaivers, type FfpcWaiverPlayer, type InjuryStatus, type ManualLeague, type Player, type SourceError, type WaiverLeague, type WaiverPlayer } from '@ffd/shared';
 import { buildPlayerIndex, parseRosterText, resolvePlayer, statusForSlot, type PlayerIndex } from '../adapters/manual/parse.js';
@@ -40,13 +42,14 @@ export function ffpcWaiverLeague(
   if (!paste) return { ...base, rules: null, pastedAt: null, runs: [], runsSource: null, claims: null };
 
   const page = parseFfpcWaivers(paste.text);
-  const restOfSeason = (p: Player) => {
-    if (p.playerId.startsWith('ffpc:')) return null; // not matched to Sleeper: no projections
-    return weeks.reduce((sum, w) => {
-      const stats = w.get(p.playerId);
-      return sum + (stats ? scoreStats(stats, p.position, FFPC_RULES, stats.pts_allow ?? null) : 0);
-    }, 0);
+  const score = (p: Player, w: Projections) => {
+    const stats = w.get(p.playerId);
+    return stats ? scoreStats(stats, p.position, FFPC_RULES, stats.pts_allow ?? null) : 0;
   };
+  const matched = (p: Player) => !p.playerId.startsWith('ffpc:'); // unmatched players have no Sleeper projections
+  const restOfSeason = (p: Player) => (matched(p) ? weeks.reduce((sum, w) => sum + score(p, w), 0) : null);
+  // The claim week: Sleeper's projection when there is one, else FFPC's from the page.
+  const thisWeek = (p: Player, pasted: number | null | undefined) => (matched(p) && weeks[0]?.has(p.playerId) ? score(p, weeks[0]) : (pasted ?? null));
 
   // FFPC's player, matched to Sleeper's so projections and trends line up across the app.
   const toPlayer = (fp: FfpcWaiverPlayer): Player => {
@@ -61,13 +64,13 @@ export function ffpcWaiverLeague(
   };
   const toWaiver = (fp: FfpcWaiverPlayer) => {
     const player = toPlayer(fp);
-    return waiverPlayer(player, fp.projected, restOfSeason(player), ctx);
+    return waiverPlayer(player, thisWeek(player, fp.projected), restOfSeason(player), ctx);
   };
 
   const available = page.available.map(toWaiver);
 
   // Your lineup comes from the league's roster (set by the Live Scoring paste);
-  // each player's projection from the add/drop page's roster table.
+  // the add/drop page's roster table only backs up projections Sleeper lacks.
   const pageRoster = new Map(page.roster.map((fp) => [normalizeName(fp.name), fp]));
   const lines = parseRosterText(league.rosterText);
   const mine = lines.flatMap((line) => {
@@ -75,7 +78,7 @@ export function ffpcWaiverLeague(
     if (!player) return [];
     const fp = pageRoster.get(normalizeName(player.position === 'DEF' ? `${player.nflTeam} DST` : player.name));
     const status = statusForSlot(line.slot);
-    return [{ slot: line.slot, status, wp: waiverPlayer(fp ? toPlayer(fp) : player, fp?.projected ?? null, restOfSeason(player), ctx) }];
+    return [{ slot: line.slot, status, wp: waiverPlayer(player, thisWeek(player, fp?.projected), restOfSeason(player), ctx) }];
   });
   const starters = mine.filter((m) => m.status === 'starter').map((m) => ({ slot: m.slot!, player: m.wp }));
   const bench = mine.filter((m) => m.status === 'bench').map((m) => m.wp);
