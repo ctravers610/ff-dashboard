@@ -130,4 +130,20 @@ describe('adviseLeague', () => {
       expect.objectContaining({ slot: 'WR', playerName: 'Bye Starter', reason: 'bye', detail: 'On bye', suggestion: expect.objectContaining({ playerName: 'Brian Thomas' }) }),
     ]);
   });
+
+  it('waits until the day before his game to warn about a Questionable starter', () => {
+    const kickoff = '2026-10-25T17:00:00Z';
+    const games = new Map([['TB', { ...game(false), kickoff }]]);
+    const l = league([[evans, 'starter']], [injured(evans, 'WR')]);
+    const at = (iso: string) => adviseLeague(l, { games, projectedFor: () => null }, new Date(iso));
+    expect(at('2026-10-22T12:00:00Z')).toEqual([]); // Thursday: three days out
+    expect(at('2026-10-24T18:00:00Z')).toHaveLength(1); // Saturday afternoon: under a day
+  });
+
+  it('still warns right away about a starter who is Out', () => {
+    const out = player('Out Guy', 'WR', 'TB', 'Out');
+    const games = new Map([['TB', { ...game(false), kickoff: '2026-10-25T17:00:00Z' }]]);
+    const l = league([[out, 'starter']], [injured(out, 'WR')]);
+    expect(adviseLeague(l, { games, projectedFor: () => null }, new Date('2026-10-22T12:00:00Z'))).toHaveLength(1);
+  });
 });

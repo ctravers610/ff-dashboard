@@ -27,7 +27,16 @@ function gameState(player: Player, games: AdviceContext['games']): GameState {
   return game.started ? 'started' : 'upcoming';
 }
 
-export function adviseLeague(league: LeagueSummary, ctx: AdviceContext): LineupAlert[] {
+// Players often carry a Questionable tag all week and play anyway, so it's only
+// worth a warning in the last day before his game.
+const QUESTIONABLE_LEAD_MS = 24 * 60 * 60 * 1000;
+function tooEarlyToWorry(alert: LineupAlert, player: Player | undefined, games: AdviceContext['games'], now: Date): boolean {
+  if (alert.reason !== 'injury' || alert.detail !== 'Questionable' || !player?.nflTeam) return false;
+  const kickoff = games?.get(player.nflTeam)?.kickoff;
+  return kickoff != null && new Date(kickoff).getTime() - now.getTime() > QUESTIONABLE_LEAD_MS;
+}
+
+export function adviseLeague(league: LeagueSummary, ctx: AdviceContext, now = new Date()): LineupAlert[] {
   const rosterById = new Map(league.roster.map((r) => [r.player.playerId, r.player]));
   const used = new Set<string>(); // one bench player is suggested for at most one slot
 
@@ -57,6 +66,7 @@ export function adviseLeague(league: LeagueSummary, ctx: AdviceContext): LineupA
   for (const alert of [...league.alerts, ...byes]) {
     const starter = alert.playerId ? rosterById.get(alert.playerId) : undefined;
     if (starter && gameState(starter, ctx.games) === 'started') continue;
+    if (tooEarlyToWorry(alert, starter, ctx.games, now)) continue;
     advice.push({ ...alert, suggestion: bestFor(alert.slot) });
   }
   return advice;

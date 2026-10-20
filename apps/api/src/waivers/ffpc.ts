@@ -53,10 +53,11 @@ export function ffpcWaiverLeague(
     const team = TEAM[fp.nflTeam] ?? fp.nflTeam;
     const name = fp.position === 'DEF' ? `${team} DST` : fp.name;
     const matched = resolvePlayer({ slot: fp.position, name }, index);
-    const injuryStatus = (fp.injury && INJURY[fp.injury]) || null; // FFPC's own status is the freshest
-    return matched
-      ? { ...matched, injuryStatus }
-      : { playerId: `ffpc:${fp.position}:${normalizeName(fp.name)}`, name: fp.name, position: fp.position, nflTeam: team, injuryStatus };
+    // Sleeper's injury tag is live, while the paste's is frozen at the time it was
+    // copied, so Sleeper's wins; the paste's only fills in for a player Sleeper doesn't know.
+    if (matched) return matched;
+    const injuryStatus = (fp.injury && INJURY[fp.injury]) || null;
+    return { playerId: `ffpc:${fp.position}:${normalizeName(fp.name)}`, name: fp.name, position: fp.position, nflTeam: team, injuryStatus };
   };
   const toWaiver = (fp: FfpcWaiverPlayer) => {
     const player = toPlayer(fp);
