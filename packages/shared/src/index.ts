@@ -276,9 +276,18 @@ export interface WaiverLeague {
   // processed claims (history), FFPC's page, or (an estimate) its settings.
   runs: WaiverRun[];
   runsSource: 'history' | 'ffpc' | 'settings' | null;
+  // ESPN only: the claims you have in, in the order ESPN lists them. Null
+  // where the platform doesn't show them.
+  pendingClaims?: PendingClaim[] | null;
   // Your claims for the next run (null when there's no known next run). ESPN
   // shows you your own pending claims; elsewhere you mark them set yourself.
   claims: WaiverClaims | null;
+}
+
+export interface PendingClaim {
+  add: WaiverPlayer;
+  drop: WaiverPlayer | null; // null: no drop (an open roster spot)
+  bid: number | null; // FAAB bid; null where the league doesn't bid
 }
 
 export interface WaiverClaims {

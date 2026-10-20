@@ -1,10 +1,10 @@
 // Waivers for ESPN leagues, using ESPN's own free-agent list and its
 // projections, which are already scored with the league's settings.
 
-import type { SourceError, WaiverLeague, WaiverPlayer, WaiverRules } from '@ffd/shared';
+import type { PendingClaim, SourceError, WaiverLeague, WaiverPlayer, WaiverRules } from '@ffd/shared';
 import { espnClient, type EspnAuth } from '../adapters/espn/client.js';
 import { BENCH_SLOT, findMyTeamId, IR_SLOT, SLOT_NAMES, SLOT_ORDER, toEspnPlayer } from '../adapters/espn/mapper.js';
-import type { EspnFreeAgents, EspnLeague, EspnPlayer } from '../adapters/espn/types.js';
+import type { EspnFreeAgents, EspnLeague, EspnPlayer, EspnTransaction } from '../adapters/espn/types.js';
 import { waiverPlayer, type WaiverContext } from './context.js';
 import { espnSchedule } from './schedule.js';
 import { pickAvailable, startablePositions, suggestMoves } from './moves.js';
@@ -78,6 +78,42 @@ export function espnWaiverLeague(league: EspnLeague, freeAgents: EspnFreeAgents,
   };
 }
 
+/**
+ * Your pending claims, with names and projections. ESPN gives only player ids,
+ * so they're looked up on the league's rosters and free agents, and any left
+ * over are fetched by id.
+ */
+export async function espnPendingClaims(
+  claims: EspnTransaction[],
+  league: EspnLeague,
+  freeAgents: EspnFreeAgents,
+  faab: boolean,
+  ctx: WaiverContext,
+  fetchPlayers: (ids: number[]) => Promise<EspnPlayer[]>,
+): Promise<PendingClaim[]> {
+  const known = new Map<number, EspnPlayer>();
+  for (const t of league.teams ?? []) for (const e of t.roster?.entries ?? []) if (e.playerPoolEntry?.player) known.set(e.playerPoolEntry.player.id, e.playerPoolEntry.player);
+  for (const fa of freeAgents.players) known.set(fa.player.id, fa.player);
+  const ids = claims.flatMap((c) => (c.items ?? []).map((i) => i.playerId));
+  const missing = [...new Set(ids.filter((id) => !known.has(id)))];
+  if (missing.length) for (const p of await fetchPlayers(missing).catch(() => [])) known.set(p.id, p);
+
+  const season = Number(ctx.season);
+  const toWaiver = (id: number | undefined): WaiverPlayer | null => {
+    const p = id == null ? undefined : known.get(id);
+    if (!p) return null;
+    const v = projection(p, season, ctx.week);
+    return waiverPlayer(toEspnPlayer(p), v.week, v.restOfSeason, ctx);
+  };
+  return [...claims]
+    .sort((a, b) => (a.proposedDate ?? 0) - (b.proposedDate ?? 0))
+    .flatMap((c) => {
+      const add = toWaiver(c.items?.find((i) => i.type === 'ADD')?.playerId);
+      if (!add) return [];
+      return [{ add, drop: toWaiver(c.items?.find((i) => i.type === 'DROP')?.playerId), bid: faab ? (c.bidAmount ?? 0) : null }];
+    });
+}
+
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export async function fetchEspnWaivers(
@@ -101,11 +137,15 @@ export async function fetchEspnWaivers(
         const schedule = await espnSchedule(leagueId, ctx.season, ctx.week, auth);
         // Your own claims for the coming run, so reminders can skip a league you've already handled.
         const pending = await espnClient.pendingTransactions(leagueId, ctx.season, ctx.week, auth).catch(() => null);
+        const base = espnWaiverLeague(league, freeAgents, myTeamId, name, ctx);
+        let pendingClaims: PendingClaim[] | null = null;
         if (pending) {
           const mine = (pending.transactions ?? []).filter((t) => t.type === 'WAIVER' && t.status === 'PENDING' && t.teamId === myTeamId);
           result.pendingClaims.set(String(league.id), mine.length);
+          const fetchPlayers = (ids: number[]) => espnClient.players(leagueId, ctx.season, ctx.week, ids, auth).then((r) => r.players.map((p) => p.player));
+          pendingClaims = await espnPendingClaims(mine, league, freeAgents, base.rules?.type === 'faab', ctx, fetchPlayers);
         }
-        result.leagues.push({ ...espnWaiverLeague(league, freeAgents, myTeamId, name, ctx), ...schedule });
+        result.leagues.push({ ...base, ...schedule, pendingClaims });
       } catch (e) {
         result.errors.push({ source: `espn:${leagueId}`, message: errorMessage(e) });
       }

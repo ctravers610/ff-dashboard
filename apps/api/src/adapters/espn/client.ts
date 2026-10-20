@@ -1,6 +1,6 @@
 import { cached, MINUTE } from '../../cache.js';
 import { config } from '../../config.js';
-import type { EspnFreeAgents, EspnLeague } from './types.js';
+import type { EspnFreeAgents, EspnLeague, EspnTransaction } from './types.js';
 
 const VIEWS = ['mSettings', 'mTeam', 'mRoster', 'mMatchupScore', 'mScoreboard', 'mStatus'];
 
@@ -67,8 +67,15 @@ export const espnClient = {
     cached(`espn:pending:${leagueId}:${season}:${week}`, 5 * MINUTE, () => {
       const params = views('mTransactions2');
       params.set('scoringPeriodId', String(week));
-      return get<{ transactions?: { type: string; status?: string; teamId?: number }[] }>(leagueId, season, auth, params);
+      return get<{ transactions?: EspnTransaction[] }>(leagueId, season, auth, params);
     }),
+  // Specific players by id, with stats for the week, e.g. the ones in your claims.
+  players: (leagueId: string, season: string, week: number, ids: number[], auth: EspnAuth | null) => {
+    const params = views('kona_player_info');
+    params.set('scoringPeriodId', String(week));
+    const filter = { players: { filterIds: { value: ids }, limit: ids.length } };
+    return get<EspnFreeAgents>(leagueId, season, auth, params, { 'X-Fantasy-Filter': JSON.stringify(filter) });
+  },
   freeAgents: (leagueId: string, season: string, week: number, auth: EspnAuth | null) =>
     cached(`espn:free-agents:${leagueId}:${season}:${week}`, 5 * MINUTE, () => {
       const params = views('kona_player_info');

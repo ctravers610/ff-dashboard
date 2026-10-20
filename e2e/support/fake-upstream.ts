@@ -89,7 +89,13 @@ function route(url: URL, headers: http.IncomingHttpHeaders): Reply | null {
     const authed = cookie.includes(`SWID=${espn.ESPN_SWID}`) && cookie.includes(`espn_s2=${espn.ESPN_S2}`);
     if (e[1] === espn.ESPN_FAILING_LEAGUE_ID || !authed) return { status: 401, body: { messages: ['You are not authorized to view this League.'] } };
     if (e[1] === espn.ESPN_LEAGUE_ID) {
-      return { body: url.searchParams.getAll('view').includes('kona_player_info') ? espn.freeAgents() : espn.league() };
+      const view = url.searchParams.getAll('view');
+      if (view.includes('mTransactions2')) return { body: espn.transactions() };
+      if (view.includes('kona_player_info')) {
+        const ids = JSON.parse(String(headers['x-fantasy-filter'] ?? '{}'))?.players?.filterIds?.value as number[] | undefined;
+        return { body: ids ? espn.playersById(ids) : espn.freeAgents() };
+      }
+      return { body: espn.league() };
     }
   }
 

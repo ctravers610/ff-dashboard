@@ -110,6 +110,8 @@ function Claims({ league }: { league: WaiverLeague }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['waivers'] }),
   });
   const claims = league.claims;
+  // ESPN can show your claims even when we don't know when its waivers run.
+  if (!claims && league.pendingClaims?.length) return <span className="text-emerald-300">{league.pendingClaims.length} pending on ESPN</span>;
   if (!claims) return <span className="text-slate-400">—</span>;
   if (claims.source === 'espn') {
     return (
@@ -247,6 +249,36 @@ function Moves({ league, week }: { league: WaiverLeague; week: number }) {
   );
 }
 
+// The claims you have in on ESPN, in ESPN's order: who you add, who goes, and the bid.
+function PendingClaims({ league, week }: { league: WaiverLeague; week: number }) {
+  const claims = league.pendingClaims ?? [];
+  if (claims.length === 0) return <p className="text-sm text-slate-400">No claims in on ESPN for the next run.</p>;
+  return (
+    <ol className="divide-y divide-slate-800">
+      {claims.map((c, i) => (
+        <li key={`${c.add.player.playerId}:${c.drop?.player.playerId ?? ''}`} className="grid gap-x-4 gap-y-1 py-3 text-sm sm:grid-cols-[2rem_minmax(0,1.3fr)_minmax(0,1fr)_5rem] sm:items-start">
+          <span className="font-semibold tabular-nums text-slate-400">{i + 1}.</span>
+          <span className="min-w-0">
+            <span className="text-emerald-400">Add</span> <PlayerLine p={c.add} />
+            {c.add.week != null && <span className="block text-xs text-slate-400">{fmt(c.add.week)} projected in week {week}</span>}
+          </span>
+          <span className="min-w-0">
+            {c.drop ? (
+              <>
+                <span className="text-rose-300">Drop</span> <PlayerLine p={c.drop} />
+                {c.drop.week != null && <span className="block text-xs text-slate-400">{fmt(c.drop.week)} projected in week {week}</span>}
+              </>
+            ) : (
+              <span className="text-slate-400">No drop</span>
+            )}
+          </span>
+          <span className="tabular-nums sm:text-right">{c.bid != null && <span className="font-semibold">${c.bid}</span>}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function Available({ league }: { league: WaiverLeague }) {
   const [sort, setSort] = useState<Sort>('week');
   const [position, setPosition] = useState<(typeof POSITIONS)[number]>('All');
@@ -375,6 +407,11 @@ export function WaiversView() {
         {league && (
           <section aria-label={`Waivers for ${league.name}`} className="flex flex-col gap-4">
             <Header league={league} next={current?.next ?? null} />
+            {league.pendingClaims && (
+              <Card title="Your claims">
+                <PendingClaims league={league} week={data.week} />
+              </Card>
+            )}
             {(league.platform !== 'ffpc' || league.pastedAt) && (
               <>
                 <Card title="Suggested moves">

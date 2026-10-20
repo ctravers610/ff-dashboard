@@ -61,6 +61,20 @@ test.describe('Waivers', () => {
     await expect(byes.getByRole('listitem')).toHaveText(`Week ${CLAIM_WEEK}Jaylen Waddle WRLineup covered`);
   });
 
+  test('ESPN: shows the claims you have in, with the bid and the drop', async ({ page }) => {
+    await pickLeague(page, ESPN_LEAGUE_NAME);
+    const claims = leagueSection(page, ESPN_LEAGUE_NAME).getByRole('region', { name: 'Your claims' }).getByRole('listitem');
+    await expect(claims).toHaveCount(2);
+    await expect(leagueSection(page, ESPN_LEAGUE_NAME)).toContainText('Your claims2 pending on ESPN');
+    // Oldest first: Rice, then Geno Smith, who isn't in the free-agent list and is looked up by id.
+    await expect(claims.nth(0)).toContainText('Add Rashee Rice WR · KC');
+    await expect(claims.nth(0)).toContainText('No drop');
+    await expect(claims.nth(0)).toContainText('$22');
+    await expect(claims.nth(1)).toContainText('Add Geno Smith QB · NYJ');
+    await expect(claims.nth(1)).toContainText('Drop Najee Harris RB · NYG');
+    await expect(claims.nth(1)).toContainText('$5');
+  });
+
   test('puts leagues in order of their next waiver run, learned from processed claims', async ({ page }) => {
     const pills = page.getByRole('group', { name: 'League' }).getByRole('button');
     await expect(pills.nth(0)).toContainText(`${SLEEPER_LEAGUE_NAME}Sleeper · Tue night, in`); // Wed 3 AM: overnight, so the night before

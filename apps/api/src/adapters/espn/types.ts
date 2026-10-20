@@ -98,3 +98,13 @@ export interface EspnLeague {
 export interface EspnFreeAgents {
   players: { status: 'FREEAGENT' | 'WAIVERS' | string; player: EspnPlayer }[];
 }
+
+// From the mTransactions2 view. Signed in as you, pending waiver claims are yours.
+export interface EspnTransaction {
+  type: string; // 'WAIVER', 'FREEAGENT', ...
+  status?: string; // 'PENDING', 'EXECUTED', ...
+  teamId?: number;
+  bidAmount?: number;
+  proposedDate?: number;
+  items?: { type: 'ADD' | 'DROP' | string; playerId: number }[];
+}

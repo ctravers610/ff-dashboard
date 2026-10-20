@@ -2,7 +2,7 @@
 // positions, teams and lineup slots. Checked against the API's ESPN types.
 
 import type { EspnLeague, EspnRosterEntry } from '../../apps/api/src/adapters/espn/types.js';
-import { PLAYERS as P, SEASON, WEEK, type FxPlayer } from './players.js';
+import { ALL_PLAYERS, PLAYERS as P, SEASON, WEEK, type FxPlayer } from './players.js';
 import { ESPN_FAAB, espnFreeAgents as FREE_AGENTS, espnWaiverStats } from './waivers.js';
 
 export const ESPN_LEAGUE_ID = '900001';
@@ -143,18 +143,41 @@ export function league(): EspnLeague {
 }
 
 // The kona_player_info view: players on no team in the league.
+const poolPlayer = (p: FxPlayer) => ({
+  id: p.espnId,
+  fullName: p.name,
+  defaultPositionId: POSITION_ID[p.position],
+  proTeamId: TEAM_ID[p.team] ?? 0,
+  injuryStatus: p.injury ? 'QUESTIONABLE' : 'ACTIVE',
+  stats: espnWaiverStats(p),
+});
+
 export function freeAgents() {
+  return { players: FREE_AGENTS.map(([p, status]) => ({ status, player: poolPlayer(p) })) };
+}
+
+/** Players asked for by id (X-Fantasy-Filter filterIds), from the whole pool. */
+export function playersById(ids: number[]) {
+  return { players: ALL_PLAYERS.filter((p) => ids.includes(p.espnId)).map((p) => ({ status: 'FREEAGENT', player: poolPlayer(p) })) };
+}
+
+// Your pending waiver claims, oldest first once sorted: Rice for $22 with no
+// drop, then Geno Smith (not in the free-agent list, so looked up by id) for
+// $5, dropping Najee Harris.
+export const ESPN_PENDING_CLAIMS = [
+  { player: P.geno, drop: P.najee, bid: 5, at: 2 },
+  { player: P.rice, drop: null, bid: 22, at: 1 },
+];
+
+export function transactions() {
   return {
-    players: FREE_AGENTS.map(([p, status]) => ({
-      status,
-      player: {
-        id: p.espnId,
-        fullName: p.name,
-        defaultPositionId: POSITION_ID[p.position],
-        proTeamId: TEAM_ID[p.team] ?? 0,
-        injuryStatus: p.injury ? 'QUESTIONABLE' : 'ACTIVE',
-        stats: espnWaiverStats(p),
-      },
+    transactions: ESPN_PENDING_CLAIMS.map((c) => ({
+      type: 'WAIVER',
+      status: 'PENDING',
+      teamId: 1,
+      bidAmount: c.bid,
+      proposedDate: c.at,
+      items: [{ type: 'ADD', playerId: c.player.espnId }, ...(c.drop ? [{ type: 'DROP', playerId: c.drop.espnId }] : [])],
     })),
   };
 }
