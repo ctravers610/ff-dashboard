@@ -6,6 +6,7 @@ import { SideList, WithSideList } from '../SideList';
 import { LeagueHistoryCard, type HistoryMode } from './LeagueHistoryCard';
 import { RecapPanel } from './LineupRecap';
 import { TradesPanel } from './TradesPanel';
+import { Awards, LuckTable } from '../outlook/SeasonCards';
 import { ResultChip } from './ResultChip';
 
 // League by league: pick a league on the left; on the right, its weekly
@@ -73,6 +74,8 @@ export function HistoryView() {
             onPickWeek={setWeek}
           />
           <RecapPanel leagueKey={keyOf(league)} week={week} onWeek={setWeek} />
+          {oddsFor(league) && <Awards outlook={oddsFor(league)!} />}
+          {oddsFor(league) && <LuckTable outlook={oddsFor(league)!} />}
           <TradesPanel leagueKey={keyOf(league)} />
         </section>
       </WithSideList>

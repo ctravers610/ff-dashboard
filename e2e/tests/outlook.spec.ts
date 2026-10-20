@@ -30,4 +30,14 @@ test.describe('Season outlook', () => {
     const card = await showLeague(page, SLEEPER_LEAGUE_NAME);
     await expect(card).toContainText(/Playoff chance(\d+|<1|>99)%~\d+\.\d wins/);
   });
+
+  test('History shows how lucky every team has been, and the season awards', async ({ page }) => {
+    await openTab(page, 'History');
+    await showLeague(page, SLEEPER_LEAGUE_NAME);
+    const luck = page.getByRole('region', { name: 'Luck' });
+    await expect(luck.getByRole('row')).toHaveCount(5); // header + 4 teams
+    await expect(luck.getByRole('row').filter({ hasText: '(you)' })).toContainText('3-2'); // weeks 1-5
+    const awards = page.getByRole('region', { name: 'Season awards' });
+    for (const title of ['Highest score', 'Biggest blowout', 'Heartbreaker']) await expect(awards).toContainText(title);
+  });
 });

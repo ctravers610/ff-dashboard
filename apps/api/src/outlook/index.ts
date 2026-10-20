@@ -1,15 +1,19 @@
 // GET /api/outlook: for each league, your chance of making the playoffs (the
-// rest of the regular season simulated from everyone's scoring so far) and a
-// preview of your next opponent. Sleeper and ESPN only: FFPC has no standings
-// or schedule we can see.
+// rest of the regular season simulated from everyone's scoring so far), a
+// preview of your next opponent, how lucky every team has been, and the
+// season's awards. Sleeper and ESPN only: FFPC has no standings or schedule
+// we can see.
 
 import type { LeagueOutlook, OpponentPreview, OutlookResponse, SourceError } from '@ffd/shared';
 import { espnClient, type EspnAuth } from '../adapters/espn/client.js';
 import { BENCH_SLOT, findMyTeamId, IR_SLOT, teamName as espnTeamName, toEspnPlayer } from '../adapters/espn/mapper.js';
 import type { EspnLeague } from '../adapters/espn/types.js';
 import { sleeperClient } from '../adapters/sleeper/client.js';
-import { toPlayer } from '../adapters/sleeper/mapper.js';
-import type { SleeperLeague } from '../adapters/sleeper/types.js';
+import { NON_STARTER_SLOTS, toPlayer } from '../adapters/sleeper/mapper.js';
+import type { SleeperLeague, SleeperMatchup, SleeperTransaction } from '../adapters/sleeper/types.js';
+import { lineupTotals, type RosteredPlayer } from '../recap/lineup.js';
+import { getTrades } from '../trades/index.js';
+import { luckTable, seasonAwards, type AwardExtras, type PlayedGame } from './digest.js';
 import { config } from '../config.js';
 import { nflGames } from '../scoring/games.js';
 import { activeSources } from '../sources/store.js';
@@ -23,6 +27,8 @@ const record = (t: SeasonTeam) => `${t.wins}-${t.losses}${t.ties ? `-${t.ties}` 
 interface LoadedSeason extends LeagueSeason {
   myTeamId: string;
   injured: Map<string, OpponentPreview['injuredStarters']>;
+  played: PlayedGame[]; // finished head-to-head games, for luck and awards
+  extras?: AwardExtras;
 }
 
 /** The outlook for your team from a loaded season. `previewWeek`: the first week whose games haven't started. */
@@ -31,6 +37,7 @@ export function outlookFor(base: Pick<LeagueOutlook, 'platform' | 'leagueId'>, s
   const me = s.teams.find((t) => t.teamId === s.myTeamId);
   const decided = s.remaining.length === 0 && me && s.playoffTeams;
   const finalRank = [...s.teams].sort(standingsOrder).findIndex((t) => t.teamId === s.myTeamId) + 1;
+  const luck = luckTable(s.teams, s.played, s.myTeamId);
 
   let next: OpponentPreview | null = null;
   const game = s.remaining.find((g) => g.week >= previewWeek && (g.a === s.myTeamId || g.b === s.myTeamId));
@@ -56,6 +63,8 @@ export function outlookFor(base: Pick<LeagueOutlook, 'platform' | 'leagueId'>, s
     playoffChance: odds ? odds.playoffChance : decided ? (finalRank <= s.playoffTeams! ? 1 : 0) : null,
     projectedWins: odds ? round1(odds.projectedWins) : (me?.wins ?? null),
     next,
+    luck,
+    awards: seasonAwards(s.teams, s.played, luck, s.myTeamId, s.extras),
   };
 }
 
@@ -109,6 +118,16 @@ async function sleeperSeason(league: SleeperLeague, myUserId: string, players: A
       }),
     ]),
   );
+  // Finished weeks: every game's score, and what Sleeper alone can tell (benches, pickups, trades).
+  const finished = Array.from({ length: Math.max(0, Math.min(currentWeek - 1, lastWeek)) }, (_, i) => i + 1);
+  const pastWeeks = await Promise.all(finished.map(async (week) => [week, await sleeperClient.matchups(league.league_id, week)] as const));
+  const played: PlayedGame[] = pastWeeks.flatMap(([week, matchups]) => {
+    const byMatchup = new Map<number, SleeperMatchup[]>();
+    for (const m of matchups) if (m.matchup_id != null) byMatchup.set(m.matchup_id, [...(byMatchup.get(m.matchup_id) ?? []), m]);
+    return [...byMatchup.values()].flatMap(([a, b]) => (a && b ? [{ week, a: String(a.roster_id), b: String(b.roster_id), pa: a.points, pb: b.points }] : []));
+  });
+  const extras = await sleeperExtras(league, pastWeeks, players, rosters.map((r) => String(r.roster_id)));
+
   return {
     teams,
     remaining,
@@ -116,7 +135,58 @@ async function sleeperSeason(league: SleeperLeague, myUserId: string, players: A
     medianGames: league.settings?.league_average_match === 1,
     myTeamId: String(mine.roster_id),
     injured,
+    played,
+    extras,
   };
+}
+
+/** Benches, the best waiver pickup and the worst trade: Sleeper's matchups and transactions have the detail. */
+async function sleeperExtras(
+  league: SleeperLeague,
+  pastWeeks: (readonly [number, SleeperMatchup[]])[],
+  players: Awaited<ReturnType<typeof sleeperClient.players>>,
+  teamIds: string[],
+): Promise<AwardExtras> {
+  const slots = league.roster_positions.filter((s) => !NON_STARTER_SLOTS.has(s));
+  const benchLeft = new Map(teamIds.map((id) => [id, 0]));
+  for (const [, matchups] of pastWeeks) {
+    for (const m of matchups) {
+      if (!m.players_points) continue;
+      const startedAt = new Map((m.starters ?? []).map((id, i) => [id, slots[i] ?? null]));
+      const rostered: RosteredPlayer[] = (m.players ?? []).flatMap((id) => {
+        const player = toPlayer(id, players);
+        return player ? [{ player, points: m.players_points![id] ?? 0, startedAt: startedAt.get(id) ?? null }] : [];
+      });
+      const totals = lineupTotals(slots, rostered);
+      benchLeft.set(String(m.roster_id), (benchLeft.get(String(m.roster_id)) ?? 0) + Math.max(0, totals.best - (m.points ?? totals.points)));
+    }
+  }
+
+  // The pickup whose new team got the most started points out of him after the claim.
+  const claims = (
+    await Promise.all(pastWeeks.map(([week]) => sleeperClient.transactions(league.league_id, week).catch(() => [] as SleeperTransaction[])))
+  )
+    .flat()
+    .filter((t) => (t.type === 'waiver' || t.type === 'free_agent') && t.status === 'complete');
+  let bestPickup: AwardExtras['bestPickup'] = null;
+  for (const t of claims) {
+    for (const [id, roster] of Object.entries(t.adds ?? {})) {
+      const points = pastWeeks
+        .filter(([week]) => week > (t.leg ?? 0))
+        .reduce((n, [, ms]) => {
+          const m = ms.find((x) => x.roster_id === roster);
+          return n + (m?.starters?.includes(id) ? (m.players_points?.[id] ?? 0) : 0);
+        }, 0);
+      const name = toPlayer(id, players)?.name;
+      if (name && points > (bestPickup?.points ?? 0)) bestPickup = { teamId: String(roster), player: name, points: round1(points) };
+    }
+  }
+
+  const trades = await getTrades(`sleeper:${league.league_id}`).catch(() => null);
+  const worst = [...(trades?.trades ?? [])].sort((a, b) => b.margin - a.margin)[0];
+  const worstTrade =
+    worst && worst.margin >= 10 ? { loser: worst.sides[1]!.teamName, winner: worst.sides[0]!.teamName, margin: worst.margin, wins: worst.winsSwung } : null;
+  return { benchLeft: new Map([...benchLeft].map(([id, n]) => [id, round1(n)])), bestPickup, worstTrade };
 }
 
 // ── ESPN ────────────────────────────────────────────────────────────────
@@ -162,7 +232,10 @@ export function espnSeason(league: EspnLeague, myTeamId: number): LoadedSeason {
       }),
     ]),
   );
-  return { teams, remaining, playoffTeams: league.settings?.scheduleSettings?.playoffTeamCount ?? null, myTeamId: String(myTeamId), injured };
+  const played: PlayedGame[] = schedule
+    .filter((g) => finished(g) && g.matchupPeriodId <= lastPeriod && g.home && g.away)
+    .map((g) => ({ week: g.matchupPeriodId, a: String(g.home!.teamId), b: String(g.away!.teamId), pa: g.home!.totalPoints ?? 0, pb: g.away!.totalPoints ?? 0 }));
+  return { teams, remaining, playoffTeams: league.settings?.scheduleSettings?.playoffTeamCount ?? null, myTeamId: String(myTeamId), injured, played };
 }
 
 async function espnOutlooks(leagueIds: string[], season: string, auth: EspnAuth | null, previewWeek: number, errors: SourceError[]): Promise<LeagueOutlook[]> {

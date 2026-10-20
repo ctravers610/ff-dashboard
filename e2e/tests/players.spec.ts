@@ -73,8 +73,10 @@ test.describe('Players tab', () => {
     await expect(panel).toContainText('Josh Allen');
     await expect(panel).toContainText('Drake Maye');
     await expect(panel).toContainText('vs MIA'); // BUF's game this week
-    // The fixture gives every player the same projection.
-    await expect(panel).toContainText('Too close to call on projections');
+    // The fixture gives every player the same projection, so the matchup decides it:
+    // Miami has allowed QBs a bit less than average (20.0 vs 22.0), which trims Allen's.
+    await expect(panel).toContainText('MIA allows 20.0 to QBs');
+    await expect(panel).toContainText('Drake Maye projects 1.4 more (PPR, weighed by matchup).');
 
     await panel.getByRole('button', { name: 'Clear' }).click();
     await expect(panel).toHaveCount(0);

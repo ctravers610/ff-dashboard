@@ -383,6 +383,31 @@ export interface OpponentPreview {
   injuredStarters: { name: string; position: string; status: string }[];
 }
 
+// How each team's head-to-head record compares with how it scored: the
+// all-play record (as if it played every team every week) and the wins that
+// implies. Luck is actual wins minus those expected wins.
+export interface LuckRow {
+  teamName: string;
+  isMe: boolean;
+  wins: number;
+  losses: number;
+  ties: number;
+  allPlayWins: number;
+  allPlayLosses: number;
+  expectedWins: number;
+  luck: number;
+  pointsFor: number;
+  pointsAgainst: number;
+}
+
+// A season superlative: who, and the number behind it.
+export interface Award {
+  title: string; // "Unluckiest"
+  teamName: string;
+  isMe: boolean;
+  detail: string; // "2.4 fewer wins than their scoring earned"
+}
+
 export interface LeagueOutlook {
   platform: Platform;
   leagueId: string;
@@ -392,12 +417,29 @@ export interface LeagueOutlook {
   playoffChance: number | null;
   projectedWins: number | null; // final regular-season wins, on average
   next: OpponentPreview | null;
+  luck: LuckRow[]; // luckiest first; empty before any week is finished
+  awards: Award[];
 }
 
 export interface OutlookResponse {
   season: string;
   leagues: LeagueOutlook[];
   errors: SourceError[];
+}
+
+// ── Defense vs position ────────────────────────────────────────────────
+
+// PPR points each NFL defense has given up per game to each position this
+// season; rank 1 gives up the most (the best matchup).
+export interface DefenseVsPosition {
+  allowed: number;
+  rank: number;
+}
+
+export interface DefenseResponse {
+  games: number; // finished games counted, league-wide
+  leagueAverage: Record<string, number>; // per position, per game
+  teams: Record<string, Record<string, DefenseVsPosition>>; // NFL team -> position -> numbers
 }
 
 // ── Trades ─────────────────────────────────────────────────────────────
