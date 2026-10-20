@@ -61,6 +61,14 @@ test.describe('Waivers', () => {
     await expect(byes.getByRole('listitem')).toHaveText(`Week ${CLAIM_WEEK}Jaylen Waddle WRLineup covered`);
   });
 
+  test('the Refresh button reloads the Waivers tab too', async ({ page }) => {
+    await expect(leagueSection(page, SLEEPER_LEAGUE_NAME)).toBeVisible();
+    const reloaded = page.waitForResponse((r) => r.url().endsWith('/api/waivers') && r.ok());
+    await page.getByRole('button', { name: 'Refresh' }).click();
+    await reloaded;
+    await expect(page.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+  });
+
   test('ESPN: shows the claims you have in, with the bid and the drop', async ({ page }) => {
     await pickLeague(page, ESPN_LEAGUE_NAME);
     const claims = leagueSection(page, ESPN_LEAGUE_NAME).getByRole('region', { name: 'Your claims' }).getByRole('listitem');

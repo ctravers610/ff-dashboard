@@ -47,12 +47,13 @@ export function useHistory() {
   });
 }
 
-// Free agents and suggested moves. Waivers change slowly, so every 5 minutes is plenty.
+// Free agents, suggested moves and your ESPN claims. Every 30 seconds, so a claim
+// you just made on ESPN shows up within a minute (the API asks ESPN at most every 30 seconds).
 export function useWaivers() {
   return useQuery({
     queryKey: ['waivers'],
     queryFn: () => api<WaiversResponse>('/api/waivers'),
-    refetchInterval: 5 * 60_000,
+    refetchInterval: 30_000,
   });
 }
 

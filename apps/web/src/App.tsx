@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useState, type ComponentType, type SVGProps } from 'react';
 import { signOut, useDashboard, useWaivers, type Me } from './api';
 import { AddLeagueDialog } from './components/AddLeagueDialog';
@@ -26,7 +27,15 @@ const VIEWS: { id: View; label: string; Icon: ComponentType<SVGProps<SVGSVGEleme
 ];
 
 export default function App({ user }: { user: Me['user'] }) {
-  const { data, error, isPending, isFetching, refetch } = useDashboard();
+  const { data, error, isPending } = useDashboard();
+  // Refresh reloads everything on screen (dashboard, waivers, history, ...), not just the matchups.
+  const queryClient = useQueryClient();
+  // Spins only for a refresh you asked for, not for the background polling.
+  const [isFetching, setRefreshing] = useState(false);
+  const refresh = async () => {
+    setRefreshing(true);
+    await queryClient.invalidateQueries().finally(() => setRefreshing(false));
+  };
   // Loaded on every tab, so the Waivers button can flag leagues whose reminder has come.
   const needClaims = useWaivers().data?.leagues.filter((l) => l.claims?.reminderDue).length ?? 0;
   // Reminder notifications open /?view=waivers, so honor a view in the address.
@@ -89,7 +98,7 @@ export default function App({ user }: { user: Me['user'] }) {
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => refetch()}
+            onClick={() => void refresh()}
             disabled={isFetching}
             aria-label={isFetching ? 'Refreshing' : 'Refresh'}
             title="Refresh"

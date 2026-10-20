@@ -62,9 +62,10 @@ export const espnClient = {
       params.set('scoringPeriodId', String(week));
       return get<{ transactions?: { type: string; status?: string; processDate?: number }[] }>(leagueId, season, auth, params);
     }),
-  // The same, fresh: signed in as you, ESPN includes your own pending claims (and nobody else's).
+  // The same, fresh: signed in as you, ESPN includes your own pending claims (and
+  // nobody else's). Kept only briefly, so a claim you just made shows up within a minute.
   pendingTransactions: (leagueId: string, season: string, week: number, auth: EspnAuth | null) =>
-    cached(`espn:pending:${leagueId}:${season}:${week}`, 5 * MINUTE, () => {
+    cached(`espn:pending:${leagueId}:${season}:${week}`, 30_000, () => {
       const params = views('mTransactions2');
       params.set('scoringPeriodId', String(week));
       return get<{ transactions?: EspnTransaction[] }>(leagueId, season, auth, params);
