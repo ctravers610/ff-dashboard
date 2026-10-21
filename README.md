@@ -98,6 +98,20 @@ The image runs as a non-root user, contains no secrets (they come from environme
 
 In production (`NODE_ENV=production`) the server refuses to start if sign-in isn't configured, if `PUBLIC_URL` isn't https, or if Yahoo is set up without a `TOKEN_ENCRYPTION_KEY`. The local compose preview runs with `AUTH_DISABLED=1` because it is only reachable from your own computer.
 
+### Deploying
+
+`render.yaml` deploys two services from the Dockerfile on [Render](https://render.com), with Postgres on [Neon](https://neon.tech):
+
+- **ffd-app**, the private dashboard, on an always-on plan (reminders and the live feed run on timers inside it) behind GitHub sign-in.
+- **ffd-demo**, the public demo (`DEMO_MODE=1`), on the free plan, which sleeps when idle.
+
+1. In Neon, create a project with two databases, `ffd` and `ffd_demo`, and copy each one's connection string.
+2. Create a GitHub OAuth app for the live site (callback `https://<ffd-app host>/api/auth/github/callback`).
+3. In Render, choose **New > Blueprint**, pick this repository, and fill in the values it asks for: each service's `PUBLIC_URL` and `DATABASE_URL`, the GitHub app, your ESPN cookies and the VAPID keys.
+4. Once both are live, run the smoke test against each: `node scripts/smoke-test.mjs https://<host>`.
+
+Each push to `main` redeploys both services once CI passes. The app applies database migrations on startup. Your Sleeper and ESPN leagues are added in the app (Add league), as locally.
+
 ### Database
 
 Tables are defined in `apps/api/src/db/schema.ts`. After changing it, generate a migration and commit the new SQL:

@@ -1,0 +1,55 @@
+# Render Blueprint: both services, built from the Dockerfile. In Render: New >
+# Blueprint, pick this repository, then fill in the values marked sync: false
+# (Render asks for them once and never stores them in git). Databases live on
+# Neon; see "Deploying" in the README.
+
+services:
+  # Your dashboard: always on (reminders and the live feed run on timers inside
+  # it, so a plan that sleeps would miss them), behind GitHub sign-in.
+  - type: web
+    name: ffd-app
+    runtime: docker
+    plan: starter
+    region: virginia
+    branch: main
+    autoDeployTrigger: checksPass # only after CI passes on the commit
+    healthCheckPath: /api/health
+    envVars:
+      - key: PUBLIC_URL # e.g. https://ffd-app.onrender.com, no trailing slash
+        sync: false
+      - key: DATABASE_URL # Neon connection string for the ffd database
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_ALLOWED_USER_IDS
+        sync: false
+      - key: ESPN_S2
+        sync: false
+      - key: ESPN_SWID
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEY # only used with Yahoo; a random 32-byte key
+        generateValue: true
+
+  # The public demo: made-up leagues, no sign-in, read-only. Free plan: it
+  # sleeps when nobody is looking and takes a few seconds to wake.
+  - type: web
+    name: ffd-demo
+    runtime: docker
+    plan: free
+    region: virginia
+    branch: main
+    autoDeployTrigger: checksPass
+    healthCheckPath: /api/health
+    envVars:
+      - key: DEMO_MODE
+        value: '1'
+      - key: PUBLIC_URL # e.g. https://ffd-demo.onrender.com
+        sync: false
+      - key: DATABASE_URL # Neon connection string for the ffd_demo database
+        sync: false

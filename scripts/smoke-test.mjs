@@ -106,6 +106,21 @@ if (me?.authEnabled) {
     const cookie = res.headers.get('set-cookie') ?? '';
     assert(/HttpOnly/i.test(cookie) && /SameSite=Lax/i.test(cookie), `state cookie ${cookie.split(';')[0]}… lacks HttpOnly/SameSite`);
   });
+} else if (me?.demo) {
+  await check('the demo shows its made-up leagues without signing in', async () => {
+    const res = await fetch(url('/api/dashboard'));
+    const body = await res.json().catch(() => ({}));
+    assert(res.status === 200, `HTTP ${res.status}`);
+    assert((body.leagues?.length ?? 0) >= 3, `${body.leagues?.length ?? 0} leagues`);
+  });
+
+  await check('the demo refuses every change with a JSON 403', async () => {
+    for (const [method, path] of [['POST', '/api/manual-leagues'], ['POST', '/api/live/poll'], ['DELETE', '/api/sources/1']]) {
+      const res = await fetch(url(path), { method });
+      assert(res.status === 403, `${method} ${path}: HTTP ${res.status}`);
+      assert(res.headers.get('content-type')?.includes('application/json'), `${method} ${path}: content-type ${res.headers.get('content-type')}`);
+    }
+  });
 } else {
   console.warn('! Sign-in is off on this deployment: anyone who can reach it can see the data.');
 }
