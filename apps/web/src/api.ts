@@ -21,11 +21,15 @@ export async function api<T>(url: string, init?: RequestInit): Promise<T> {
 
 export interface Me {
   authEnabled: boolean;
+  demo?: boolean; // the public demo: made-up leagues, nothing can be changed
   user: { login: string; name: string | null; avatarUrl: string | null } | null;
 }
 
 /** Who is signed in. Fetched once; a 401 anywhere else resets it (see main.tsx). */
 export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/api/auth/me'), staleTime: Infinity });
+
+/** Whether this is the read-only public demo: controls that change things are hidden. */
+export const useDemo = () => useMe().data?.demo === true;
 
 // A custom hook: any component can call useDashboard() to get the data,
 // loading state and error, and it refreshes every 60 seconds on its own.

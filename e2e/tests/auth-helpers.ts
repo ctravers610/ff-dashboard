@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { expect, type BrowserContext, type Page } from '@playwright/test';
-import type { GithubUserKey } from '../fixtures/github.js';
+import type { GithubUserKey } from '@ffd/demo/fixtures/github';
 import { UPSTREAM_PORT } from '../support/env.js';
 
 /** Who the fake GitHub signs in next (once), or 'cancel' to decline on GitHub's page. */

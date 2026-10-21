@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
-import { ESPN_LEAGUE_ID, ESPN_LEAGUE_NAME } from '../fixtures/espn.js';
-import { FRIEND_USERNAME, SLEEPER_USERNAME } from '../fixtures/sleeper.js';
-import { FFPC_LEAGUE, FFPC_TEAM } from '../fixtures/ffpc.js';
+import { ESPN_LEAGUE_ID, ESPN_LEAGUE_NAME } from '@ffd/demo/fixtures/espn';
+import { FRIEND_USERNAME, SLEEPER_USERNAME } from '@ffd/demo/fixtures/sleeper';
+import { FFPC_LEAGUE, FFPC_TEAM } from '@ffd/demo/fixtures/ffpc';
 import { expect, test } from './fixtures.js';
 import { openDashboard } from './helpers.js';
 import { seedFfpcLeague } from './seed.js';

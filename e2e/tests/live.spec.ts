@@ -1,8 +1,8 @@
 import type { APIRequestContext, Page } from '@playwright/test';
-import { ESPN_LEAGUE_NAME } from '../fixtures/espn.js';
-import { FFPC_TEAM } from '../fixtures/ffpc.js';
-import { PLAYERS as P } from '../fixtures/players.js';
-import { SLEEPER_LEAGUE_NAME } from '../fixtures/sleeper.js';
+import { ESPN_LEAGUE_NAME } from '@ffd/demo/fixtures/espn';
+import { FFPC_TEAM } from '@ffd/demo/fixtures/ffpc';
+import { PLAYERS as P } from '@ffd/demo/fixtures/players';
+import { SLEEPER_LEAGUE_NAME } from '@ffd/demo/fixtures/sleeper';
 import { UPSTREAM_PORT } from '../support/env.js';
 import { expect, test } from './fixtures.js';
 import { openDashboard } from './helpers.js';

@@ -72,7 +72,7 @@ describe('the API guard', () => {
 
   it('keeps the health check and sign-in status public', async () => {
     expect((await app.inject({ url: '/api/health' })).statusCode).toBe(200);
-    expect((await app.inject({ url: '/api/auth/me' })).json()).toEqual({ authEnabled: true, user: null });
+    expect((await app.inject({ url: '/api/auth/me' })).json()).toEqual({ authEnabled: true, demo: false, user: null });
   });
 
   it('rejects a made-up session cookie', async () => {
@@ -103,6 +103,7 @@ describe('signing in with GitHub', () => {
     expect((await app.inject({ url: '/api/private', cookies })).json()).toEqual({ hello: 'owner' });
     expect((await app.inject({ url: '/api/auth/me', cookies })).json()).toEqual({
       authEnabled: true,
+      demo: false,
       user: { login: 'owner', name: 'Name', avatarUrl: null },
     });
   });
@@ -174,7 +175,24 @@ describe('sign-in turned off (local development)', () => {
   it('lets everything through and says so', async () => {
     await build({ mode: 'off', github: null });
     expect((await app.inject({ url: '/api/private' })).statusCode).toBe(200);
-    expect((await app.inject({ url: '/api/auth/me' })).json()).toEqual({ authEnabled: false, user: null });
+    expect((await app.inject({ url: '/api/auth/me' })).json()).toEqual({ authEnabled: false, demo: false, user: null });
     expect((await app.inject({ url: '/api/auth/github/login' })).statusCode).toBe(404);
+  });
+});
+
+describe('demo mode', () => {
+  beforeEach(async () => {
+    await build({ mode: 'demo', github: null });
+  });
+
+  it('lets anyone read without signing in', async () => {
+    expect((await app.inject({ url: '/api/private' })).statusCode).toBe(200);
+    expect((await app.inject({ url: '/api/auth/me' })).json()).toMatchObject({ authEnabled: false, demo: true, user: null });
+  });
+
+  it('refuses every change', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/private' });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().message).toBe('This is a read-only demo');
   });
 });

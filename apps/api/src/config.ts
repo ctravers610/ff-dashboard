@@ -1,13 +1,15 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { demoSettings } from '@ffd/demo';
 import { parseKey } from './auth/crypto.js';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
-// Tests (unit and end-to-end) must not pick up a developer's own accounts,
-// cookies or keys, so .env is skipped when NODE_ENV=test. Variables already set
-// in the environment always win over the file.
-if (process.env.NODE_ENV !== 'test') {
+// Tests (unit and end-to-end) and the public demo must not pick up a
+// developer's own accounts, cookies or keys, so .env is skipped when
+// NODE_ENV=test or DEMO_MODE=1. Variables already set in the environment always
+// win over the file.
+if (process.env.NODE_ENV !== 'test' && process.env.DEMO_MODE !== '1') {
   try {
     process.loadEnvFile(path.join(rootDir, '.env'));
   } catch {
@@ -24,6 +26,7 @@ const list = (value: string | undefined) =>
     .filter(Boolean);
 
 function loadAuth(env: Env) {
+  if (env.DEMO_MODE === '1') return { mode: 'demo' as const, github: null };
   const clientId = env.GITHUB_CLIENT_ID?.trim();
   const clientSecret = env.GITHUB_CLIENT_SECRET?.trim();
   const allowedUserIds = list(env.GITHUB_ALLOWED_USER_IDS).map(Number).filter(Number.isSafeInteger);
@@ -33,8 +36,34 @@ function loadAuth(env: Env) {
   return { mode: 'off' as const, github: null };
 }
 
+/**
+ * The public demo (DEMO_MODE=1): made-up leagues from @ffd/demo, served by a
+ * fake upstream the API starts on a loopback port, with sign-in off and every
+ * change refused. Your own accounts, cookies and keys are never read.
+ */
+function applyDemo(cfg: ReturnType<typeof baseConfig>, env: Env) {
+  if (env.DEMO_MODE !== '1') return { ...cfg, demo: null };
+  const port = Number(env.DEMO_UPSTREAM_PORT ?? 3099);
+  const demo = demoSettings(`http://127.0.0.1:${port}`);
+  return {
+    ...cfg,
+    demo: { upstreamPort: port },
+    sleeperUsernames: demo.sleeperUsernames,
+    espnLeagueIds: demo.espnLeagueIds,
+    espnAuth: demo.espnAuth,
+    upstream: { ...cfg.upstream, ...demo.upstream },
+    push: null,
+    yahoo: null,
+    tokenKey: null,
+  };
+}
+
 /** Reads the configuration from environment variables. A function so tests can try different environments. */
 export function loadConfig(env: Env = process.env) {
+  return applyDemo(baseConfig(env), env);
+}
+
+function baseConfig(env: Env) {
   // Where browsers reach the app: OAuth redirect URIs and the cross-site check use it.
   const publicUrl = (env.PUBLIC_URL ?? 'https://localhost:5173').replace(/\/+$/, '');
   return {

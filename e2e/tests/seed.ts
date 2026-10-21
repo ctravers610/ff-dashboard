@@ -1,6 +1,6 @@
 import { convertFfpcLivePage } from '@ffd/shared';
 import { expect, type APIRequestContext } from '@playwright/test';
-import { livePage } from '../fixtures/ffpc.js';
+import { livePage } from '@ffd/demo/fixtures/ffpc';
 
 /**
  * Creates the fixture FFPC league through the API, built by the same converter the

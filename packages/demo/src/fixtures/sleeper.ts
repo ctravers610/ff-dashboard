@@ -7,7 +7,7 @@ import type {
   SleeperPlayerMap,
   SleeperRoster,
   SleeperUser,
-} from '../../apps/api/src/adapters/sleeper/types.js';
+} from '../../../../apps/api/src/adapters/sleeper/types.js';
 import { ALL_PLAYERS, PLAYERS as P, SEASON, WEEK, type FxPlayer } from './players.js';
 import { SLEEPER_FAAB } from './waivers.js';
 
@@ -16,7 +16,7 @@ const sum = (xs: number[]) => round2(xs.reduce((a, b) => a + b, 0));
 
 export const SLEEPER_USERNAME = 'e2e_user';
 export const SLEEPER_LEAGUE_ID = 'SLP1';
-export const SLEEPER_LEAGUE_NAME = 'E2E Sleeper League';
+export const SLEEPER_LEAGUE_NAME = 'College Buddies';
 export const SLEEPER_MY_TEAM = 'Gridiron Gang';
 export const SLEEPER_OPP_TEAM = 'Blitz Brigade';
 

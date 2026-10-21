@@ -1,8 +1,8 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from './fixtures.js';
 import type { Page } from '@playwright/test';
-import { FFPC_TEAM } from '../fixtures/ffpc.js';
-import { SLEEPER_LEAGUE_NAME } from '../fixtures/sleeper.js';
+import { FFPC_TEAM } from '@ffd/demo/fixtures/ffpc';
+import { SLEEPER_LEAGUE_NAME } from '@ffd/demo/fixtures/sleeper';
 import { openDashboard, openLeague, openTab } from './helpers.js';
 import { seedFfpcLeague, waitForHistory } from './seed.js';
 

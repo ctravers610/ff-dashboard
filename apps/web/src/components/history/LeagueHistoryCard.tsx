@@ -87,7 +87,7 @@ export function LeagueHistoryCard({
               <span className={`text-2xl font-semibold ${season.winnable.length ? 'text-amber-300' : ''}`}>{season.winnable.length}</span>
               {season.winnable.map((w) => (
                 <button key={w} type="button" onClick={() => onPickWeek(w)} className="text-xs font-medium text-slate-300 underline decoration-slate-600 hover:text-slate-100" aria-label={`Show the week ${w} recap`}>
-                  Wk {w}
+                  Week {w}
                 </button>
               ))}
               <span className="text-xs text-slate-400">· {season.leftOnBench.toFixed(1)} pts left on the bench</span>

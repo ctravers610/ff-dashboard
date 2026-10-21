@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useState, type ComponentType, type SVGProps } from 'react';
-import { signOut, useDashboard, useWaivers, type Me } from './api';
+import { signOut, useDashboard, useDemo, useWaivers, type Me } from './api';
 import { AddLeagueDialog } from './components/AddLeagueDialog';
 import { Hero } from './components/Hero';
 import { ChartIcon, FootballIcon, RefreshIcon, ScoreboardIcon, SwapIcon, UsersIcon } from './components/icons';
@@ -27,6 +27,7 @@ const VIEWS: { id: View; label: string; Icon: ComponentType<SVGProps<SVGSVGEleme
 
 export default function App({ user }: { user: Me['user'] }) {
   const { data, error, isPending } = useDashboard();
+  const demo = useDemo();
   // Refresh reloads everything on screen (dashboard, waivers, history, ...), not just the matchups.
   const queryClient = useQueryClient();
   // Spins only for a refresh you asked for, not for the background polling.
@@ -117,7 +118,14 @@ export default function App({ user }: { user: Me['user'] }) {
         </div>
       </header>
 
-      <YahooConnect />
+      {demo ? (
+        <p role="note" className="mb-4 rounded-lg border border-violet-800 bg-violet-950/50 px-4 py-2.5 text-sm text-violet-100">
+          <span className="font-semibold">Demo:</span> made-up leagues on Sleeper, ESPN and FFPC, frozen in week 6 of a season. Look around: everything
+          works except changing things.
+        </p>
+      ) : (
+        <YahooConnect />
+      )}
 
       {error && (
         <div role="alert" className="mb-4 rounded-lg bg-rose-950/60 p-4 text-sm text-rose-200">
@@ -141,7 +149,8 @@ export default function App({ user }: { user: Me['user'] }) {
           <div className="grid gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start">
             <main className="lg:order-2">
               {data.leagues.length > 0 && <Hero data={data} />}
-              {data.leagues.length > 0 && <MatchupTable leagues={data.leagues} onEdit={setEditing} />}
+              {data.leagues.length > 0 && <MatchupTable leagues={data.leagues} onEdit={demo ? undefined : setEditing} />}
+              {!demo && (
               <button
                 type="button"
                 onClick={() => setAdding(true)}
@@ -149,6 +158,7 @@ export default function App({ user }: { user: Me['user'] }) {
               >
                 + Add league
               </button>
+              )}
             </main>
             {/* Stays in view while the matchups scroll, and scrolls on its own. */}
             <aside className="lg:sticky lg:top-4 lg:order-1 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">

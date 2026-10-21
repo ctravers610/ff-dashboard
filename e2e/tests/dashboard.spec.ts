@@ -8,14 +8,14 @@ import {
   ESPN_OPP_POINTS,
   ESPN_OPP_PROJECTED,
   ESPN_OPP_TEAM,
-} from '../fixtures/espn.js';
+} from '@ffd/demo/fixtures/espn';
 import {
   SLEEPER_LEAGUE_NAME,
   SLEEPER_ME_POINTS,
   SLEEPER_MY_TEAM,
   SLEEPER_OPP_POINTS,
   SLEEPER_OPP_TEAM,
-} from '../fixtures/sleeper.js';
+} from '@ffd/demo/fixtures/sleeper';
 import { leagueCard, openDashboard, openLeague, pts } from './helpers.js';
 
 test.describe('Matchups', () => {
@@ -181,6 +181,11 @@ test.describe('Lineup status', () => {
     ]);
     expect(await lineup(page, ESPN_LEAGUE_NAME)).toBe('red');
     await expect(leagueCard(page, ESPN_LEAGUE_NAME)).toContainText('Empty K · Jayden Reed out');
+
+    // Out, but with a healthy bench player to start instead: fixable, so yellow.
+    await page.unrouteAll();
+    await withAlerts([{ slot: 'WR', playerId: 'x', playerName: 'Jayden Reed', reason: 'injury', detail: 'Out', suggestion: { playerName: 'Romeo Doubs', position: 'WR', projected: 9 } }]);
+    expect(await lineup(page, ESPN_LEAGUE_NAME)).toBe('yellow');
   });
 });
 

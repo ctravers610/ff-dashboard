@@ -1,5 +1,5 @@
-import { ESPN_LEAGUE_NAME } from '../fixtures/espn.js';
-import { RECAP_WEEK, SLEEPER_LEAGUE_NAME, SLEEPER_PAST } from '../fixtures/sleeper.js';
+import { ESPN_LEAGUE_NAME } from '@ffd/demo/fixtures/espn';
+import { RECAP_WEEK, SLEEPER_LEAGUE_NAME, SLEEPER_PAST } from '@ffd/demo/fixtures/sleeper';
 import { expect, test } from './fixtures.js';
 import { openDashboard, openTab, showLeague } from './helpers.js';
 

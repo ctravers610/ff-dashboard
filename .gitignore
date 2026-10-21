@@ -3,6 +3,7 @@ dist/
 .env
 certs/
 apps/api/.cache/
+apps/api/.cache-demo/
 apps/api/data/
 *.log
 .DS_Store

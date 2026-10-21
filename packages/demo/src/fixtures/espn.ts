@@ -1,13 +1,13 @@
 // What ESPN's unofficial league API would return, using ESPN's numeric ids for
 // positions, teams and lineup slots. Checked against the API's ESPN types.
 
-import type { EspnLeague, EspnRosterEntry } from '../../apps/api/src/adapters/espn/types.js';
+import type { EspnLeague, EspnRosterEntry } from '../../../../apps/api/src/adapters/espn/types.js';
 import { ALL_PLAYERS, PLAYERS as P, SEASON, WEEK, type FxPlayer } from './players.js';
 import { ESPN_FAAB, espnFreeAgents as FREE_AGENTS, espnWaiverStats } from './waivers.js';
 
 export const ESPN_LEAGUE_ID = '900001';
 export const ESPN_FAILING_LEAGUE_ID = '900002'; // always answers 401, to test error handling
-export const ESPN_LEAGUE_NAME = 'E2E ESPN League';
+export const ESPN_LEAGUE_NAME = 'Office League';
 export const ESPN_S2 = 'e2e-espn-s2-cookie';
 export const ESPN_SWID = '{E2E-SWID-0001}';
 export const ESPN_MY_TEAM = 'Waiver Wire Warriors';

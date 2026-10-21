@@ -1,13 +1,14 @@
 import type { WaiverLeague } from '@ffd/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, type ClipboardEvent } from 'react';
-import { api } from '../../api';
+import { api, useDemo } from '../../api';
 
 // FFPC has no API, so its waivers come from a copy of the league's add/drop
 // page. Pasting saves it straight away; there's nothing else to fill in.
 export function FfpcWaiverPaste({ league }: { league: WaiverLeague }) {
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(!league.pastedAt);
+  const demo = useDemo();
+  const [open, setOpen] = useState(!league.pastedAt && !demo);
   const save = useMutation({
     mutationFn: (text: string) =>
       api(`/api/manual-leagues/${league.leagueId}/waivers`, {
@@ -41,7 +42,7 @@ export function FfpcWaiverPaste({ league }: { league: WaiverLeague }) {
             ? `From FFPC's add/drop page as pasted ${pastedAt}: who's available and your FAAB. Projections and injury tags are live. Paste again after bids process to stay current.`
             : "FFPC has no API, so paste the league's add/drop page to see waivers here."}
         </p>
-        {league.pastedAt && (
+        {league.pastedAt && !demo && (
           <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="rounded-md px-3 py-1 font-medium text-violet-300 hover:bg-violet-950">
             {open ? 'Cancel' : 'Paste a newer copy'}
           </button>

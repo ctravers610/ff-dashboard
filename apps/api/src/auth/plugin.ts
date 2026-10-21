@@ -13,7 +13,8 @@ declare module 'fastify' {
 }
 
 export interface AuthOptions {
-  mode: 'github' | 'off';
+  // 'demo': no sign-in, and nothing can be changed (the public demo).
+  mode: 'github' | 'off' | 'demo';
   sessions: SessionStore;
   github: GithubClient | null;
   allowedUserIds: number[];
@@ -48,6 +49,12 @@ export async function registerAuth(app: FastifyInstance, opts: AuthOptions) {
     const path = req.url.split('?')[0]!;
     if (!path.startsWith('/api/')) return; // the web app's files are public; it shows the sign-in screen
 
+    // The demo is open to anyone, so it only ever reads.
+    if (opts.mode === 'demo') {
+      if (SAFE_METHODS.has(req.method)) return;
+      return reply.code(403).send({ statusCode: 403, error: 'Forbidden', message: 'This is a read-only demo' });
+    }
+
     // Defense in depth on top of SameSite: a request that changes something must
     // come from this app's own pages, not from another site.
     const origin = req.headers.origin;
@@ -64,6 +71,7 @@ export async function registerAuth(app: FastifyInstance, opts: AuthOptions) {
 
   app.get('/api/auth/me', async (req) => ({
     authEnabled: opts.mode === 'github',
+    demo: opts.mode === 'demo',
     user: req.user ? { login: req.user.login, name: req.user.name, avatarUrl: req.user.avatarUrl } : null,
   }));
 

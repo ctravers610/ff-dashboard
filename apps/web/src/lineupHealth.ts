@@ -2,10 +2,10 @@ import { canPlay, type LeagueSummary, type LineupAlert, type WaiverLeague } from
 
 // Whether a league's lineup is ready, as a traffic light on its matchup row:
 //   green  - nothing to fix;
-//   yellow - something to fix, and there's a way: a healthy bench player, or a
-//            free agent / waiver claim for a slot the bench can't fill (also a
-//            Questionable or Doubtful starter, who may well play);
-//   red    - a starter who is Out, or a slot nobody can fill.
+//   yellow - something to fix, and there's a way: a healthy bench player (even
+//            for a starter who is Out), or a free agent / waiver claim for a
+//            slot the bench can't fill; also a Questionable or Doubtful starter;
+//   red    - a starter who is Out with nobody to replace him, or a slot nobody can fill.
 export type Health = 'green' | 'yellow' | 'red';
 
 const OUT = new Set(['Out', 'IR', 'Suspended', 'PUP']);
@@ -24,7 +24,7 @@ function issue(alert: LineupAlert, waivers: WaiverLeague | undefined): LineupIss
     const fix = alert.suggestion
       ? `Start ${alert.suggestion.playerName} (${alert.suggestion.position}) from your bench instead`
       : 'No healthy bench player who hasn’t played yet can take his place';
-    return { alert, level: out ? 'red' : 'yellow', label: `${who} ${alert.detail.toLowerCase()}`, fix };
+    return { alert, level: out && !alert.suggestion ? 'red' : 'yellow', label: `${who} ${alert.detail.toLowerCase()}`, fix };
   }
   // An empty slot, or a starter on bye (the same thing: no points).
   const label = alert.reason === 'bye' ? `${who} on bye` : `Empty ${alert.slot}`;

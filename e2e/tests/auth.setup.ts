@@ -2,7 +2,7 @@
 // cookie, so every other test starts signed in without repeating the flow.
 
 import { test as setup } from '@playwright/test';
-import { OWNER } from '../fixtures/github.js';
+import { OWNER } from '@ffd/demo/fixtures/github';
 import { OWNER_STATE } from '../support/env.js';
 import { expectSignedIn, signIn } from './auth-helpers.js';
 

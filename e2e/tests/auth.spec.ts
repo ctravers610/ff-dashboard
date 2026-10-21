@@ -1,5 +1,5 @@
-import { INTRUDER, OWNER } from '../fixtures/github.js';
-import { SLEEPER_LEAGUE_NAME } from '../fixtures/sleeper.js';
+import { INTRUDER, OWNER } from '@ffd/demo/fixtures/github';
+import { SLEEPER_LEAGUE_NAME } from '@ffd/demo/fixtures/sleeper';
 import { withDb } from '../support/database.js';
 import { expectSignedIn, sessionCookie, signIn, signInScreen } from './auth-helpers.js';
 import { expect, test } from './fixtures.js';
@@ -17,7 +17,7 @@ test.describe('Sign-in', () => {
     for (const path of ['/api/dashboard', '/api/history', '/api/manual-leagues', '/api/auth/yahoo/status']) {
       expect((await request.get(path)).status(), path).toBe(401);
     }
-    expect(await (await request.get('/api/auth/me')).json()).toEqual({ authEnabled: true, user: null });
+    expect(await (await request.get('/api/auth/me')).json()).toEqual({ authEnabled: true, demo: false, user: null });
     expect((await request.get('/api/health')).status()).toBe(200);
   });
 

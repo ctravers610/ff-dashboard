@@ -70,7 +70,20 @@ Other scripts: `npm test`, `npm run typecheck`, `npm run build`, `npm run e2e`.
 - `npm test` runs the fast tests: unit tests for the mappers, parsers and scoring engine, plus tests against a throwaway Postgres.
 - `npm run e2e` runs Playwright end to end. It boots the real stack (the production web build, the real API, a real Postgres database `ffd_e2e` that it creates and drops) and drives it in Chromium. Run `npx playwright install chromium` once first.
 
-The e2e tests never touch Sleeper, ESPN or your accounts. The API's upstream URLs are configurable, so the tests point it at a small fake server (`e2e/support/fake-upstream.ts`) that serves fixture data shaped like the real APIs, and `NODE_ENV=test` keeps your `.env` out of the run. Expected scores in the FFPC tests are worked out by hand from FFPC's published rules, so they check the scoring engine independently of its own code. GitHub sign-in is tested the same way, against a fake GitHub: the full redirect flow, a refused account, a forged callback, sign-out and session expiry. A separate spec scans every screen with axe-core for WCAG 2.1 AA violations, on desktop and phone widths.
+The e2e tests never touch Sleeper, ESPN or your accounts. The API's upstream URLs are configurable, so the tests point it at a small fake server (`packages/demo/src/fake-upstream.ts`) that serves fixture data shaped like the real APIs, and `NODE_ENV=test` keeps your `.env` out of the run. Expected scores in the FFPC tests are worked out by hand from FFPC's published rules, so they check the scoring engine independently of its own code. GitHub sign-in is tested the same way, against a fake GitHub: the full redirect flow, a refused account, a forged callback, sign-out and session expiry. A separate spec scans every screen with axe-core for WCAG 2.1 AA violations, on desktop and phone widths.
+
+### Demo mode
+
+A public demo of the whole app with made-up leagues on Sleeper, ESPN and FFPC, frozen in week 6 of a season:
+
+```bash
+docker compose up -d     # Postgres, if it isn't running
+npm run demo             # http://localhost:8090
+# or, in the production image with its own throwaway database:
+docker compose --profile demo up --build    # http://localhost:8090
+```
+
+`DEMO_MODE=1` starts the same fake upstream the end-to-end tests use (`packages/demo`) inside the API on a loopback port and points the app at it. There's no sign-in, and the API refuses every request that would change something, so it's safe to put on the internet. It never reads `.env`, so none of your accounts, cookies or keys can reach it, and it uses its own database (`ffd_demo`).
 
 ### Production build in Docker
 

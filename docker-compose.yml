@@ -46,5 +46,37 @@ services:
     ports:
       - '127.0.0.1:8080:3001'
 
+  # The public demo in the production image: made-up leagues, no sign-in,
+  # read-only. `docker compose --profile demo up --build`, then
+  # http://localhost:8090. Its own throwaway database, so it never sees yours.
+  demo-db:
+    profiles: [demo]
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ffd
+      POSTGRES_PASSWORD: ffd_demo_password
+      POSTGRES_DB: ffd_demo
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ffd -d ffd_demo']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  demo:
+    profiles: [demo]
+    build:
+      context: .
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-local}
+    depends_on:
+      demo-db:
+        condition: service_healthy
+    environment:
+      DEMO_MODE: '1'
+      DATABASE_URL: postgres://ffd:ffd_demo_password@demo-db:5432/ffd_demo
+      API_PORT: '3001'
+      PUBLIC_URL: http://localhost:8090
+    ports:
+      - '127.0.0.1:8090:3001'
+
 volumes:
   pgdata:

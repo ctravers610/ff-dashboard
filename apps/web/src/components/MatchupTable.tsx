@@ -23,7 +23,7 @@ function opponentCell(l: LeagueSummary): string {
 // left, since that's where your attention matters most. Each row is colored by
 // whether its lineup is ready (see lineupHealth) and opens to the league's
 // details: what to fix, lineups, standings, roster.
-export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; onEdit: (leagueId: string) => void }) {
+export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; onEdit?: (leagueId: string) => void }) {
   const [open, setOpen] = useState<Set<string>>(new Set());
   const waivers = useWaivers().data;
   const toggle = (key: string) =>
@@ -157,7 +157,7 @@ export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; on
               <ChevronIcon className={`text-slate-400 transition ${isOpen ? 'rotate-180' : ''}`} />
             </button>
             <div id={`${nameId}-details`} hidden={!isOpen}>
-              {isOpen && <LeagueDetails league={league} issues={lineup.issues} onEdit={league.manual ? () => onEdit(league.leagueId) : undefined} />}
+              {isOpen && <LeagueDetails league={league} issues={lineup.issues} onEdit={league.manual && onEdit ? () => onEdit(league.leagueId) : undefined} />}
             </div>
           </article>
         );

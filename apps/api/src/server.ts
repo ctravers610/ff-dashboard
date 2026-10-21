@@ -12,6 +12,7 @@ import { reminderRepo } from './reminders/store.js';
 import { getWaivers } from './waivers/index.js';
 import { sleeperNflState } from './adapters/sleeper/index.js';
 import { gamesLive, pollLive } from './live/service.js';
+import { startDemo } from './demo.js';
 
 const app = await buildApp();
 
@@ -24,6 +25,7 @@ if (problems.length > 0 && process.env.NODE_ENV === 'production') {
   process.exit(1);
 }
 if (config.auth.mode === 'off') app.log.warn('Sign-in is off: anyone who can reach this server can use it. Fine for local development only.');
+if (config.demo) app.log.info('Demo mode: made-up leagues, no sign-in, read-only.');
 
 // Bring the database schema up to date before taking requests.
 try {
@@ -31,6 +33,7 @@ try {
   const imported = await manualLeagueRepo.importLegacyJson();
   if (imported > 0) app.log.info(`Imported ${imported} manual league(s) from the old JSON file into Postgres`);
   if (await yahooTokenRepo.importLegacyFile()) app.log.info('Moved the Yahoo tokens from the old file into the database, encrypted');
+  if (config.demo) await startDemo(config.demo.upstreamPort);
 } catch (e) {
   app.log.error(e, 'Could not reach the database. Is it running? Start it with: docker compose up -d');
   process.exit(1);

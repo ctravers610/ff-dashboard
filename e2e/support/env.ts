@@ -2,9 +2,9 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ESPN_FAILING_LEAGUE_ID, ESPN_LEAGUE_ID, ESPN_S2, ESPN_SWID } from '../fixtures/espn.js';
-import { GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, OWNER } from '../fixtures/github.js';
-import { SLEEPER_USERNAME } from '../fixtures/sleeper.js';
+import { ESPN_FAILING_LEAGUE_ID, ESPN_LEAGUE_ID, ESPN_S2, ESPN_SWID } from '@ffd/demo/fixtures/espn';
+import { GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, OWNER } from '@ffd/demo/fixtures/github';
+import { SLEEPER_USERNAME } from '@ffd/demo/fixtures/sleeper';
 
 export const e2eDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const repoRoot = path.resolve(e2eDir, '..');

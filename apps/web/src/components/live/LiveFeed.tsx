@@ -1,7 +1,7 @@
 import type { LiveEvent, LiveEventLeague } from '@ffd/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { api, useLive } from '../../api';
+import { api, useDemo, useLive } from '../../api';
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
@@ -62,6 +62,7 @@ export function LiveFeed() {
   const { data, error, isPending } = useLive();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<Filter>('all');
+  const demo = useDemo();
   const check = useMutation({
     mutationFn: () => api('/api/live/poll', { method: 'POST' }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['live'] }),
@@ -84,6 +85,7 @@ export function LiveFeed() {
           {data?.live && <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />}
           Live scoring
         </h2>
+        {!demo && (
         <button
           type="button"
           onClick={() => check.mutate()}
@@ -92,6 +94,7 @@ export function LiveFeed() {
         >
           {check.isPending ? 'Checking…' : 'Check now'}
         </button>
+        )}
       </header>
 
       {isPending ? (

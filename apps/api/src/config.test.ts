@@ -58,3 +58,21 @@ describe('derived settings', () => {
     expect(cfg.yahoo?.redirectUri).toBe('https://ffd.example.com/api/auth/yahoo/callback');
   });
 });
+
+describe('demo mode', () => {
+  const env = { DEMO_MODE: '1', NODE_ENV: 'production', DEMO_UPSTREAM_PORT: '3099' };
+
+  it('follows the made-up leagues on the built-in fake upstream, never your own accounts', () => {
+    const cfg = loadConfig({ ...env, SLEEPER_USERNAMES: 'me', ESPN_S2: 'real-cookie', ESPN_SWID: '{REAL}', VAPID_PUBLIC_KEY: 'k', VAPID_PRIVATE_KEY: 'k' });
+    expect(cfg.demo).toEqual({ upstreamPort: 3099 });
+    expect(cfg.auth.mode).toBe('demo');
+    expect(cfg.sleeperUsernames).not.toContain('me');
+    expect(cfg.espnAuth?.espnS2).not.toBe('real-cookie');
+    expect(cfg.upstream.sleeperApi).toBe('http://127.0.0.1:3099/sleeper/v1');
+    expect(cfg.push).toBeNull();
+  });
+
+  it('is allowed to run in production without sign-in', () => {
+    expect(configProblems(loadConfig(env), env)).toEqual([]);
+  });
+});

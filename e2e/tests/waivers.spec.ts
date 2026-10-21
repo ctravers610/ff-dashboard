@@ -1,8 +1,8 @@
 import type { Page } from '@playwright/test';
-import { ESPN_LEAGUE_NAME } from '../fixtures/espn.js';
-import { SLEEPER_LEAGUE_NAME } from '../fixtures/sleeper.js';
-import { FFPC_LEAGUE, FFPC_TEAM } from '../fixtures/ffpc.js';
-import { CLAIM_WEEK, ESPN_FAAB, FFPC_FAAB_LEFT, ffpcWaiverPage, SLEEPER_FAAB } from '../fixtures/waivers.js';
+import { ESPN_LEAGUE_NAME } from '@ffd/demo/fixtures/espn';
+import { SLEEPER_LEAGUE_NAME } from '@ffd/demo/fixtures/sleeper';
+import { FFPC_LEAGUE, FFPC_TEAM } from '@ffd/demo/fixtures/ffpc';
+import { CLAIM_WEEK, ESPN_FAAB, FFPC_FAAB_LEFT, ffpcWaiverPage, SLEEPER_FAAB } from '@ffd/demo/fixtures/waivers';
 import { expect, test } from './fixtures.js';
 import { openDashboard, openTab, paste } from './helpers.js';
 import { seedFfpcLeague } from './seed.js';

@@ -10,8 +10,8 @@
 
 import { PLAYERS as P, type FxPlayer } from './players.js';
 
-export const FFPC_LEAGUE = 'E2E Gorilla Tourney #12345';
-export const FFPC_TEAM = 'Test Club';
+export const FFPC_LEAGUE = 'Gorilla Tourney #12345';
+export const FFPC_TEAM = 'Gorilla Grinders';
 export const FFPC_OPP = 'Rival Squad';
 
 interface Starter {
@@ -83,7 +83,7 @@ export function livePage(): string {
     '',
     'My Teams',
     '',
-    `E2E Gorilla Tourney (Aug 5 9:00 PM) #12345 - ${FFPC_TEAM} (2-3)`,
+    `Gorilla Tourney (Aug 5 9:00 PM) #12345 - ${FFPC_TEAM} (2-3)`,
     'My Teams',
     'League',
     'Live Scoring',

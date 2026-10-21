@@ -11,7 +11,7 @@
 // - ESPN: two open roster spots, so upgrades need no drop: Rice over Malik
 //   Nabers at WR (+8) and Chris Olave over Puka Nacua at FLEX (+4).
 
-import type { EspnStat } from '../../apps/api/src/adapters/espn/types.js';
+import type { EspnStat } from '../../../../apps/api/src/adapters/espn/types.js';
 import { FFPC_TEAM, ME as FFPC_STARTERS, MY_BENCH as FFPC_BENCH } from './ffpc.js';
 import { GAMES, PLAYERS as P, SEASON, UPCOMING_GAMES, WEEK, type FxPlayer } from './players.js';
 
@@ -94,7 +94,7 @@ export function ffpcWaiverPage(leagueNumber = '#12345'): string {
   return [
     'someuser',
     'My Teams',
-    `E2E Gorilla Tourney (Aug 5 9:00 PM) ${leagueNumber} - ${FFPC_TEAM} (2-3)`,
+    `Gorilla Tourney (Aug 5 9:00 PM) ${leagueNumber} - ${FFPC_TEAM} (2-3)`,
     'Transactions',
     'Free Agent Auction Bidding',
     `Remaining FAAB Dollars: $${FFPC_FAAB_LEFT}`,

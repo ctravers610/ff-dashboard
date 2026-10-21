@@ -1,7 +1,7 @@
 import { expect, test } from './fixtures.js';
-import { ESPN_LEAGUE_NAME } from '../fixtures/espn.js';
-import { FFPC_TEAM } from '../fixtures/ffpc.js';
-import { SLEEPER_LEAGUE_NAME } from '../fixtures/sleeper.js';
+import { ESPN_LEAGUE_NAME } from '@ffd/demo/fixtures/espn';
+import { FFPC_TEAM } from '@ffd/demo/fixtures/ffpc';
+import { SLEEPER_LEAGUE_NAME } from '@ffd/demo/fixtures/sleeper';
 import { openDashboard, openTab } from './helpers.js';
 import { seedFfpcLeague } from './seed.js';
 

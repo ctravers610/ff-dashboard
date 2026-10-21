@@ -13,12 +13,14 @@ COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY packages/shared/package.json packages/shared/
+COPY packages/demo/package.json packages/demo/
 COPY e2e/package.json e2e/
 # Only what the build needs; the end-to-end tooling (Playwright) is skipped.
-RUN npm ci -w @ffd/api -w @ffd/web -w @ffd/shared --include-workspace-root
+RUN npm ci -w @ffd/api -w @ffd/web -w @ffd/shared -w @ffd/demo --include-workspace-root
 
 COPY tsconfig.base.json ./
 COPY packages/shared packages/shared
+COPY packages/demo packages/demo
 COPY apps/api apps/api
 COPY apps/web apps/web
 RUN npm run build -w @ffd/web && npm run build -w @ffd/api
@@ -36,6 +38,7 @@ COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY packages/shared/package.json packages/shared/
+COPY packages/demo/package.json packages/demo/
 COPY e2e/package.json e2e/
 RUN npm ci --omit=dev -w @ffd/api && npm cache clean --force
 

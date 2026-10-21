@@ -3,7 +3,7 @@ import { FaabPacing } from './FaabPacing';
 import { friendlyRun, friendlyRunWithTime, nextRun, type WaiverLeague, type WaiverMove, type WaiverPlayer, type WaiverRules } from '@ffd/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState, type ReactNode } from 'react';
-import { api, useWaivers } from '../../api';
+import { api, useDemo, useWaivers } from '../../api';
 import { PLATFORM_LABEL } from '../../format';
 import { SideList, WithSideList } from '../SideList';
 import { FfpcWaiverPaste } from './FfpcWaiverPaste';
@@ -112,6 +112,7 @@ function Claims({ league }: { league: WaiverLeague }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['waivers'] }),
   });
   const claims = league.claims;
+  const demo = useDemo();
   // ESPN can show your claims even when we don't know when its waivers run.
   if (!claims && league.pendingClaims?.length) return <span className="text-emerald-300">{league.pendingClaims.length} pending on ESPN</span>;
   if (!claims) return <span className="text-slate-400">—</span>;
@@ -122,6 +123,7 @@ function Claims({ league }: { league: WaiverLeague }) {
       </span>
     );
   }
+  if (demo) return <span className="text-slate-400">{claims.set ? 'Set for this run' : 'Not set yet'}</span>;
   if (claims.set) {
     return (
       <span className="flex items-center gap-2">
@@ -374,6 +376,7 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
 
 export function WaiversView() {
   const { data, error, isPending } = useWaivers();
+  const demo = useDemo();
   // A reminder notification links straight to its league: /?view=waivers&league=sleeper:123
   const [selected, setSelected] = useState<string | null>(() => new URLSearchParams(window.location.search).get('league'));
 
@@ -396,7 +399,7 @@ export function WaiversView() {
         <p className="text-sm text-slate-400" title={`Projections use each league's own scoring; rest of season runs through week ${data.lastRegularWeek}.`}>
           Claims made now play in <span className="font-semibold text-slate-200">week {data.week}</span>.
         </p>
-        <Reminders />
+        {!demo && <Reminders />}
       </div>
 
       {data.errors.map((e) => (

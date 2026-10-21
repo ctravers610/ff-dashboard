@@ -1,6 +1,6 @@
 import { expect, test } from './fixtures.js';
 import type { Page } from '@playwright/test';
-import { FFPC_ME_POINTS, FFPC_LEAGUE, FFPC_OPP, FFPC_TEAM, ME, OPP, livePage } from '../fixtures/ffpc.js';
+import { FFPC_ME_POINTS, FFPC_LEAGUE, FFPC_OPP, FFPC_TEAM, ME, OPP, livePage } from '@ffd/demo/fixtures/ffpc';
 import { leagueCard, openDashboard, openLeague, paste, pts } from './helpers.js';
 
 // FFPC has no usable API, so its leagues come from pasting the Live Scoring page.

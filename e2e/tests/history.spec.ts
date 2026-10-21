@@ -1,8 +1,8 @@
 import { expect, test } from './fixtures.js';
 import type { Page } from '@playwright/test';
-import { ESPN_LEAGUE_NAME, ESPN_PAST } from '../fixtures/espn.js';
-import { FFPC_LEAGUE, FFPC_TEAM } from '../fixtures/ffpc.js';
-import { SLEEPER_LEAGUE_NAME, SLEEPER_PAST } from '../fixtures/sleeper.js';
+import { ESPN_LEAGUE_NAME, ESPN_PAST } from '@ffd/demo/fixtures/espn';
+import { FFPC_LEAGUE, FFPC_TEAM } from '@ffd/demo/fixtures/ffpc';
+import { SLEEPER_LEAGUE_NAME, SLEEPER_PAST } from '@ffd/demo/fixtures/sleeper';
 import { leagueCard, openDashboard, openTab, pts, showLeague, sideListEntry } from './helpers.js';
 import { seedFfpcLeague, waitForHistory } from './seed.js';
 
