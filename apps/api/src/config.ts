@@ -143,6 +143,10 @@ export function configProblems(cfg: Config, env: Env = process.env): string[] {
   if (cfg.auth.mode === 'github' && !cfg.publicUrl.startsWith('https://') && env.NODE_ENV === 'production') {
     problems.push(`PUBLIC_URL must be https in production so session cookies are only sent encrypted (got ${cfg.publicUrl}).`);
   }
+  // Locally the database defaults to the one docker-compose.yml runs; a deployment must say where its own is.
+  if (env.NODE_ENV === 'production' && !env.DATABASE_URL?.trim()) {
+    problems.push('DATABASE_URL is not set, so there is no database to use (the local default only works on a development machine).');
+  }
   if (!cfg.push && (env.VAPID_PUBLIC_KEY?.trim() || env.VAPID_PRIVATE_KEY?.trim())) {
     problems.push('Waiver reminders need both VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY; only one is set.');
   }

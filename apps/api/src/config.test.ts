@@ -20,8 +20,8 @@ describe('sign-in configuration', () => {
   });
 
   it('refuses production without sign-in, unless deliberately opened', () => {
-    expect(problemsFor({ NODE_ENV: 'production' })).toEqual([expect.stringContaining('anyone could open this dashboard')]);
-    expect(problemsFor({ NODE_ENV: 'production', AUTH_DISABLED: '1' })).toEqual([]);
+    expect(problemsFor({ NODE_ENV: 'production', DATABASE_URL: 'postgres://db/ffd' })).toEqual([expect.stringContaining('anyone could open this dashboard')]);
+    expect(problemsFor({ NODE_ENV: 'production', DATABASE_URL: 'postgres://db/ffd', AUTH_DISABLED: '1' })).toEqual([]);
   });
 
   it('flags half-finished sign-in setup in any environment, naming what is missing', () => {
@@ -35,7 +35,7 @@ describe('sign-in configuration', () => {
   });
 
   it('requires https in production when sign-in is on', () => {
-    const prod = { ...github, NODE_ENV: 'production' };
+    const prod = { ...github, NODE_ENV: 'production', DATABASE_URL: 'postgres://db/ffd' };
     expect(problemsFor({ ...prod, PUBLIC_URL: 'http://example.com' })[0]).toContain('must be https');
     expect(problemsFor({ ...prod, PUBLIC_URL: 'https://example.com' })).toEqual([]);
   });
@@ -60,7 +60,7 @@ describe('derived settings', () => {
 });
 
 describe('demo mode', () => {
-  const env = { DEMO_MODE: '1', NODE_ENV: 'production', DEMO_UPSTREAM_PORT: '3099' };
+  const env = { DEMO_MODE: '1', NODE_ENV: 'production', DEMO_UPSTREAM_PORT: '3099', DATABASE_URL: 'postgres://db/ffd_demo' };
 
   it('follows the made-up leagues on the built-in fake upstream, never your own accounts', () => {
     const cfg = loadConfig({ ...env, SLEEPER_USERNAMES: 'me', ESPN_S2: 'real-cookie', ESPN_SWID: '{REAL}', VAPID_PUBLIC_KEY: 'k', VAPID_PRIVATE_KEY: 'k' });
@@ -74,5 +74,15 @@ describe('demo mode', () => {
 
   it('is allowed to run in production without sign-in', () => {
     expect(configProblems(loadConfig(env), env)).toEqual([]);
+  });
+});
+
+describe('database', () => {
+  it('requires DATABASE_URL in production, instead of falling back to the local default', () => {
+    expect(problemsFor({ NODE_ENV: 'production', DEMO_MODE: '1' })).toEqual([
+      'DATABASE_URL is not set, so there is no database to use (the local default only works on a development machine).',
+    ]);
+    expect(problemsFor({ NODE_ENV: 'production', DEMO_MODE: '1', DATABASE_URL: 'postgres://db/ffd' })).toEqual([]);
+    expect(problemsFor({})).toEqual([]); // development: the local default is fine
   });
 });
