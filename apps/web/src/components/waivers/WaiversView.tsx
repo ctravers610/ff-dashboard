@@ -26,6 +26,7 @@ const keyOf = (l: WaiverLeague) => `${l.platform}:${l.leagueId}`;
 const SOURCE_NOTE: Record<NonNullable<WaiverLeague['runsSource']>, string> = {
   history: "Learned from this league's processed claims",
   ffpc: "From FFPC's add/drop page",
+  'ffpc-standard': "FFPC's bid times, the same in every league: Wednesdays 11 PM and Sundays 10 AM ET",
   settings: 'Estimated from league settings',
 };
 

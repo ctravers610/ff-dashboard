@@ -80,6 +80,16 @@ export const nextWaiverRun = (runs: WaiverRun[], now = new Date()) => nextRun(ru
 export const isOvernight = ({ time }: WaiverRun) => Number(time.split(':')[0]) < 6;
 
 /** "Wednesdays at 11 pm ET and Sundays at 10 am ET", as FFPC's add/drop page words it. */
+/**
+ * FFPC processes bids at the same times in every league: Wednesdays at 11 PM
+ * and Sundays at 10 AM Eastern. Used until a league's add/drop page is pasted
+ * (whose own schedule wins, in case FFPC ever changes it).
+ */
+export const FFPC_STANDARD_RUNS: WaiverRun[] = [
+  { day: 3, time: '23:00' },
+  { day: 0, time: '10:00' },
+];
+
 export function parseFfpcBidSchedule(text: string): WaiverRun[] {
   const runs: WaiverRun[] = [];
   const re = /(Sun|Mon|Tues?|Wed(?:nes)?|Thu(?:rs)?|Fri|Sat(?:ur)?)\w*\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)/gi;

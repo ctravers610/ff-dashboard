@@ -276,7 +276,7 @@ export interface WaiverLeague {
   // When this league's waivers process, and where that came from: its own
   // processed claims (history), FFPC's page, or (an estimate) its settings.
   runs: WaiverRun[];
-  runsSource: 'history' | 'ffpc' | 'settings' | null;
+  runsSource: 'history' | 'ffpc' | 'ffpc-standard' | 'settings' | null;
   // ESPN only: the claims you have in, in the order ESPN lists them. Null
   // where the platform doesn't show them.
   pendingClaims?: PendingClaim[] | null;

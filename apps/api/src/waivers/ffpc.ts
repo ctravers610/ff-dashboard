@@ -5,7 +5,7 @@
 // with FFPC's rules like FFPC live scoring, and injury tags are Sleeper's too.
 // FFPC's own numbers only fill in for players Sleeper doesn't know.
 
-import { parseFfpcBidSchedule, parseFfpcWaivers, type FfpcWaiverPlayer, type InjuryStatus, type ManualLeague, type Player, type SourceError, type WaiverLeague, type WaiverPlayer } from '@ffd/shared';
+import { FFPC_STANDARD_RUNS, parseFfpcBidSchedule, parseFfpcWaivers, type FfpcWaiverPlayer, type InjuryStatus, type ManualLeague, type Player, type SourceError, type WaiverLeague, type WaiverPlayer } from '@ffd/shared';
 import { buildPlayerIndex, parseRosterText, resolvePlayer, statusForSlot, type PlayerIndex } from '../adapters/manual/parse.js';
 import { manualLeagueRepo } from '../adapters/manual/store.js';
 import { sleeperClient } from '../adapters/sleeper/client.js';
@@ -39,7 +39,9 @@ export function ffpcWaiverLeague(
 ): WaiverLeague {
   // Named by your team, as everywhere else in the app (see adapters/manual).
   const base = { leagueId: league.id, platform: 'ffpc' as const, name: league.teamName || league.name, moves: [], available: [], openRosterSpots: 0 };
-  if (!paste) return { ...base, rules: null, pastedAt: null, runs: [], runsSource: null, claims: null };
+  // Bids run at the same times in every FFPC league, so the schedule is known before any paste.
+  const standard = { runs: FFPC_STANDARD_RUNS, runsSource: 'ffpc-standard' as const };
+  if (!paste) return { ...base, rules: null, pastedAt: null, ...standard, claims: null };
 
   const page = parseFfpcWaivers(paste.text);
   const score = (p: Player, w: Projections) => {
@@ -90,9 +92,10 @@ export function ffpcWaiverLeague(
     // FFPC rosters are a fixed size and always full, so every add needs a drop.
     moves: suggestMoves({ starters, bench, available, openRosterSpots: 0, byeTeams: ctx.byeTeams }),
     pastedAt: paste.capturedAt.toISOString(),
-    // FFPC says when bids process right on the page.
-    runs: page.bidSchedule ? parseFfpcBidSchedule(page.bidSchedule) : [],
-    runsSource: page.bidSchedule ? 'ffpc' : null,
+    // FFPC says when bids process right on the page; otherwise its standard times.
+    ...(page.bidSchedule && parseFfpcBidSchedule(page.bidSchedule).length
+      ? { runs: parseFfpcBidSchedule(page.bidSchedule), runsSource: 'ffpc' as const }
+      : standard),
     claims: null,
   };
 }

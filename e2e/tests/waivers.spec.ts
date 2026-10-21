@@ -178,7 +178,10 @@ test.describe('FFPC waivers (pasted add/drop page)', () => {
 
   const pasteBox = (page: Page) => leagueSection(page, FFPC_TEAM).getByPlaceholder("Paste FFPC's add/drop page here");
 
-  test('asks for the page until it has been pasted', async ({ page }) => {
+  test('asks for the page until it has been pasted, already knowing when FFPC bids run', async ({ page }) => {
+    const runs = leagueSection(page, FFPC_TEAM).getByRole('definition').first();
+    await expect(runs).toContainText('Wed 11:00 PM and Sun 10:00 AM ETnext in');
+    await expect(runs.locator('[title]')).toHaveAttribute('title', /FFPC's bid times, the same in every league/);
     await expect(leagueSection(page, FFPC_TEAM)).toContainText("FFPC has no API, so paste the league's add/drop page");
     await expect(pasteBox(page)).toBeVisible();
     await expect(leagueSection(page, FFPC_TEAM).getByRole('heading', { name: 'Suggested moves' })).toHaveCount(0);

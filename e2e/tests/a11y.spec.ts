@@ -40,7 +40,8 @@ test.describe('Accessibility', () => {
 
   test('Waivers', async ({ page }) => {
     await openTab(page, 'Waivers');
-    await expect(page.getByRole('heading', { name: 'Suggested moves' })).toBeVisible();
+    // The league whose bids run next comes first: here the FFPC one, waiting for its add/drop page.
+    await expect(page.getByRole('region', { name: /^Waivers for / })).toBeVisible();
     await expectNoViolations(page, 'the Waivers tab');
   });
 
