@@ -136,26 +136,51 @@ test.describe('Matchups', () => {
   });
 });
 
-test.describe('Lineup alerts', () => {
+test.describe('Lineup status', () => {
   test.beforeEach(async ({ page }) => {
     await openDashboard(page);
   });
 
-  const alerts = (page: import('@playwright/test').Page) => page.getByRole('region', { name: 'Lineup alerts' }).getByRole('listitem');
+  const lineup = (page: import('@playwright/test').Page, name: string) => leagueCard(page, name).getAttribute('data-lineup');
 
-  test('warns about a questionable starter whose game hasn’t started, with a healthy bench swap', async ({ page }) => {
-    const alert = alerts(page).filter({ hasText: 'Jayden Reed' });
-    await expect(alert).toContainText(`Jayden Reed (Questionable) starts at WR in ${ESPN_LEAGUE_NAME}`);
+  test('a questionable starter with a healthy bench swap turns the row yellow, with the fix inside', async ({ page }) => {
+    expect(await lineup(page, ESPN_LEAGUE_NAME)).toBe('yellow');
+    await expect(leagueCard(page, ESPN_LEAGUE_NAME)).toContainText('Jayden Reed questionable');
+    const issues = (await openLeague(page, ESPN_LEAGUE_NAME)).getByRole('region', { name: 'Lineup issues' });
     // Mike Evans is healthy on the bench too, but his game is over; Higgins's as well.
-    await expect(alert).toContainText("Romeo Doubs (WR) is healthy on your bench and hasn't played yet");
-    await expect(alert).toContainText('projected 31.5 in PPR'); // the fixture projection, scored as plain PPR
-    await expect(alert.getByRole('link', { name: /Open ESPN/ })).toHaveAttribute('href', new RegExp(`leagueId=${ESPN_LEAGUE_ID}&teamId=1`));
+    await expect(issues).toContainText('Start Romeo Doubs (WR) from your bench instead');
+    await expect(issues.getByRole('link', { name: /Fix it on ESPN/ })).toHaveAttribute('href', new RegExp(`leagueId=${ESPN_LEAGUE_ID}&teamId=1`));
   });
 
-  test('drops the alert once that player’s game has started: the lineup is locked', async ({ page }) => {
-    // Jaylen Waddle is questionable in Sleeper, but DEN's game is final.
-    await expect(alerts(page)).toHaveCount(1);
-    await expect(alerts(page).filter({ hasText: 'Jaylen Waddle' })).toHaveCount(0);
+  test('a lineup with nothing to fix is green; a game that has started no longer counts', async ({ page }) => {
+    // Jaylen Waddle is questionable in Sleeper, but DEN's game is final: the lineup is locked.
+    expect(await lineup(page, SLEEPER_LEAGUE_NAME)).toBe('green');
+    await expect(leagueCard(page, SLEEPER_LEAGUE_NAME)).not.toContainText('Jaylen Waddle');
+  });
+
+  test('an Out starter, or a slot nobody can fill, turns it red; a slot a free agent can fill stays yellow', async ({ page }) => {
+    const withAlerts = async (alerts: object[]) => {
+      await page.route('**/api/dashboard', async (route) => {
+        const res = await route.fetch();
+        const body = await res.json();
+        body.leagues.find((l: { name: string }) => l.name === ESPN_LEAGUE_NAME).alerts = alerts;
+        await route.fulfill({ response: res, json: body });
+      });
+      await page.reload();
+    };
+    // An empty RB slot with nobody on the bench: free agent Breece Hall can fill it.
+    await withAlerts([{ slot: 'RB', playerId: null, playerName: null, reason: 'empty', detail: 'Empty RB slot', suggestion: null }]);
+    expect(await lineup(page, ESPN_LEAGUE_NAME)).toBe('yellow');
+    await expect((await openLeague(page, ESPN_LEAGUE_NAME)).getByRole('region', { name: 'Lineup issues' })).toContainText('Pick up Breece Hall (RB)');
+
+    // No kicker anywhere, and a starter who is out.
+    await page.unrouteAll();
+    await withAlerts([
+      { slot: 'K', playerId: null, playerName: null, reason: 'empty', detail: 'Empty K slot', suggestion: null },
+      { slot: 'WR', playerId: 'x', playerName: 'Jayden Reed', reason: 'injury', detail: 'Out', suggestion: null },
+    ]);
+    expect(await lineup(page, ESPN_LEAGUE_NAME)).toBe('red');
+    await expect(leagueCard(page, ESPN_LEAGUE_NAME)).toContainText('Empty K · Jayden Reed out');
   });
 });
 

@@ -1,5 +1,7 @@
 import { winProbability, type LeagueSummary } from '@ffd/shared';
 import { useState } from 'react';
+import { useWaivers } from '../api';
+import { HEALTH_TEXT, lineupHealth } from '../lineupHealth';
 import { CLOSE_MARGIN, matchupMargin, matchupStatus, ordinal, PLATFORM_LABEL, pregame, pts, signed } from '../format';
 import { ChevronIcon } from './icons';
 import { LeagueDetails } from './LeagueDetails';
@@ -18,10 +20,12 @@ function opponentCell(l: LeagueSummary): string {
 
 // Every league on one screen, the most uncertain matchup first: closest to a
 // 50/50 chance to win, from the live projections and how much of the week is
-// left, since that's where your attention matters most. Each row opens to the
-// league's details (lineups, standings, roster).
+// left, since that's where your attention matters most. Each row is colored by
+// whether its lineup is ready (see lineupHealth) and opens to the league's
+// details: what to fix, lineups, standings, roster.
 export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; onEdit: (leagueId: string) => void }) {
   const [open, setOpen] = useState<Set<string>>(new Set());
+  const waivers = useWaivers().data;
   const toggle = (key: string) =>
     setOpen((prev) => {
       const next = new Set(prev);
@@ -39,6 +43,7 @@ export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; on
       margin: pregame(league.matchup)?.margin ?? matchupMargin(league.matchup),
       status: matchupStatus(league.matchup),
       odds: winProbability(league.matchup),
+      lineup: lineupHealth(league, waivers?.leagues.find((w) => w.platform === league.platform && w.leagueId === league.leagueId)),
     }))
     .sort((a, b) => (a.odds == null ? Infinity : Math.abs(a.odds - 0.5)) - (b.odds == null ? Infinity : Math.abs(b.odds - 0.5)));
   const widest = Math.max(1, ...rows.map((r) => Math.abs(r.margin ?? 0)));
@@ -66,20 +71,29 @@ export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; on
         </span>
         <span />
       </div>
-      {rows.map(({ league, key, before, margin, status, odds }) => {
+      {rows.map(({ league, key, before, margin, status, odds, lineup }) => {
         const isOpen = open.has(key);
         const nameId = `league-${key.replace(/\W/g, '-')}`;
         const close = margin != null && Math.abs(margin) < CLOSE_MARGIN;
         const ahead = before ? before.margin > 0 : status.leading;
         const tone = ahead == null ? 'none' : close ? 'close' : ahead ? 'up' : 'down';
         return (
-          <article key={key} aria-labelledby={nameId} className="border-b border-slate-800 last:border-b-0">
+          <article
+            key={key}
+            aria-labelledby={nameId}
+            data-lineup={lineup.health}
+            className={`border-b border-l-4 border-b-slate-800 last:border-b-0 ${
+              lineup.health === 'red' ? 'border-l-rose-500' : lineup.health === 'yellow' ? 'border-l-amber-400' : 'border-l-emerald-500'
+            }`}
+          >
             <button
               type="button"
               aria-expanded={isOpen}
               aria-controls={`${nameId}-details`}
               onClick={() => toggle(key)}
-              className={`${columns} w-full px-4 py-3 text-left text-sm transition hover:bg-slate-800/60`}
+              className={`${columns} w-full px-4 py-3 text-left text-sm transition hover:bg-slate-800/60 ${
+                lineup.health === 'red' ? 'bg-rose-950/40' : lineup.health === 'yellow' ? 'bg-amber-950/25' : ''
+              }`}
             >
               <span className="line-clamp-2 min-w-0 sm:line-clamp-none sm:truncate">
                 <span id={nameId} className="font-medium">
@@ -89,6 +103,12 @@ export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; on
                   {' · '}
                   {league.matchup?.allPlay ? 'all-play' : PLATFORM_LABEL[league.platform]}
                 </span>
+                <span className="sr-only">, {HEALTH_TEXT[lineup.health]}</span>
+                {lineup.issues.length > 0 && (
+                  <span className={`block truncate text-xs ${lineup.health === 'red' ? 'text-rose-300' : 'text-amber-300'}`}>
+                    {lineup.issues.map((i) => i.label).join(' · ')}
+                  </span>
+                )}
               </span>
               {before ? (
                 <span className="text-right tabular-nums text-slate-300" title="Projected: no one has played yet">
@@ -137,7 +157,7 @@ export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; on
               <ChevronIcon className={`text-slate-400 transition ${isOpen ? 'rotate-180' : ''}`} />
             </button>
             <div id={`${nameId}-details`} hidden={!isOpen}>
-              {isOpen && <LeagueDetails league={league} onEdit={league.manual ? () => onEdit(league.leagueId) : undefined} />}
+              {isOpen && <LeagueDetails league={league} issues={lineup.issues} onEdit={league.manual ? () => onEdit(league.leagueId) : undefined} />}
             </div>
           </article>
         );

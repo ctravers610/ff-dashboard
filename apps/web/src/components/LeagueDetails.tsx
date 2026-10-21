@@ -2,6 +2,8 @@ import type { LeagueSummary } from '@ffd/shared';
 import { useState } from 'react';
 import { ordinal, pmr, record } from '../format';
 import { AllPlaySummary, AllPlayTable } from './AllPlay';
+import type { LineupIssue } from '../lineupHealth';
+import { LineupIssues } from './LineupIssues';
 import { LineupTable } from './LineupTable';
 import { RosterList } from './RosterList';
 import { Scoreboard } from './Scoreboard';
@@ -11,7 +13,7 @@ import { percent, UpNext, useLeagueOutlook } from './outlook/UpNext';
 type Tab = 'allplay' | 'lineup' | 'standings' | 'roster' | null;
 
 // Everything about one league, shown when its row in the matchup table is opened.
-export function LeagueDetails({ league, onEdit }: { league: LeagueSummary; onEdit?: () => void }) {
+export function LeagueDetails({ league, issues = [], onEdit }: { league: LeagueSummary; issues?: LineupIssue[]; onEdit?: () => void }) {
   // Opening a league shows its lineups straight away.
   const [tab, setTab] = useState<Tab>(league.matchup ? 'lineup' : null);
   const me = league.standings.find((t) => t.teamId === league.myTeamId);
@@ -58,6 +60,7 @@ export function LeagueDetails({ league, onEdit }: { league: LeagueSummary; onEdi
         </p>
       </div>
 
+      <LineupIssues league={league} issues={issues} />
       {outlook && <UpNext outlook={outlook} />}
 
       {league.matchup ? (

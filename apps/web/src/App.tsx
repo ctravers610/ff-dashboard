@@ -2,7 +2,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useState, type ComponentType, type SVGProps } from 'react';
 import { signOut, useDashboard, useWaivers, type Me } from './api';
 import { AddLeagueDialog } from './components/AddLeagueDialog';
-import { AlertList } from './components/AlertList';
 import { Hero } from './components/Hero';
 import { ChartIcon, FootballIcon, RefreshIcon, ScoreboardIcon, SwapIcon, UsersIcon } from './components/icons';
 import { LiveFeed } from './components/live/LiveFeed';
@@ -142,7 +141,6 @@ export default function App({ user }: { user: Me['user'] }) {
           <div className="grid gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start">
             <main className="lg:order-2">
               {data.leagues.length > 0 && <Hero data={data} />}
-              <AlertList leagues={data.leagues} />
               {data.leagues.length > 0 && <MatchupTable leagues={data.leagues} onEdit={setEditing} />}
               <button
                 type="button"
