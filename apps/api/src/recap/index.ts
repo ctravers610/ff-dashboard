@@ -3,7 +3,7 @@
 // and free agents who'd have beaten your starters.
 
 import type { LineupRecap, Player, RecapResponse, RecapSeasonLeague, RecapSeasonResponse, SourceError } from '@ffd/shared';
-import { espnClient, type EspnAuth } from '../adapters/espn/client.js';
+import { espnClient, espnSourceError, type EspnAuth } from '../adapters/espn/client.js';
 import { BENCH_SLOT, findMyTeamId, IR_SLOT, SLOT_NAMES, SLOT_ORDER, toEspnPlayer } from '../adapters/espn/mapper.js';
 import type { EspnPlayer } from '../adapters/espn/types.js';
 import { buildPlayerIndex, parseRosterText, resolvePlayer } from '../adapters/manual/parse.js';
@@ -119,7 +119,7 @@ async function espnRecaps(season: string, week: number, auth: EspnAuth | null, e
       const r = await espnRecap(leagueId, season, week, auth);
       if (r) out.push(r);
     } catch (e) {
-      errors.push({ source: `espn:${leagueId}`, message: errorMessage(e) });
+      errors.push(espnSourceError(leagueId, e));
     }
   }
   return out;

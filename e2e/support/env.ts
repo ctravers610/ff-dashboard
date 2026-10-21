@@ -49,6 +49,7 @@ export const apiEnv: Record<string, string> = {
   GITHUB_ALLOWED_USER_IDS: String(OWNER.id),
   GITHUB_OAUTH_URL: `${up}/github`,
   GITHUB_API_URL: `${up}/github-api`,
+  SIGNIN_LIMIT: '1000', // the tests sign in many times from one address
 };
 
 /** The signed-in browser state (session cookie) that most tests start from. */

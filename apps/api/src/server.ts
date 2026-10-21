@@ -7,7 +7,8 @@ import { sessionStore } from './auth/sessions.js';
 import { config, configProblems } from './config.js';
 import { db, pool, runMigrations } from './db/client.js';
 import { defaultSender } from './reminders/routes.js';
-import { sendDueReminders, sendFfpcPasteReminders, sendLineupCheck, sendWeeklyRecap } from './reminders/send.js';
+import { sendDueReminders, sendEspnCookieAlert, sendFfpcPasteReminders, sendLineupCheck, sendWeeklyRecap } from './reminders/send.js';
+import { getDashboard } from './dashboard.js';
 import { reminderRepo } from './reminders/store.js';
 import { getWaivers } from './waivers/index.js';
 import { sleeperNflState } from './adapters/sleeper/index.js';
@@ -64,9 +65,16 @@ if (sender) {
         .then((n) => n > 0 && app.log.info(`Sent an FFPC paste reminder covering ${n} page(s)`))
         .catch((e) => app.log.warn(e, 'Could not check FFPC pastes'));
     }
-    await sendLineupCheck(reminderRepo, sender)
-      .then((n) => n > 0 && app.log.info(`Sent a lineup check covering ${n} starter(s)`))
-      .catch((e) => app.log.warn(e, 'Could not run the lineup check'));
+    // One dashboard load serves the lineup check and the ESPN cookie check.
+    const dashboard = await getDashboard().catch((e) => void app.log.warn(e, 'Could not load the dashboard for reminders'));
+    if (dashboard) {
+      await sendLineupCheck(reminderRepo, sender, new Date(), dashboard)
+        .then((n) => n > 0 && app.log.info(`Sent a lineup check covering ${n} starter(s)`))
+        .catch((e) => app.log.warn(e, 'Could not run the lineup check'));
+      await sendEspnCookieAlert(dashboard, reminderRepo, sender)
+        .then((sent) => sent && app.log.info('Sent the ESPN cookie alert'))
+        .catch((e) => app.log.warn(e, 'Could not check the ESPN cookies'));
+    }
     await sendWeeklyRecap(reminderRepo, sender)
       .then((sent) => sent && app.log.info('Sent the weekly lineup recap'))
       .catch((e) => app.log.warn(e, 'Could not send the weekly recap'));

@@ -12,3 +12,5 @@ apps/api/data/
 e2e/.tmp/
 test-results/
 playwright-report/
+# Database dumps from npm run backup: real data, never commit
+backups/

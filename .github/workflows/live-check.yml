@@ -1,0 +1,30 @@
+name: Live check
+
+# Runs the smoke test against the deployed sites every morning, and on demand.
+# If one is down or broken, the run fails and GitHub emails you.
+
+on:
+  schedule:
+    - cron: '0 13 * * *' # 9 AM Eastern (8 AM in winter)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        site:
+          - ${{ vars.APP_URL || 'https://ffd-app.onrender.com' }}
+          - ${{ vars.DEMO_URL || 'https://ffd-demo.onrender.com' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      # The free plan may be asleep; the smoke test waits up to two minutes for it.
+      - run: node scripts/smoke-test.mjs ${{ matrix.site }}

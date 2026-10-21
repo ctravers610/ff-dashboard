@@ -2,7 +2,7 @@
 // via the web-push library: each message is encrypted for the browser and
 // signed with our VAPID key, then handed to that browser's push service).
 
-import type { WaiversResponse, WaiverLeague } from '@ffd/shared';
+import { easternParts, type DashboardResponse, type WaiversResponse, type WaiverLeague } from '@ffd/shared';
 import webpush from 'web-push';
 import { getDashboard } from '../dashboard.js';
 import { nflGames } from '../scoring/games.js';
@@ -59,8 +59,8 @@ export async function sendDueReminders(leagues: WaiverLeague[], store: ReminderS
 }
 
 /** The pre-kickoff lineup check: one notification for every lineup problem now due. Returns how many it covered. */
-export async function sendLineupCheck(store: ReminderStore, sender: Sender, now = new Date()): Promise<number> {
-  const dashboard = await getDashboard();
+export async function sendLineupCheck(store: ReminderStore, sender: Sender, now = new Date(), loaded?: DashboardResponse): Promise<number> {
+  const dashboard = loaded ?? (await getDashboard());
   const games = await nflGames(dashboard.season, dashboard.week);
   const issues = lineupIssues(dashboard.leagues, games, dashboard.season, dashboard.week);
   const due = dueLineupIssues(issues, await store.sentKeys(issues.map((i) => i.key)), now);
@@ -68,6 +68,31 @@ export async function sendLineupCheck(store: ReminderStore, sender: Sender, now 
   await sendToAll(store, sender, lineupMessage(due));
   await store.markSent(due.map((i) => i.key));
   return due.length;
+}
+
+/** The ESPN cookies to send when ESPN has refused them, at most once a day. Pure. */
+export function espnCookieAlert(dashboard: Pick<DashboardResponse, 'errors'>, now: Date) {
+  const refused = dashboard.errors.filter((e) => e.code === 'espn-cookies');
+  if (refused.length === 0) return null;
+  const { year, month, day } = easternParts(now);
+  return {
+    key: `espn-cookies:${year}-${month}-${day}`,
+    message: {
+      title: 'ESPN stopped accepting your cookies',
+      body: `${refused.length === 1 ? 'An ESPN league' : `${refused.length} ESPN leagues`} can't load until you update ESPN_S2 and ESPN_SWID: in .env on your computer, and on Render (ffd-app, Environment) for the live site.`,
+      url: '/',
+      tag: 'espn-cookies',
+    },
+  };
+}
+
+/** Pushes the ESPN cookie alert, once a day while it lasts. Returns whether it went out. */
+export async function sendEspnCookieAlert(dashboard: DashboardResponse, store: ReminderStore, sender: Sender, now = new Date()): Promise<boolean> {
+  const alert = espnCookieAlert(dashboard, now);
+  if (!alert || (await store.sentKeys([alert.key])).size) return false;
+  await sendToAll(store, sender, alert.message);
+  await store.markSent([alert.key]);
+  return true;
 }
 
 /** Nudges to paste FFPC's pages again once they're out of date, once each. Returns how many it covered. */

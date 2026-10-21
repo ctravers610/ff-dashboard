@@ -196,3 +196,17 @@ describe('demo mode', () => {
     expect(res.json().message).toBe('This is a read-only demo');
   });
 });
+
+describe('sign-in rate limit', () => {
+  beforeEach(async () => {
+    await build({ signInLimit: { max: 3, windowMs: 60_000 } });
+  });
+
+  it('refuses a burst of sign-in attempts from one address, but not the rest of the app', async () => {
+    for (let i = 0; i < 3; i++) expect((await app.inject({ url: '/api/auth/github/login' })).statusCode).toBe(302);
+    const blocked = await app.inject({ url: '/api/auth/github/login' });
+    expect(blocked.statusCode).toBe(429);
+    expect(blocked.headers['retry-after']).toBeDefined();
+    expect((await app.inject({ url: '/api/auth/me' })).statusCode).toBe(200);
+  });
+});

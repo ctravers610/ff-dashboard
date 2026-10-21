@@ -1,0 +1,42 @@
+name: Keep awake
+
+# On Render's free plan the dashboard sleeps after ~15 minutes without visitors,
+# and its reminders and live feed run on timers inside it, so they stop too.
+# This wakes it every 10 minutes during the windows that matter (times are UTC;
+# the comments are US Eastern daylight time, an hour earlier in winter):
+#   Tue 6 PM - Wed midnight   waiver reminders (overnight runs), FFPC Wed 11 PM bids
+#   Thu 6 PM - 9 PM           lineup check before Thursday night
+#   Sun 7 AM - 9 PM           FFPC Sun 10 AM bids, lineup checks, live feed
+#   Mon 6 PM - 9 PM           Monday night
+#   Tue 9 AM                  the weekly recap
+# About 220 hours a month, well inside Render's 750 free hours. If the site
+# doesn't answer, the run fails and GitHub emails you: a free uptime check.
+# (GitHub pauses scheduled workflows after 60 days with no commits; re-enable
+# it under Actions if that happens.)
+
+on:
+  schedule:
+    - cron: '*/10 22-23 * * 2'
+    - cron: '*/10 * * * 3'
+    - cron: '*/10 0-3 * * 4'
+    - cron: '*/10 22-23 * * 4'
+    - cron: '*/10 0 * * 5'
+    - cron: '*/10 11-23 * * 0'
+    - cron: '*/10 0 * * 1'
+    - cron: '*/10 22-23 * * 1'
+    - cron: '*/10 0 * * 2'
+    - cron: '*/10 13 * * 2'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wake the dashboard
+        env:
+          URL: ${{ vars.APP_URL || 'https://ffd-app.onrender.com' }}
+        # A sleeping free instance takes up to a minute to start.
+        run: curl --fail --silent --show-error --retry 8 --retry-delay 10 --retry-all-errors --max-time 90 "$URL/api/health"

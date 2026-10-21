@@ -20,6 +20,8 @@ export interface AuthOptions {
   allowedUserIds: number[];
   publicUrl: string;
   sessionDays?: number;
+  // Sign-in attempts allowed per address in each window; more get a 429.
+  signInLimit?: { max: number; windowMs: number };
 }
 
 // API routes anyone may call: the health check and the sign-in flow itself.
@@ -42,6 +44,25 @@ export async function registerAuth(app: FastifyInstance, opts: AuthOptions) {
   const cookie = { path: '/', httpOnly: true, secure, sameSite: 'lax' as const };
   const ownOrigin = new URL(opts.publicUrl).origin;
   const sessionDays = opts.sessionDays ?? 30;
+
+  // A fixed-window limit on the sign-in flow per client address: plenty for a
+  // person, too few for a script hammering the OAuth endpoints.
+  const limit = opts.signInLimit ?? { max: 20, windowMs: 10 * 60 * 1000 };
+  const attempts = new Map<string, { count: number; resetAt: number }>();
+  app.addHook('onRequest', async (req, reply) => {
+    if (!req.url.startsWith('/api/auth/github/')) return;
+    const now = Date.now();
+    if (attempts.size > 10_000) for (const [ip, a] of attempts) if (a.resetAt <= now) attempts.delete(ip); // keep it small
+    const a = attempts.get(req.ip);
+    if (!a || a.resetAt <= now) {
+      attempts.set(req.ip, { count: 1, resetAt: now + limit.windowMs });
+      return;
+    }
+    if (++a.count > limit.max) {
+      reply.header('Retry-After', String(Math.ceil((a.resetAt - now) / 1000)));
+      return reply.code(429).send({ statusCode: 429, error: 'Too Many Requests', message: 'Too many sign-in attempts. Try again in a few minutes.' });
+    }
+  });
 
   // Runs before every route, so a new route is protected unless it is deliberately public.
   app.addHook('onRequest', async (req, reply) => {

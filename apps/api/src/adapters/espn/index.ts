@@ -1,6 +1,6 @@
 import { nflGames } from '../../scoring/games.js';
 import type { AdapterResult } from '../types.js';
-import { espnClient, type EspnAuth } from './client.js';
+import { espnClient, espnSourceError, type EspnAuth } from './client.js';
 import { findMyTeamId, toLeagueSummary } from './mapper.js';
 
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -34,7 +34,7 @@ export async function fetchEspnLeagues(
           toLeagueSummary({ league, myTeamId, account: member?.displayName ?? 'espn', progressFor }),
         );
       } catch (e) {
-        result.errors.push({ source: `espn:${leagueId}`, message: errorMessage(e) });
+        result.errors.push(espnSourceError(leagueId, e));
       }
     }),
   );

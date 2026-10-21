@@ -5,6 +5,7 @@ import { PLATFORM_LABEL } from '../../format';
 import { SideList, WithSideList } from '../SideList';
 import { LeagueHistoryCard, type HistoryMode } from './LeagueHistoryCard';
 import { RecapPanel } from './LineupRecap';
+import { TradeFinder } from './TradeFinder';
 import { TradesPanel } from './TradesPanel';
 import { Awards, LuckTable } from '../outlook/SeasonCards';
 import { ResultChip } from './ResultChip';
@@ -77,6 +78,7 @@ export function HistoryView() {
           {oddsFor(league) && <Awards outlook={oddsFor(league)!} />}
           {oddsFor(league) && <LuckTable outlook={oddsFor(league)!} />}
           <TradesPanel leagueKey={keyOf(league)} />
+          <TradeFinder leagueKey={keyOf(league)} />
         </section>
       </WithSideList>
     </div>

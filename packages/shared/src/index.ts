@@ -213,6 +213,9 @@ export interface HistoryResponse {
 export interface SourceError {
   source: string;
   message: string;
+  // A problem with a known fix: 'espn-cookies' means ESPN refused the saved
+  // cookies (expired, or signed out), so ESPN_S2 and ESPN_SWID need updating.
+  code?: 'espn-cookies';
 }
 
 export interface DashboardResponse {
@@ -476,6 +479,29 @@ export interface TradeReport {
   final: boolean; // the regular season is over: this is the verdict
   verdict: string; // the plain summary
   roast: string | null; // for the lopsided ones
+}
+
+// The trade finder: a deal that makes both starting lineups better.
+export interface TradePiece {
+  name: string;
+  position: string;
+  nflTeam: string | null;
+  perWeek: number; // projected points a week, rest of season, league scoring
+}
+
+export interface TradeIdea {
+  partner: string; // their team name
+  give: TradePiece[];
+  get: TradePiece[];
+  myGain: number; // your best lineup, points a week
+  theirGain: number;
+}
+
+export interface TradeFinderResponse {
+  leagueKey: string;
+  supported: boolean; // false for FFPC: no other rosters to look at
+  weeksLeft: number;
+  ideas: TradeIdea[]; // best for you first
 }
 
 export interface TradesResponse {

@@ -81,6 +81,8 @@ function baseConfig(env: Env) {
     // Sign in with GitHub, limited to the allow-listed numeric user ids. Off when not configured
     // (fine for local development; production refuses to start that way, see configProblems).
     auth: loadAuth(env),
+    // Sign-in attempts allowed per address every 10 minutes (the end-to-end tests sign in a lot).
+    signInLimit: Number(env.SIGNIN_LIMIT ?? 20),
     // Encrypts stored OAuth tokens (Yahoo). 32 random bytes, base64.
     tokenKey: env.TOKEN_ENCRYPTION_KEY?.trim() || null,
     // Browser push for waiver reminders. Generate a pair with: npx web-push generate-vapid-keys

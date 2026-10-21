@@ -6,6 +6,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { api, useDemo, useWaivers } from '../../api';
 import { PLATFORM_LABEL } from '../../format';
 import { SideList, WithSideList } from '../SideList';
+import { SourceErrors } from '../SourceErrors';
 import { FfpcWaiverPaste } from './FfpcWaiverPaste';
 import { Reminders } from './Reminders';
 
@@ -403,11 +404,7 @@ export function WaiversView() {
         {!demo && <Reminders />}
       </div>
 
-      {data.errors.map((e) => (
-        <div key={e.source} className="rounded-lg bg-amber-950/60 p-3 text-sm text-amber-200">
-          <span className="font-medium">{e.source}:</span> {e.message}
-        </div>
-      ))}
+      <SourceErrors errors={data.errors} />
 
       <WithSideList list={entries.length > 1 && <LeaguePicker entries={entries} value={league ? keyOf(league) : ''} onChange={setSelected} />}>
         {league && (

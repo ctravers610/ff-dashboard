@@ -1,4 +1,4 @@
-import type { ByeWeeksResponse, DashboardResponse, DefenseResponse, HistoryResponse, OutlookResponse, TradesResponse, RecapResponse, RecapSeasonResponse, LiveFeedResponse, WaiversResponse } from '@ffd/shared';
+import type { ByeWeeksResponse, DashboardResponse, DefenseResponse, TradeFinderResponse, HistoryResponse, OutlookResponse, TradesResponse, RecapResponse, RecapSeasonResponse, LiveFeedResponse, WaiversResponse } from '@ffd/shared';
 import { useQuery } from '@tanstack/react-query';
 
 /** A 401 from the API: the session is missing or expired. The app answers it with the sign-in screen. */
@@ -93,6 +93,14 @@ export const useTrades = (leagueKey: string) =>
 // Points each NFL defense allows by position; it moves only when games finish.
 export const useDefense = () =>
   useQuery({ queryKey: ['defense'], queryFn: () => api<DefenseResponse>('/api/defense'), staleTime: 60 * 60_000 });
+
+// Trades that would help both lineups; projections move slowly.
+export const useTradeIdeas = (leagueKey: string) =>
+  useQuery({
+    queryKey: ['trade-finder', leagueKey],
+    queryFn: () => api<TradeFinderResponse>(`/api/trade-finder?league=${encodeURIComponent(leagueKey)}`),
+    staleTime: 30 * 60_000,
+  });
 
 // The live scoring feed; checked often since it changes play by play.
 export function useLive() {

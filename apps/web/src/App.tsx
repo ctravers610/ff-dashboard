@@ -8,6 +8,8 @@ import { LiveFeed } from './components/live/LiveFeed';
 import { ManualLeagueEditor } from './components/ManualLeagueEditor';
 import { MatchupTable } from './components/MatchupTable';
 import { PlayersView } from './components/PlayersView';
+import { SourceErrors } from './components/SourceErrors';
+import { DataStatus } from './components/DataStatus';
 import { WaiversView } from './components/waivers/WaiversView';
 import { YahooConnect } from './components/YahooConnect';
 import { useShortcut } from './shortcuts';
@@ -134,11 +136,7 @@ export default function App({ user }: { user: Me['user'] }) {
       )}
 
       {/* The Waivers and History tabs report their own data problems. */}
-      {(view === 'matchups' || view === 'players') && data?.errors.map((e) => (
-        <div key={e.source} className="mb-3 rounded-lg bg-amber-950/60 p-3 text-sm text-amber-200">
-          <span className="font-medium">{e.source}:</span> {e.message}
-        </div>
-      ))}
+      {(view === 'matchups' || view === 'players') && data && <SourceErrors errors={data.errors} className="mb-3" />}
 
       {isPending && <p className="text-slate-400">Loading your leagues…</p>}
 
@@ -150,6 +148,7 @@ export default function App({ user }: { user: Me['user'] }) {
             <main className="lg:order-2">
               {data.leagues.length > 0 && <Hero data={data} />}
               {data.leagues.length > 0 && <MatchupTable leagues={data.leagues} onEdit={demo ? undefined : setEditing} />}
+              <DataStatus data={data} />
               {!demo && (
               <button
                 type="button"

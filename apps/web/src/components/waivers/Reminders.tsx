@@ -70,7 +70,12 @@ export function Reminders() {
 
   if (!key.publicKey) return null; // not set up on this server
   if (!supported()) {
-    return <p className={`${box} text-slate-400`}>Reminders need the dashboard added to your home screen on an iPhone.</p>;
+    // iPhone Safari only allows push for sites added to the Home Screen and opened from there.
+    return (
+      <p className={`${box} text-slate-400`}>
+        For reminders on an iPhone, tap Share, then Add to Home Screen, and open the dashboard from its new icon.
+      </p>
+    );
   }
 
   return (

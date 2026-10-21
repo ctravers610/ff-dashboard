@@ -123,10 +123,16 @@ test.describe('Matchups', () => {
     await expect(rows.nth(2)).toContainText(SLEEPER_MY_TEAM); // 3-2 is second
   });
 
-  test('reports a failing league without hiding the others', async ({ page }) => {
-    // League 900002 always answers 401; the error is shown, the working leagues still render.
-    await expect(page.getByText('espn:900002')).toBeVisible();
-    await expect(page.getByText('rejected the cookies for league 900002')).toBeVisible();
+  test('reports a failing league without hiding the others, with the fix for refused ESPN cookies', async ({ page }) => {
+    // League 900002 always answers 401 to our cookies: one banner says how to fix it,
+    // and the working leagues still render.
+    const banner = page.getByRole('alert').filter({ hasText: 'ESPN stopped accepting your cookies' });
+    await expect(banner).toContainText("an ESPN league can't load");
+    await expect(banner).toContainText('update ESPN_S2 and ESPN_SWID');
+    // The status line under the matchups: ESPN partly loaded (one league refused the cookies).
+    const status = page.getByLabel('Data sources');
+    await expect(status).toContainText('Sleeper loaded');
+    await expect(status).toContainText('ESPN cookies refused');
     await expect(leagueCard(page, SLEEPER_LEAGUE_NAME)).toBeVisible();
     await expect(leagueCard(page, ESPN_LEAGUE_NAME)).toBeVisible();
   });

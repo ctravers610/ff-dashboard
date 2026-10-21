@@ -17,6 +17,7 @@ import { historyRoutes } from './routes/history.js';
 import { getByeWeeks, getWaivers } from './waivers/index.js';
 import { getDefense } from './defense.js';
 import { getOutlook } from './outlook/index.js';
+import { getTradeIdeas } from './trades/finderData.js';
 import { getTrades } from './trades/index.js';
 import { getRecap, getRecapSeason } from './recap/index.js';
 import { reminderRoutes } from './reminders/routes.js';
@@ -51,6 +52,7 @@ function authFromConfig(): AuthOptions {
       : null,
     allowedUserIds: gh?.allowedUserIds ?? [],
     publicUrl: config.publicUrl,
+    signInLimit: { max: config.signInLimit, windowMs: 10 * 60 * 1000 },
   };
 }
 
@@ -84,6 +86,11 @@ export async function buildApp({ logger = true, webDist = config.webDist, auth, 
     '/api/trades',
     { schema: { querystring: { type: 'object', required: ['league'], properties: { league: { type: 'string', maxLength: 100 } } } } },
     async (req) => getTrades(req.query.league),
+  );
+  app.get<{ Querystring: { league: string } }>(
+    '/api/trade-finder',
+    { schema: { querystring: { type: 'object', required: ['league'], properties: { league: { type: 'string', maxLength: 100 } } } } },
+    async (req) => getTradeIdeas(req.query.league),
   );
   app.get('/api/recap/season', async () => getRecapSeason());
   app.get<{ Querystring: { week?: number } }>(

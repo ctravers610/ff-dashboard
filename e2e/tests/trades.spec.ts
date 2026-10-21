@@ -28,4 +28,14 @@ test.describe('Trades', () => {
     await showLeague(page, ESPN_LEAGUE_NAME);
     await expect(page.getByRole('region', { name: 'Trades' })).toContainText('Trades can only be read from Sleeper leagues for now.');
   });
+
+  test('the trade finder looks for deals in Sleeper and ESPN leagues', async ({ page }) => {
+    for (const name of [SLEEPER_LEAGUE_NAME, ESPN_LEAGUE_NAME]) {
+      await showLeague(page, name);
+      const finder = page.getByRole('region', { name: 'Trade finder' });
+      // Either ideas or an honest "none"; never an error.
+      await expect(finder.getByRole('listitem').first().or(finder.getByText('No trade helps both lineups right now.'))).toBeVisible();
+      await expect(finder).not.toContainText("Couldn't");
+    }
+  });
 });

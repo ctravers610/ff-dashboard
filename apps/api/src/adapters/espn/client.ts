@@ -1,5 +1,6 @@
 import { cached, MINUTE } from '../../cache.js';
 import { config } from '../../config.js';
+import type { SourceError } from '@ffd/shared';
 import type { EspnFreeAgents, EspnLeague, EspnTransaction } from './types.js';
 
 const VIEWS = ['mSettings', 'mTeam', 'mRoster', 'mMatchupScore', 'mScoreboard', 'mStatus'];
@@ -7,6 +8,17 @@ const VIEWS = ['mSettings', 'mTeam', 'mRoster', 'mMatchupScore', 'mScoreboard', 
 export interface EspnAuth {
   espnS2: string;
   swid: string;
+}
+
+/** ESPN refused the cookies we sent: they expired, or you signed out of ESPN. */
+export class EspnCookiesError extends Error {
+  readonly code = 'espn-cookies' as const;
+}
+
+/** A failed ESPN league as a source error, tagged when the fix is new cookies. */
+export function espnSourceError(leagueId: string, e: unknown): SourceError {
+  const message = e instanceof Error ? e.message : String(e);
+  return e instanceof EspnCookiesError ? { source: `espn:${leagueId}`, message, code: e.code } : { source: `espn:${leagueId}`, message };
 }
 
 // Private leagues need the espn_s2 and SWID cookies from a logged-in browser.
@@ -23,11 +35,8 @@ async function get<T>(
 
   const res = await fetch(url, { headers });
   if (res.status === 401 || res.status === 403) {
-    throw new Error(
-      auth
-        ? `ESPN rejected the cookies for league ${leagueId} (they may have expired)`
-        : `League ${leagueId} is private: set ESPN_S2 and ESPN_SWID in .env`,
-    );
+    if (auth) throw new EspnCookiesError(`ESPN rejected the cookies for league ${leagueId} (they may have expired)`);
+    throw new Error(`League ${leagueId} is private: set ESPN_S2 and ESPN_SWID in .env`);
   }
   if (!res.ok) throw new Error(`ESPN league ${leagueId} returned HTTP ${res.status}`);
   return (await res.json()) as T;

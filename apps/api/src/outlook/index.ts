@@ -5,7 +5,7 @@
 // we can see.
 
 import type { LeagueOutlook, OpponentPreview, OutlookResponse, SourceError } from '@ffd/shared';
-import { espnClient, type EspnAuth } from '../adapters/espn/client.js';
+import { espnClient, espnSourceError, type EspnAuth } from '../adapters/espn/client.js';
 import { BENCH_SLOT, findMyTeamId, IR_SLOT, teamName as espnTeamName, toEspnPlayer } from '../adapters/espn/mapper.js';
 import type { EspnLeague } from '../adapters/espn/types.js';
 import { sleeperClient } from '../adapters/sleeper/client.js';
@@ -248,7 +248,7 @@ async function espnOutlooks(leagueIds: string[], season: string, auth: EspnAuth 
       if (myTeamId == null) continue;
       out.push(outlookFor({ platform: 'espn', leagueId }, espnSeason(league, myTeamId), previewWeek));
     } catch (e) {
-      errors.push({ source: `espn:${leagueId}`, message: errorMessage(e) });
+      errors.push(espnSourceError(leagueId, e));
     }
   }
   return out;

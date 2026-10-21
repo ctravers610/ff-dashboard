@@ -112,6 +112,15 @@ Both are on Render's free plan, which sleeps after about 15 minutes without visi
 3. In Render, choose **New > Blueprint**, pick this repository, and fill in the values it asks for: each service's `PUBLIC_URL` and `DATABASE_URL`, the GitHub app, your ESPN cookies and the VAPID keys.
 4. Once both are live, run the smoke test against each: `node scripts/smoke-test.mjs https://<host>`.
 
+Two scheduled GitHub workflows look after the live site:
+
+- **Keep awake** (`keep-awake.yml`) wakes the dashboard every 10 minutes around waiver deadlines and game days, so reminders and the live feed run on the free plan (about 220 of Render's 750 free hours a month).
+- **Live check** (`live-check.yml`) runs the smoke test against both sites every morning.
+
+Either one failing means GitHub emails you. To back up the live database to `backups/` (git-ignored), with Docker running: set `BACKUP_DATABASE_URL` to its Neon connection string and run `npm run backup`.
+
+The site can be installed like an app ("Add to Home Screen"). On an iPhone, that's required for push reminders.
+
 Each push to `main` redeploys both services once CI passes. The app applies database migrations on startup. Your Sleeper and ESPN leagues are added in the app (Add league), as locally.
 
 ### Database

@@ -2,7 +2,7 @@
 // projections, which are already scored with the league's settings.
 
 import type { PendingClaim, SourceError, WaiverLeague, WaiverPlayer, WaiverRules } from '@ffd/shared';
-import { espnClient, type EspnAuth } from '../adapters/espn/client.js';
+import { espnClient, espnSourceError, type EspnAuth } from '../adapters/espn/client.js';
 import { BENCH_SLOT, findMyTeamId, IR_SLOT, SLOT_NAMES, SLOT_ORDER, toEspnPlayer } from '../adapters/espn/mapper.js';
 import type { EspnFreeAgents, EspnLeague, EspnPlayer, EspnTransaction } from '../adapters/espn/types.js';
 import { waiverPlayer, type WaiverContext } from './context.js';
@@ -12,7 +12,7 @@ import { pickAvailable, startablePositions, suggestMoves } from './moves.js';
 // ESPN's player stats come as many rows; projections are statSourceId 1. The
 // season-level projection row (scoringPeriodId 0, split 0) is rest of season:
 // during the season it covers only the games still to play.
-function projection(p: EspnPlayer, season: number, week: number): Pick<WaiverPlayer, 'week' | 'restOfSeason'> {
+export function projection(p: EspnPlayer, season: number, week: number): Pick<WaiverPlayer, 'week' | 'restOfSeason'> {
   const find = (period: number, split: number) =>
     p.stats?.find((s) => s.seasonId === season && s.scoringPeriodId === period && s.statSourceId === 1 && (s.statSplitTypeId ?? split) === split)
       ?.appliedTotal ?? null;
@@ -147,7 +147,7 @@ export async function fetchEspnWaivers(
         }
         result.leagues.push({ ...base, ...schedule, pendingClaims });
       } catch (e) {
-        result.errors.push({ source: `espn:${leagueId}`, message: errorMessage(e) });
+        result.errors.push(espnSourceError(leagueId, e));
       }
     }),
   );

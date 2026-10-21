@@ -17,7 +17,7 @@ import { analyzeTrade, replacementLevel, type Acquired, type SideInput } from '.
 // A finished week's stats don't change.
 const pastStats = (season: string, week: number) => cached(`trades:stats:${season}:${week}`, 6 * HOUR, () => fetchStats(season, week));
 
-async function findSleeperLeague(leagueId: string, season: string): Promise<{ league: SleeperLeague; myUserId: string } | null> {
+export async function findSleeperLeague(leagueId: string, season: string): Promise<{ league: SleeperLeague; myUserId: string } | null> {
   for (const username of (await activeSources()).sleeperUsernames) {
     const user = await sleeperClient.user(username);
     if (!user?.user_id) continue;
