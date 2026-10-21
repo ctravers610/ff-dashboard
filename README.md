@@ -102,8 +102,10 @@ In production (`NODE_ENV=production`) the server refuses to start if sign-in isn
 
 `render.yaml` deploys two services from the Dockerfile on [Render](https://render.com), with Postgres on [Neon](https://neon.tech):
 
-- **ffd-app**, the private dashboard, on an always-on plan (reminders and the live feed run on timers inside it) behind GitHub sign-in.
-- **ffd-demo**, the public demo (`DEMO_MODE=1`), on the free plan, which sleeps when idle.
+- **ffd-app**, the private dashboard, behind GitHub sign-in.
+- **ffd-demo**, the public demo (`DEMO_MODE=1`).
+
+Both are on Render's free plan, which sleeps after about 15 minutes without visitors and takes about a minute to wake. Push reminders and the live feed run on timers inside the app, so on the free plan they only run while it's awake; set `ffd-app`'s plan to `starter` (paid, always on) to have them run all the time.
 
 1. In Neon, create a project with two databases, `ffd` and `ffd_demo`, and copy each one's connection string.
 2. Create a GitHub OAuth app for the live site (callback `https://<ffd-app host>/api/auth/github/callback`).

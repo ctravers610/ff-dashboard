@@ -4,12 +4,14 @@
 # Neon; see "Deploying" in the README.
 
 services:
-  # Your dashboard: always on (reminders and the live feed run on timers inside
-  # it, so a plan that sleeps would miss them), behind GitHub sign-in.
+  # Your dashboard, behind GitHub sign-in. On the free plan it sleeps after
+  # about 15 minutes without visitors, and reminders and the live feed (timers
+  # inside the app) only run while it's awake. Change plan to starter (paid,
+  # always on) to have them run all the time.
   - type: web
     name: ffd-app
     runtime: docker
-    plan: starter
+    plan: free
     region: virginia
     branch: main
     autoDeployTrigger: checksPass # only after CI passes on the commit
