@@ -1,26 +1,60 @@
-import { cached, MINUTE } from '../../cache.js';
+// The Yahoo Fantasy API, under its API Access and Use Agreement (personal use):
+//   - Nothing it returns is stored, cached or indexed: every call goes to Yahoo,
+//     and the results are used for the response being built, then dropped.
+//   - Rate limits are respected: a throttled or failing call is retried a few
+//     times with exponential backoff, honoring Yahoo's Retry-After.
+// See adapters/yahoo/index.ts for what is fetched (your own team only).
+
+import { config } from '../../config.js';
 import { getAccessToken } from './auth.js';
 
-const BASE_URL = 'https://fantasysports.yahooapis.com/fantasy/v2';
+// Yahoo answers 999 when it throttles; 429 and 5xx are worth another try too.
+const RETRYABLE = new Set([429, 500, 502, 503, 504, 999]);
 
-// GET a Yahoo Fantasy resource as JSON, e.g. "users;use_login=1/games;game_codes=nfl/leagues".
-export async function yahooGet<T = unknown>(resource: string): Promise<T> {
+export interface RetryOptions {
+  retries?: number; // after the first try
+  baseDelayMs?: number; // doubles each time: 1s, 2s, 4s
+  maxDelayMs?: number;
+  sleep?: (ms: number) => Promise<void>;
+  fetchImpl?: typeof fetch;
+}
+
+/** How long to wait before retry number `attempt` (0-based): Retry-After if Yahoo says, else exponential with jitter. */
+export function retryDelay(attempt: number, retryAfter: string | null, { baseDelayMs = 1000, maxDelayMs = 30_000 }: RetryOptions = {}): number {
+  const seconds = retryAfter != null ? Number(retryAfter) : NaN;
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds * 1000, maxDelayMs);
+  const exponential = baseDelayMs * 2 ** attempt;
+  return Math.min(exponential + Math.random() * baseDelayMs * 0.25, maxDelayMs);
+}
+
+/** fetch, retried with backoff while the answer is a throttle or a server error. */
+export async function fetchWithRetry(url: string, init: RequestInit, opts: RetryOptions = {}): Promise<Response> {
+  const { retries = 3, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), fetchImpl = fetch } = opts;
+  for (let attempt = 0; ; attempt++) {
+    let res: Response | null = null;
+    try {
+      res = await fetchImpl(url, init);
+    } catch (e) {
+      if (attempt >= retries) throw e; // the network itself failed every time
+    }
+    if (res && (!RETRYABLE.has(res.status) || attempt >= retries)) return res;
+    await sleep(retryDelay(attempt, res?.headers.get('retry-after') ?? null, opts));
+  }
+}
+
+// GET a Yahoo Fantasy resource as JSON, e.g. "users;use_login=1/games;game_codes=nfl/teams".
+export async function yahooGet<T = unknown>(resource: string, opts: RetryOptions = {}): Promise<T> {
   const token = await getAccessToken();
   if (!token) throw new Error('Yahoo is not connected');
 
   const separator = resource.includes('?') ? '&' : '?';
-  const res = await fetch(`${BASE_URL}/${resource}${separator}format=json`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const res = await fetchWithRetry(`${config.upstream.yahooFantasy}/${resource}${separator}format=json`, { headers: { Authorization: `Bearer ${token}` } }, opts);
   if (res.status === 401) throw new Error('Yahoo rejected the access token; try reconnecting Yahoo');
-  // Since mid-2026 Yahoo only serves Fantasy data to apps it has approved
-  // (apply at sports.yahoo.com/developer); unapproved apps get 403 everywhere.
+  // Yahoo only serves Fantasy data to apps it has approved; until then, 403 everywhere.
   if (res.status === 403) {
-    throw new Error("Yahoo hasn't approved this app for Fantasy API access yet (apply at sports.yahoo.com/developer)");
+    throw new Error("Yahoo hasn't turned on Fantasy API access for this app yet (it follows the confirmation form)");
   }
+  if (RETRYABLE.has(res.status)) throw new Error(`Yahoo is rate-limiting or unavailable (HTTP ${res.status}); it will be tried again on the next refresh`);
   if (!res.ok) throw new Error(`Yahoo ${resource} returned HTTP ${res.status}`);
   return (await res.json()) as T;
 }
-
-export const yahooCached = <T = unknown>(resource: string, ttlMs = MINUTE) =>
-  cached(`yahoo:${resource}`, ttlMs, () => yahooGet<T>(resource));

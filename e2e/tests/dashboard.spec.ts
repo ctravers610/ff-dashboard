@@ -16,7 +16,7 @@ import {
   SLEEPER_OPP_POINTS,
   SLEEPER_OPP_TEAM,
 } from '@ffd/demo/fixtures/sleeper';
-import { leagueCard, openDashboard, openLeague, pts } from './helpers.js';
+import { leagueCard, openDashboard, openLeague, openTab, pts } from './helpers.js';
 
 test.describe('Matchups', () => {
   test.beforeEach(async ({ page }) => {
@@ -139,6 +139,27 @@ test.describe('Matchups', () => {
 
   test('has no Yahoo prompt when Yahoo is not configured', async ({ page }) => {
     await expect(page.getByText('Connect your Yahoo account')).toHaveCount(0);
+  });
+});
+
+test.describe('Yahoo attribution', () => {
+  test('shows "Fantasy data provided by Yahoo Fantasy" whenever a Yahoo league is on the page, and only then', async ({ page }) => {
+    await openDashboard(page);
+    await expect(page.getByText('Fantasy data provided by')).toHaveCount(0);
+
+    // A made-up Yahoo league added to the page's data.
+    await page.route('**/api/dashboard', async (route) => {
+      const res = await route.fetch();
+      const body = await res.json();
+      body.leagues.push({ ...body.leagues[0], platform: 'yahoo', leagueId: '461.l.777001', myTeamId: '461.l.777001.t.4', name: 'Made-Up Yahoo League' });
+      await route.fulfill({ response: res, json: body });
+    });
+    await page.reload();
+    const credit = page.getByText('Fantasy data provided by');
+    await expect(credit).toBeVisible();
+    await expect(credit.getByRole('link', { name: 'Yahoo Fantasy' })).toHaveAttribute('href', /fantasysports\.yahoo\.com/);
+    await openTab(page, 'Players');
+    await expect(page.getByText('Fantasy data provided by')).toBeVisible(); // on every tab
   });
 });
 

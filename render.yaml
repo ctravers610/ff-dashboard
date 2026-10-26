@@ -35,6 +35,10 @@ services:
         sync: false
       - key: VAPID_PRIVATE_KEY
         sync: false
+      - key: YAHOO_CLIENT_ID # from your Yahoo app (developer.yahoo.com/apps)
+        sync: false
+      - key: YAHOO_CLIENT_SECRET
+        sync: false
       - key: TOKEN_ENCRYPTION_KEY # only used with Yahoo; a random 32-byte key
         generateValue: true
 

@@ -2,6 +2,7 @@ import type { DashboardResponse } from '@ffd/shared';
 import { fetchEspnLeagues } from './adapters/espn/index.js';
 import { fetchManualLeagues } from './adapters/manual/index.js';
 import { fetchSleeperLeagues, sleeperNflState } from './adapters/sleeper/index.js';
+import { fetchYahooLeagues } from './adapters/yahoo/index.js';
 import { backfillHistory } from './backfill.js';
 import { config } from './config.js';
 import { activeSources } from './sources/store.js';
@@ -21,6 +22,7 @@ export async function getDashboard(): Promise<DashboardResponse> {
     fetchSleeperLeagues(sources.sleeperUsernames),
     fetchEspnLeagues(sources.espnLeagueIds, nfl.season, config.espnAuth),
     fetchManualLeagues(nfl),
+    fetchYahooLeagues(nfl),
   ]);
 
   // The same league can show up under two of your accounts; keep it once.
@@ -39,8 +41,10 @@ export async function getDashboard(): Promise<DashboardResponse> {
   const leagues = withMinutesLeft(advised, nfl.week, await nflGames(nfl.season, nfl.week).catch(() => null));
 
   // Record history in the background: a database problem must never break the dashboard.
-  recordSnapshots(leagues).catch((e) => console.error('Could not save league snapshots:', e));
-  backfillHistory(leagues).catch((e) => console.error('Could not backfill past weeks:', e));
+  // Never Yahoo's: its API agreement doesn't allow storing what it returns.
+  const storable = leagues.filter((l) => l.platform !== 'yahoo');
+  recordSnapshots(storable).catch((e) => console.error('Could not save league snapshots:', e));
+  backfillHistory(storable).catch((e) => console.error('Could not backfill past weeks:', e));
 
   return {
     season: nfl.season,

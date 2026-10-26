@@ -196,6 +196,15 @@ export default function App({ user }: { user: Me['user'] }) {
           }}
         />
       )}
+      {/* Required by the Yahoo Fantasy API agreement wherever its data is shown: here, the whole app. */}
+      {data?.leagues.some((l) => l.platform === 'yahoo') && (
+        <p className="mt-8 text-center text-xs text-slate-400">
+          Fantasy data provided by{' '}
+          <a href="https://football.fantasysports.yahoo.com/" target="_blank" rel="noreferrer" className="font-medium text-slate-300 underline hover:text-slate-100">
+            Yahoo Fantasy
+          </a>
+        </p>
+      )}
       <p className="mt-8 hidden text-center text-xs text-slate-400 lg:block">
         Shortcuts: <kbd className="font-sans font-semibold text-slate-300">1</kbd>–<kbd className="font-sans font-semibold text-slate-300">4</kbd> switch tabs ·{' '}
         <kbd className="font-sans font-semibold text-slate-300">j</kbd> / <kbd className="font-sans font-semibold text-slate-300">k</kbd> next / previous league ·

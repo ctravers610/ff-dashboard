@@ -69,7 +69,8 @@ export async function trackedPlayers(dashboard: DashboardResponse): Promise<Trac
     byKey.set(key, entry);
   };
 
-  for (const league of dashboard.leagues) {
+  // Not Yahoo leagues: the feed saves its events, and Yahoo's API agreement doesn't allow storing its data.
+  for (const league of dashboard.leagues.filter((l) => l.platform !== 'yahoo')) {
     for (const s of league.matchup?.me.starters ?? []) if (s.player) add(league, s.player, 'starter');
     for (const r of league.roster) if (r.status !== 'starter') add(league, r.player, 'bench');
     for (const s of league.matchup?.opponent?.starters ?? []) if (s.player) add(league, s.player, 'opponent');

@@ -6,6 +6,11 @@ import { AlertIcon, ExternalIcon } from './icons';
 // Where to fix a lineup: the platform's own page for your team, when it has one.
 function lineupUrl(league: LeagueSummary): string | null {
   if (league.platform === 'sleeper') return `https://sleeper.com/leagues/${league.leagueId}/team`;
+  if (league.platform === 'yahoo') {
+    // League key "461.l.777001", team key "461.l.777001.t.4": the page is /f1/777001/4.
+    const [leagueNum, teamNum] = [league.leagueId.split('.l.')[1], league.myTeamId.split('.t.')[1]];
+    return leagueNum && teamNum ? `https://football.fantasysports.yahoo.com/f1/${leagueNum}/${teamNum}` : null;
+  }
   if (league.platform === 'espn') {
     return `https://fantasy.espn.com/football/team?leagueId=${league.leagueId}&teamId=${league.myTeamId}`;
   }

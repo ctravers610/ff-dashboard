@@ -87,3 +87,14 @@ describe('lineupMessage', () => {
     });
   });
 });
+
+describe('reminder keys for Yahoo leagues', () => {
+  it('stores only a hash, never Yahoo ids', () => {
+    const yahoo = { ...league('461.l.777001', [alert({ playerId: 'yahoo:3900004', playerName: 'Mike Evans' })], [evans]), platform: 'yahoo' as const };
+    const [issue] = lineupIssues([yahoo], games, '2026', 7);
+    expect(issue!.key).toMatch(/^lineup:yahoo:[0-9a-f]{64}$/);
+    expect(issue!.key).not.toContain('777001');
+    // Still stable, so each issue is reminded about once.
+    expect(lineupIssues([yahoo], games, '2026', 7)[0]!.key).toBe(issue!.key);
+  });
+});

@@ -2,6 +2,7 @@
 // reminded about 90 minutes before it's too late to fix (11:30 AM for the
 // 1 PM games). Pure functions; the scheduler in server.ts sends the result.
 
+import crypto from 'node:crypto';
 import type { LeagueSummary, LineupAlert } from '@ffd/shared';
 import type { GameScore } from '../scoring/games.js';
 
@@ -17,6 +18,11 @@ export interface LineupIssue {
   remindAt: Date;
   deadline: Date; // after this, the lineup spot is locked
 }
+
+// "Already sent" keys are stored, so a Yahoo one is kept only as a hash: no Yahoo
+// ids in the database (its API agreement doesn't allow storing its data).
+const sentKey = (key: string, platform: string) =>
+  platform === 'yahoo' ? `lineup:yahoo:${crypto.createHash('sha256').update(key).digest('hex')}` : key;
 
 const needsAttention = (a: LineupAlert) =>
   a.reason === 'empty' || a.reason === 'bye' || (a.detail != null && OUT.has(a.detail)) || (a.detail === 'Questionable' && a.suggestion != null);
@@ -41,7 +47,7 @@ export function lineupIssues(leagues: LeagueSummary[], games: Map<string, GameSc
       const basis = anyGame ? first : new Date(own!).getTime();
       return [
         {
-          key: `lineup:${season}:${week}:${league.platform}:${league.leagueId}:${alert.slot}:${alert.playerId ?? 'empty'}:${alert.reason}`,
+          key: sentKey(`lineup:${season}:${week}:${league.platform}:${league.leagueId}:${alert.slot}:${alert.playerId ?? 'empty'}:${alert.reason}`, league.platform),
           leagueName: league.name,
           alert,
           remindAt: new Date(basis - LEAD_MS),

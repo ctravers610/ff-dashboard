@@ -113,6 +113,7 @@ function baseConfig(env: Env) {
       sleeperStats: env.SLEEPER_STATS_URL ?? 'https://api.sleeper.com', // stats and projections
       espnFantasy: env.ESPN_FANTASY_URL ?? 'https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons',
       espnScoreboard: env.ESPN_SCOREBOARD_URL ?? 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard',
+      yahooFantasy: env.YAHOO_FANTASY_URL ?? 'https://fantasysports.yahooapis.com/fantasy/v2',
       githubOAuth: env.GITHUB_OAUTH_URL ?? 'https://github.com',
       githubApi: env.GITHUB_API_URL ?? 'https://api.github.com',
     },
