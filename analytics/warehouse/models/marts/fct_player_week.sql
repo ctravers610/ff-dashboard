@@ -20,7 +20,8 @@ with all_player_weeks as (
     select * from {{ ref('int_player_weeks') }}
 ),
 
-matchups as (  -- noqa: ST03 (only incremental runs read it)
+-- Only incremental runs read this; a full build leaves it unused.
+matchups as (  -- noqa: ST03
     select * from {{ ref('stg_sleeper__matchups') }}
 ),
 
