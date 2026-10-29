@@ -317,21 +317,24 @@ describe.skipIf(!enabled)('Postgres', () => {
       expect(rows[0]).toMatchObject({ points: 135.5, projected: 135.5, opponentName: 'Rival', opponentPoints: 99 });
     });
 
-    it('backfills missing weeks without overwriting live data', async () => {
+    it('fills a missing week and replaces the score of one captured before it ended', async () => {
       const store = snapshotStore(testDb.db);
-      await store.save([snapshot(2, 140)]);
-      await store.saveIfMissing([snapshot(2, 1), snapshot(3, 150)]);
+      await store.save([snapshot(2, 114.68, { projected: 130, opponentName: 'Rival', opponentPoints: 99, wins: 3 })]);
+      await store.saveFinal([snapshot(2, 134.4, { opponentName: null, opponentPoints: 120.5 }), snapshot(3, 150)]);
 
       const rows = (await store.listForSeason('2026')).filter((r) => r.leagueId === 'L1');
-      expect(Object.fromEntries(rows.map((r) => [r.week, r.points]))).toMatchObject({ 2: 140, 3: 150 });
-      expect((await store.weeksFor('sleeper', 'L1', '2026')).sort()).toEqual([1, 2, 3]);
+      expect(rows.find((r) => r.week === 2)).toMatchObject({ points: 134.4, opponentPoints: 120.5, opponentName: 'Rival', projected: 130, wins: 3 });
+      expect(rows.find((r) => r.week === 3)).toMatchObject({ points: 150 });
+      const captures = await store.capturesFor('sleeper', 'L1', '2026');
+      expect(captures.map((c) => c.week).sort()).toEqual([1, 2, 3]);
+      expect(captures.every((c) => c.capturedAt instanceof Date)).toBe(true);
     });
 
     it('keeps leagues and seasons separate', async () => {
       const store = snapshotStore(testDb.db);
       await store.save([snapshot(1, 50, { leagueId: 'L2', leagueName: 'League Two' }), snapshot(1, 60, { season: '2025' })]);
-      expect(await store.weeksFor('sleeper', 'L2', '2026')).toEqual([1]);
-      expect(await store.weeksFor('sleeper', 'L1', '2025')).toEqual([1]);
+      expect((await store.capturesFor('sleeper', 'L2', '2026')).map((c) => c.week)).toEqual([1]);
+      expect((await store.capturesFor('sleeper', 'L1', '2025')).map((c) => c.week)).toEqual([1]);
       expect((await store.listForSeason('2025')).every((r) => r.season === '2025')).toBe(true);
     });
 
