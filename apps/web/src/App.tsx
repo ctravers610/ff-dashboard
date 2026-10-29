@@ -167,7 +167,7 @@ export default function App({ user }: { user: Me['user'] }) {
         )
       ) : view === 'waivers' ? (
         <main>
-          <WaiversView />
+          <WaiversView leagues={data?.leagues} />
         </main>
       ) : view === 'players' ? (
         data && (
@@ -178,7 +178,7 @@ export default function App({ user }: { user: Me['user'] }) {
       ) : (
         <main>
           <Suspense fallback={<p className="text-slate-400">Loading history…</p>}>
-            <HistoryView />
+            <HistoryView leagues={data?.leagues} />
           </Suspense>
         </main>
       )}

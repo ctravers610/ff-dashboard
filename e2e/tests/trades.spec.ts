@@ -1,5 +1,5 @@
-import { ESPN_LEAGUE_NAME } from '@ffd/demo/fixtures/espn';
-import { SLEEPER_LEAGUE_NAME } from '@ffd/demo/fixtures/sleeper';
+import { ESPN_MY_TEAM } from '@ffd/demo/fixtures/espn';
+import { SLEEPER_MY_TEAM } from '@ffd/demo/fixtures/sleeper';
 import { expect, test } from './fixtures.js';
 import { openDashboard, openTab, showLeague } from './helpers.js';
 
@@ -12,7 +12,7 @@ test.describe('Trades', () => {
   });
 
   test('lists a league’s trades with what each side got and how it has gone', async ({ page }) => {
-    await showLeague(page, SLEEPER_LEAGUE_NAME);
+    await showLeague(page, SLEEPER_MY_TEAM);
     const trades = page.getByRole('region', { name: 'Trades' });
     const trade = trades.getByRole('listitem').first();
     await expect(trade).toContainText('Week 5');
@@ -25,12 +25,12 @@ test.describe('Trades', () => {
   });
 
   test('says when a league’s trades can’t be read', async ({ page }) => {
-    await showLeague(page, ESPN_LEAGUE_NAME);
+    await showLeague(page, ESPN_MY_TEAM);
     await expect(page.getByRole('region', { name: 'Trades' })).toContainText('Trades can only be read from Sleeper leagues for now.');
   });
 
   test('the trade finder looks for deals in Sleeper and ESPN leagues', async ({ page }) => {
-    for (const name of [SLEEPER_LEAGUE_NAME, ESPN_LEAGUE_NAME]) {
+    for (const name of [SLEEPER_MY_TEAM, ESPN_MY_TEAM]) {
       await showLeague(page, name);
       const finder = page.getByRole('region', { name: 'Trade finder' });
       // Either ideas or an honest "none"; never an error.

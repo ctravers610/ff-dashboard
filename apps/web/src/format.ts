@@ -67,6 +67,30 @@ export const PLATFORM_LABEL: Record<string, string> = {
   ffpc: 'FFPC',
 };
 
+// What to call a league on screen: your team's name, with the league's own
+// name as the smaller line beneath it. Just the league's name when the
+// platform gave no team name (or it's the same).
+export interface LeagueLabel {
+  title: string;
+  league: string | null; // the league's name, when the title is your team's
+}
+
+export function leagueLabel(l: LeagueSummary): LeagueLabel {
+  // Hand-entered leagues are already named by your team (see adapters/manual).
+  const league = l.manual?.leagueName || l.name;
+  const team = (l.manual ? l.manual.teamName : (l.standings.find((t) => t.teamId === l.myTeamId)?.teamName ?? l.matchup?.me.teamName))?.trim();
+  return team && team !== league ? { title: team, league } : { title: league, league: null };
+}
+
+/** The label for a league on a tab whose data only has its name (Waivers, History), from the dashboard's copy of it. */
+export function labelFor(leagues: LeagueSummary[] | undefined, ref: { platform: string; leagueId: string; name: string }): LeagueLabel {
+  const found = leagues?.find((l) => l.platform === ref.platform && l.leagueId === ref.leagueId);
+  return found ? leagueLabel(found) : { title: ref.name, league: null };
+}
+
+/** The smaller line under a league's title: "Office League · Sleeper", or just "Sleeper" without a league name. */
+export const leagueSubtitle = ({ league }: LeagueLabel, after: string | undefined) => [league, after].filter(Boolean).join(' · ');
+
 /** "120 · 60": your PMR and your opponent's (just yours in an all-play week). */
 export function pmr(l: LeagueSummary): string {
   const mine = l.matchup?.me.minutesLeft;

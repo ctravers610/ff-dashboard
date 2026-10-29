@@ -2,7 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from './fixtures.js';
 import type { Page } from '@playwright/test';
 import { FFPC_TEAM } from '@ffd/demo/fixtures/ffpc';
-import { SLEEPER_LEAGUE_NAME } from '@ffd/demo/fixtures/sleeper';
+import { SLEEPER_MY_TEAM } from '@ffd/demo/fixtures/sleeper';
 import { openDashboard, openLeague, openTab } from './helpers.js';
 import { seedFfpcLeague, waitForHistory } from './seed.js';
 
@@ -33,7 +33,7 @@ test.describe('Accessibility', () => {
   });
 
   test('Matchups with lineups and all-play open', async ({ page }) => {
-    await openLeague(page, SLEEPER_LEAGUE_NAME); // opens on its lineups
+    await openLeague(page, SLEEPER_MY_TEAM); // opens on its lineups
     await (await openLeague(page, FFPC_TEAM)).getByRole('button', { name: 'All-play', exact: true }).click();
     await expectNoViolations(page, 'the Matchups tab (open rows)');
   });

@@ -2,7 +2,7 @@ import { winProbability, type LeagueSummary } from '@ffd/shared';
 import { useState } from 'react';
 import { useWaivers } from '../api';
 import { HEALTH_TEXT, lineupHealth } from '../lineupHealth';
-import { CLOSE_MARGIN, matchupMargin, matchupStatus, ordinal, PLATFORM_LABEL, pregame, pts, signed } from '../format';
+import { CLOSE_MARGIN, leagueLabel, leagueSubtitle, matchupMargin, matchupStatus, ordinal, PLATFORM_LABEL, pregame, pts, signed } from '../format';
 import { ChevronIcon } from './icons';
 import { LeagueDetails } from './LeagueDetails';
 
@@ -77,6 +77,7 @@ export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; on
         const close = margin != null && Math.abs(margin) < CLOSE_MARGIN;
         const ahead = before ? before.margin > 0 : status.leading;
         const tone = ahead == null ? 'none' : close ? 'close' : ahead ? 'up' : 'down';
+        const label = leagueLabel(league);
         return (
           <article
             key={key}
@@ -95,13 +96,12 @@ export function MatchupTable({ leagues, onEdit }: { leagues: LeagueSummary[]; on
                 lineup.health === 'red' ? 'bg-rose-950/40' : lineup.health === 'yellow' ? 'bg-amber-950/25' : ''
               }`}
             >
-              <span className="line-clamp-2 min-w-0 sm:line-clamp-none sm:truncate">
-                <span id={nameId} className="font-medium">
-                  {league.name}
+              <span className="min-w-0">
+                <span id={nameId} className="line-clamp-2 font-medium sm:line-clamp-none sm:truncate">
+                  {label.title}
                 </span>
-                <span className="text-slate-400">
-                  {' · '}
-                  {league.matchup?.allPlay ? 'all-play' : PLATFORM_LABEL[league.platform]}
+                <span className="block truncate text-xs text-slate-400">
+                  {leagueSubtitle(label, league.matchup?.allPlay ? 'all-play' : PLATFORM_LABEL[league.platform])}
                 </span>
                 <span className="sr-only">, {HEALTH_TEXT[lineup.health]}</span>
                 {lineup.issues.length > 0 && (
