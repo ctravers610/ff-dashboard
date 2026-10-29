@@ -56,6 +56,44 @@ jobs:
       - name: Build (web app and API bundle)
         run: npm run build
 
+  # The analytics loader (analytics/): its tests run against a real Postgres too.
+  analytics:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: ffd
+          POSTGRES_PASSWORD: ffd_dev_password
+          POSTGRES_DB: ffd
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ffd -d ffd"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    defaults:
+      run:
+        working-directory: analytics
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: analytics/pyproject.toml
+
+      - name: Install the loader
+        run: pip install -e ".[dev]"
+
+      - name: Loader tests
+        run: pytest
+
   # The real app, end to end: Chromium drives the production web build, the real
   # API and a real Postgres, against a fake server standing in for Sleeper and ESPN.
   e2e:

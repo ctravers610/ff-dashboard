@@ -33,6 +33,7 @@ apps/
 packages/
   shared/     Platform-neutral TypeScript types and page parsers used by both apps
 e2e/          Playwright end-to-end tests, fixtures and a fake upstream server
+analytics/    Python loader for the analytics warehouse (see Analytics below)
 ```
 
 Each platform has an **adapter** in `apps/api/src/adapters/<platform>/` that fetches that platform's data and maps it into one shared model, so the frontend never deals with platform differences. Pure mapping functions are kept apart from network calls, which keeps them easy to test.
@@ -171,3 +172,26 @@ The SWID (with its curly braces) is also how the dashboard knows which team is y
 ### Yahoo
 
 Create an app at [developer.yahoo.com/apps](https://developer.yahoo.com/apps/create/) (Confidential Client, Fantasy Sports Read, redirect URI `https://localhost:5173/api/auth/yahoo/callback`), put the Client ID and Secret in `.env`, then click **Connect Yahoo** in the dashboard. Yahoo's tokens are stored in the database encrypted with `TOKEN_ENCRYPTION_KEY`, so set one first (see `.env.example`). Yahoo only serves Fantasy data to approved apps; apply at [sports.yahoo.com/developer](https://sports.yahoo.com/developer).
+
+## Analytics
+
+`analytics/` is the start of a warehouse for league history: a Python loader that copies raw data into a separate `ffd_analytics` database, which dbt models will build on. The app never reads it.
+
+```bash
+cd analytics
+python -m venv .venv
+.venv/Scripts/pip install -e ".[dev]"   # macOS/Linux: .venv/bin/pip
+.venv/Scripts/python -m loader          # first run creates ffd_analytics and loads every season
+.venv/Scripts/python -m pytest
+```
+
+What it loads, into the `raw` schema:
+
+- **Sleeper:** your users, every league since 2017 (`--first-season` to change), their users, rosters, drafts and picks, each week's matchups and transactions, and the player list (at most once a day, as Sleeper asks). Usernames come from `SLEEPER_USERNAMES` plus accounts added in the app, or `--username`.
+- **The app's database:** `league_snapshots` (History, including FFPC) and `live_events`, which exist nowhere else.
+
+ESPN, Yahoo and FFPC aren't fetched: ESPN's API is unofficial and needs your cookies, Yahoo's agreement limits keeping its data, and FFPC is never contacted.
+
+Each table holds the payload exactly as the source sent it, plus the columns that identify the item (`league_id`, `week`, …). A row is only added when the payload differs from that item's latest one, so loading again is safe and changes such as stat corrections are kept as versions. Finished leagues and weeks are fetched once; leagues in season refetch their rosters and the last two weeks. Every run is recorded in `raw.load_runs` (status, rows added, Sleeper calls, error), and an advisory lock stops two loads overlapping.
+
+Settings: `ANALYTICS_DATABASE_URL` (default: `ffd_analytics` on the local Postgres) and `APP_DATABASE_URL` (default: `DATABASE_URL`, read-only).
