@@ -7,21 +7,28 @@ with recursive leagues as (
 
 lineage as (
     -- Seasons with no earlier season loaded start a lineage...
-    select league_id, league_id as league_lineage_id, 1 as season_number
-    from leagues
-    where previous_league_id is null
-       or previous_league_id not in (select league_id from leagues)
+    select
+        first_seasons.league_id,
+        first_seasons.league_id as league_lineage_id,
+        1 as season_number
+    from leagues as first_seasons
+    where
+        first_seasons.previous_league_id is null
+        or first_seasons.previous_league_id not in (select loaded.league_id from leagues as loaded)
 
     union all
 
     -- ...and each renewal continues it.
-    select leagues.league_id, lineage.league_lineage_id, lineage.season_number + 1
-    from leagues
-    inner join lineage on leagues.previous_league_id = lineage.league_id
+    select
+        renewals.league_id,
+        lineage.league_lineage_id,
+        lineage.season_number + 1 as season_number
+    from leagues as renewals
+    inner join lineage on lineage.league_id = renewals.previous_league_id
 ),
 
 starting_slots as (
-    select league_id, count(*) as starting_slots
+    select league_id, count(*)::int as starting_slots
     from {{ ref('int_lineup_slots') }}
     group by 1
 )

@@ -56,9 +56,9 @@ jobs:
       - name: Build (web app and API bundle)
         run: npm run build
 
-  # The analytics warehouse (analytics/): the loader's tests, then the dbt
-  # models built and tested on an empty raw schema, which catches SQL that
-  # doesn't compile or run. Both against a real Postgres.
+  # The analytics warehouse (analytics/): the loader's tests, then the made-up
+  # fixture league loaded and every dbt model built and tested on it (unit
+  # tests, data tests, contracts), with the SQL linted. Against a real Postgres.
   analytics:
     runs-on: ubuntu-latest
 
@@ -96,13 +96,27 @@ jobs:
       - name: Loader tests
         run: pytest
 
-      - name: Create the raw schema
-        run: python -m loader --schema-only
+      - name: Load the fixture league
+        run: python -m loader.fixture
 
-      - name: dbt build (models and tests)
+      - name: Install dbt packages
+        working-directory: analytics/warehouse
+        run: dbt deps
+
+      - name: Lint the SQL
+        working-directory: analytics/warehouse
+        run: sqlfluff lint models tests
+
+      # The whole project every time: on a database that starts empty, a full
+      # build takes seconds. (Building only what a PR changed pays off with a
+      # persistent warehouse to defer the rest to.)
+      - name: dbt build (models, unit tests and data tests)
         working-directory: analytics/warehouse
         run: |
-          dbt deps
+          # Every model created empty first: a unit test of an incremental
+          # model reads the model's own columns, so its table has to exist.
+          dbt seed
+          dbt run --empty
           dbt build
 
   # The real app, end to end: Chromium drives the production web build, the real

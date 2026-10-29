@@ -22,6 +22,6 @@ cross join lateral (
     select 'add' as action, key as player_id, value as roster_id
     from jsonb_each_text({{ jsonb_object("transactions.txn -> 'adds'") }})
     union all
-    select 'drop', key, value
+    select 'drop' as action, key as player_id, value as roster_id
     from jsonb_each_text({{ jsonb_object("transactions.txn -> 'drops'") }})
 ) as moves

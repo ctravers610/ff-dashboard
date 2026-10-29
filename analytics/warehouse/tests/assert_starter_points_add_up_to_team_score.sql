@@ -15,6 +15,11 @@ select
     matchups.points,
     coalesce(starters.starter_points, 0) as starter_points
 from {{ ref('stg_sleeper__matchups') }} as matchups
-left join starters using (league_id, week, roster_id)
-where matchups.custom_points is null
-  and abs(matchups.points - coalesce(starters.starter_points, 0)) > 0.01
+left join starters
+    on
+        starters.league_id = matchups.league_id
+        and starters.week = matchups.week
+        and starters.roster_id = matchups.roster_id
+where
+    matchups.custom_points is null
+    and abs(matchups.points - coalesce(starters.starter_points, 0)) > 0.01

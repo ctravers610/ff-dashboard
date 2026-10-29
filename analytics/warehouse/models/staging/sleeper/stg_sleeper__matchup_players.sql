@@ -24,7 +24,8 @@ from teams
 cross join jsonb_array_elements_text({{ jsonb_array("teams.team -> 'players'") }}) as player (player_id)
 left join lateral (
     select s.starter_index
-    from jsonb_array_elements_text({{ jsonb_array("teams.team -> 'starters'") }})
+    from
+        jsonb_array_elements_text({{ jsonb_array("teams.team -> 'starters'") }})
         with ordinality as s (player_id, starter_index)
     where s.player_id = player.player_id
 ) as starter on true

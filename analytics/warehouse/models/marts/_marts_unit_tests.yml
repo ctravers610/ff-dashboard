@@ -1,0 +1,137 @@
+version: 2
+
+unit_tests:
+  - name: team_week_results_median_and_all_play
+    description: >
+      Week 1 is final: 100 beats 90, 80 beats 70, the median is 85. Week 2 is
+      the current NFL week, so it has scores but no results yet.
+    model: fct_team_week
+    given:
+      - input: ref('int_matchups_paired')
+        rows:
+          - {league_id: L1, week: 1, roster_id: 1, matchup_id: 1, points: 100, opponent_roster_id: 2, opponent_points: 90}
+          - {league_id: L1, week: 1, roster_id: 2, matchup_id: 1, points: 90, opponent_roster_id: 1, opponent_points: 100}
+          - {league_id: L1, week: 1, roster_id: 3, matchup_id: 2, points: 80, opponent_roster_id: 4, opponent_points: 70}
+          - {league_id: L1, week: 1, roster_id: 4, matchup_id: 2, points: 70, opponent_roster_id: 3, opponent_points: 80}
+          - {league_id: L1, week: 2, roster_id: 1, matchup_id: 1, points: 50, opponent_roster_id: 2, opponent_points: 40}
+          - {league_id: L1, week: 2, roster_id: 2, matchup_id: 1, points: 40, opponent_roster_id: 1, opponent_points: 50}
+      - input: ref('dim_league')
+        rows:
+          - {league_id: L1, season: 2026, status: in_season, plays_median: true, playoff_week_start: 15}
+      - input: ref('stg_sleeper__nfl_state')
+        rows:
+          - {season: 2026, week: 2}
+      - input: ref('int_best_lineups')
+        rows: []
+      - input: ref('dim_team')
+        rows: []
+    expect:
+      rows:
+        - {week: 1, roster_id: 1, is_final: true, result: win, median_result: win, all_play_wins: 3, all_play_ties: 0, all_play_losses: 0}
+        - {week: 1, roster_id: 2, is_final: true, result: loss, median_result: win, all_play_wins: 2, all_play_ties: 0, all_play_losses: 1}
+        - {week: 1, roster_id: 3, is_final: true, result: win, median_result: loss, all_play_wins: 1, all_play_ties: 0, all_play_losses: 2}
+        - {week: 1, roster_id: 4, is_final: true, result: loss, median_result: loss, all_play_wins: 0, all_play_ties: 0, all_play_losses: 3}
+        - {week: 2, roster_id: 1, is_final: false, result: null, median_result: null, all_play_wins: null, all_play_ties: null, all_play_losses: null}
+        - {week: 2, roster_id: 2, is_final: false, result: null, median_result: null, all_play_wins: null, all_play_ties: null, all_play_losses: null}
+
+  - name: player_history_merges_versions_that_change_nothing_tracked
+    description: >
+      Version 2 changed only untracked fields, so it merges into version 1.
+      The injury, the release and the return to a healthy KC player each start
+      a new row, even though the last matches the first.
+    model: dim_player_history
+    given:
+      - input: ref('stg_sleeper__player_versions')
+        rows:
+          - {version_id: 1, player_id: p1, full_name: A, position: WR, nfl_team: KC, status: Active, injury_status: null, loaded_at: '2026-10-01 00:00:00+00'}
+          - {version_id: 2, player_id: p1, full_name: A, position: WR, nfl_team: KC, status: Active, injury_status: null, loaded_at: '2026-10-02 00:00:00+00'}
+          - {version_id: 3, player_id: p1, full_name: A, position: WR, nfl_team: KC, status: Active, injury_status: Questionable, loaded_at: '2026-10-03 00:00:00+00'}
+          - {version_id: 4, player_id: p1, full_name: A, position: WR, nfl_team: null, status: Active, injury_status: Questionable, loaded_at: '2026-10-05 00:00:00+00'}
+          - {version_id: 5, player_id: p1, full_name: A, position: WR, nfl_team: KC, status: Active, injury_status: null, loaded_at: '2026-10-08 00:00:00+00'}
+          - {version_id: 6, player_id: p2, full_name: B, position: RB, nfl_team: SF, status: Active, injury_status: null, loaded_at: '2026-10-01 00:00:00+00'}
+    expect:
+      rows:
+        - {player_id: p1, nfl_team: KC, injury_status: null, valid_from: '2026-10-01 00:00:00+00', valid_to: '2026-10-03 00:00:00+00', is_current: false}
+        - {player_id: p1, nfl_team: KC, injury_status: Questionable, valid_from: '2026-10-03 00:00:00+00', valid_to: '2026-10-05 00:00:00+00', is_current: false}
+        - {player_id: p1, nfl_team: null, injury_status: Questionable, valid_from: '2026-10-05 00:00:00+00', valid_to: '2026-10-08 00:00:00+00', is_current: false}
+        - {player_id: p1, nfl_team: KC, injury_status: null, valid_from: '2026-10-08 00:00:00+00', valid_to: null, is_current: true}
+        - {player_id: p2, nfl_team: SF, injury_status: null, valid_from: '2026-10-01 00:00:00+00', valid_to: null, is_current: true}
+
+  - name: league_lineage_follows_renewals
+    description: A renews into B into C; D renewed from a league that wasn't loaded, so it starts its own lineage.
+    model: dim_league
+    given:
+      - input: ref('stg_sleeper__leagues')
+        rows:
+          - {league_id: A, season: 2024, previous_league_id: null, roster_positions: '["QB"]'}
+          - {league_id: B, season: 2025, previous_league_id: A, roster_positions: '["QB"]'}
+          - {league_id: C, season: 2026, previous_league_id: B, roster_positions: '["QB"]'}
+          - {league_id: D, season: 2026, previous_league_id: X, roster_positions: '["QB"]'}
+      - input: ref('int_lineup_slots')
+        rows: []
+    expect:
+      rows:
+        - {league_id: A, league_lineage_id: A, season_number: 1}
+        - {league_id: B, league_lineage_id: A, season_number: 2}
+        - {league_id: C, league_lineage_id: A, season_number: 3}
+        - {league_id: D, league_lineage_id: D, season_number: 1}
+
+  - name: player_week_incremental_run_takes_only_newly_loaded_weeks
+    description: The table already has data loaded on Oct 5, so only week 2 (loaded Oct 10) is processed.
+    model: fct_player_week
+    overrides:
+      macros:
+        is_incremental: true
+    given:
+      - input: this
+        rows:
+          - {league_id: L1, week: 1, roster_id: 1, player_id: p1, points: 10, loaded_at: '2026-10-05 00:00:00+00'}
+      - input: ref('int_player_weeks')
+        rows:
+          - {team_key: t1, league_id: L1, season: 2026, week: 1, roster_id: 1, player_id: p1, points: 10, loaded_at: '2026-10-01 00:00:00+00'}
+          - {team_key: t1, league_id: L1, season: 2026, week: 2, roster_id: 1, player_id: p1, points: 12, loaded_at: '2026-10-10 00:00:00+00'}
+          - {team_key: t1, league_id: L1, season: 2026, week: 2, roster_id: 1, player_id: p2, points: 3, loaded_at: '2026-10-10 00:00:00+00'}
+      - input: ref('stg_sleeper__matchups')
+        rows:
+          - {league_id: L1, week: 1, loaded_at: '2026-10-01 00:00:00+00'}
+          - {league_id: L1, week: 2, loaded_at: '2026-10-10 00:00:00+00'}
+      - input: ref('int_best_lineups')
+        rows: []
+    expect:
+      rows:
+        - {week: 2, player_id: p1, week_key: 202602, points: 12}
+        - {week: 2, player_id: p2, week_key: 202602, points: 3}
+
+  - name: pickups_are_credited_only_until_dropped
+    description: >
+      p1 is claimed in week 2, dropped in week 4 and picked up again in week 6.
+      The first add gets weeks 2-4, the second weeks 6 on; the drop gets nothing.
+    model: fct_transaction_moves
+    given:
+      - input: ref('stg_sleeper__transaction_moves')
+        rows:
+          - {transaction_id: tx1, league_id: L1, week: 2, action: add, player_id: p1, roster_id: 1}
+          - {transaction_id: tx2, league_id: L1, week: 4, action: drop, player_id: p1, roster_id: 1}
+          - {transaction_id: tx3, league_id: L1, week: 6, action: add, player_id: p1, roster_id: 1}
+      - input: ref('stg_sleeper__transactions')
+        rows:
+          - {transaction_id: tx1, transaction_type: waiver, status: complete, created_at: '2026-09-15 09:00:00+00', waiver_bid: 12}
+          - {transaction_id: tx2, transaction_type: free_agent, status: complete, created_at: '2026-09-30 09:00:00+00'}
+          - {transaction_id: tx3, transaction_type: free_agent, status: complete, created_at: '2026-10-14 09:00:00+00'}
+      - input: ref('stg_sleeper__leagues')
+        rows:
+          - {league_id: L1, season: 2026}
+      - input: ref('int_player_weeks')
+        rows:
+          - {league_id: L1, roster_id: 1, player_id: p1, week: 2, is_starter: true, points: 10}
+          - {league_id: L1, roster_id: 1, player_id: p1, week: 3, is_starter: false, points: 7}
+          - {league_id: L1, roster_id: 1, player_id: p1, week: 4, is_starter: true, points: 5}
+          - {league_id: L1, roster_id: 1, player_id: p1, week: 6, is_starter: true, points: 20}
+          - {league_id: L1, roster_id: 1, player_id: p1, week: 7, is_starter: true, points: 15}
+      - input: ref('dim_team')
+        rows: []
+    expect:
+      rows:
+        - {transaction_id: tx1, action: add, waiver_bid: 12, dropped_week: 4, weeks_rostered: 3, weeks_started: 2, points_started: 15}
+        - {transaction_id: tx2, action: drop, waiver_bid: null, dropped_week: null, weeks_rostered: null, weeks_started: null, points_started: null}
+        - {transaction_id: tx3, action: add, waiver_bid: null, dropped_week: null, weeks_rostered: 2, weeks_started: 2, points_started: 35}

@@ -8,6 +8,7 @@
         materialized='incremental',
         unique_key=['event_id', 'league_key'],
         incremental_strategy='delete+insert',
+        on_schema_change='append_new_columns',
     )
 }}
 
@@ -29,5 +30,5 @@ select
     points
 from {{ ref('stg_app__live_event_scores') }}
 {% if is_incremental() %}
-where event_id > (select coalesce(max(event_id), 0) from {{ this }})
+    where event_id > (select coalesce(max(existing.event_id), 0) from {{ this }} as existing)
 {% endif %}

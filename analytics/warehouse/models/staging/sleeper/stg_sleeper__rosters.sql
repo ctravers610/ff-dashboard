@@ -20,11 +20,11 @@ select
     (roster -> 'settings' ->> 'ties')::int as ties,
     -- Sleeper splits points into whole points and hundredths.
     coalesce((roster -> 'settings' ->> 'fpts')::numeric, 0)
-        + coalesce((roster -> 'settings' ->> 'fpts_decimal')::numeric, 0) / 100 as points_for,
+    + coalesce((roster -> 'settings' ->> 'fpts_decimal')::numeric, 0) / 100 as points_for,
     coalesce((roster -> 'settings' ->> 'fpts_against')::numeric, 0)
-        + coalesce((roster -> 'settings' ->> 'fpts_against_decimal')::numeric, 0) / 100 as points_against,
+    + coalesce((roster -> 'settings' ->> 'fpts_against_decimal')::numeric, 0) / 100 as points_against,
     coalesce((roster -> 'settings' ->> 'ppts')::numeric, 0)
-        + coalesce((roster -> 'settings' ->> 'ppts_decimal')::numeric, 0) / 100 as potential_points,
+    + coalesce((roster -> 'settings' ->> 'ppts_decimal')::numeric, 0) / 100 as potential_points,
     (roster -> 'settings' ->> 'waiver_position')::int as waiver_position,
     (roster -> 'settings' ->> 'waiver_budget_used')::int as waiver_budget_used,
     (roster -> 'settings' ->> 'total_moves')::int as total_moves,

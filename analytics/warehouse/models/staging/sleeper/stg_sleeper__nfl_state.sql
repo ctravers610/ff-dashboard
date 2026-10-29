@@ -3,7 +3,7 @@ with latest as (
 )
 
 select
-    (payload ->> 'league_season')::int as season,
+    coalesce(payload ->> 'league_season', payload ->> 'season')::int as season,
     (payload ->> 'week')::int as week,
     (payload ->> 'display_week')::int as display_week,
     payload ->> 'season_type' as season_type,
