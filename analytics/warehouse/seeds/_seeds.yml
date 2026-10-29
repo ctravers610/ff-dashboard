@@ -1,0 +1,16 @@
+version: 2
+
+seeds:
+  - name: nfl_seasons
+    description: >
+      Each NFL season's opening night and number of regular-season weeks (17
+      until 2021, 18 since). Add a row before each new season; dim_week is
+      built from it.
+    config:
+      column_types:
+        season: int
+        kickoff_date: date
+        regular_season_weeks: int
+    columns:
+      - name: season
+        data_tests: [unique, not_null]

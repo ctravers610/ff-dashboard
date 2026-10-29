@@ -6,7 +6,7 @@ with latest as (
 ),
 
 teams as (
-    select latest.league_id, latest.week, team
+    select latest.league_id, latest.week, latest.loaded_at, team
     from latest
     cross join jsonb_array_elements(latest.payload) as team
 )
@@ -18,7 +18,8 @@ select
     player.player_id,
     starter.starter_index is not null as is_starter,
     starter.starter_index::int as starter_index,
-    coalesce((teams.team -> 'players_points' ->> player.player_id)::numeric, 0) as points
+    coalesce((teams.team -> 'players_points' ->> player.player_id)::numeric, 0) as points,
+    teams.loaded_at
 from teams
 cross join jsonb_array_elements_text({{ jsonb_array("teams.team -> 'players'") }}) as player (player_id)
 left join lateral (
