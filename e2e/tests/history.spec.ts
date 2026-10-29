@@ -1,8 +1,8 @@
 import { expect, test } from './fixtures.js';
 import type { Page } from '@playwright/test';
-import { ESPN_LEAGUE_NAME, ESPN_PAST } from '@ffd/demo/fixtures/espn';
+import { ESPN_MY_TEAM, ESPN_PAST } from '@ffd/demo/fixtures/espn';
 import { FFPC_LEAGUE, FFPC_TEAM } from '@ffd/demo/fixtures/ffpc';
-import { SLEEPER_LEAGUE_NAME, SLEEPER_PAST } from '@ffd/demo/fixtures/sleeper';
+import { SLEEPER_LEAGUE_NAME, SLEEPER_MY_TEAM, SLEEPER_PAST } from '@ffd/demo/fixtures/sleeper';
 import { leagueCard, openDashboard, openTab, pts, showLeague, sideListEntry } from './helpers.js';
 import { seedFfpcLeague, waitForHistory } from './seed.js';
 
@@ -34,7 +34,9 @@ test.describe('History tab', () => {
 
   test('rebuilds finished Sleeper weeks and records the live one', async ({ page }) => {
     await openHistory(page);
-    const card = await showLeague(page, SLEEPER_LEAGUE_NAME);
+    const card = await showLeague(page, SLEEPER_MY_TEAM);
+    await expect(card.getByRole('heading', { level: 2 })).toHaveText(SLEEPER_MY_TEAM); // named by your team, the league beneath
+    await expect(card).toContainText(`${SLEEPER_LEAGUE_NAME} · Sleeper`);
 
     expect(await chipTitles(card)).toEqual(expectedTitles(SLEEPER_PAST)); // W L W W L, then the live week
     await expect(card).toContainText('3-2');
@@ -43,7 +45,7 @@ test.describe('History tab', () => {
 
   test('rebuilds finished ESPN weeks, finding my side whether I was home or away', async ({ page }) => {
     await openHistory(page);
-    const card = await showLeague(page, ESPN_LEAGUE_NAME);
+    const card = await showLeague(page, ESPN_MY_TEAM);
 
     expect(await chipTitles(card)).toEqual(expectedTitles(ESPN_PAST)); // L W L W W, then the live week
     await expect(card).toContainText('3-2');
@@ -53,6 +55,7 @@ test.describe('History tab', () => {
   test('an FFPC league has only the week that was pasted, and it is an all-play week', async ({ page }) => {
     await openHistory(page);
     const card = await showLeague(page, FFPC_TEAM);
+    await expect(card).toContainText(`${FFPC_LEAGUE} · FFPC`); // the tournament, from the dashboard
 
     expect(await chipTitles(card)).toEqual(['Week 6: in progress']);
     await expect(card).toContainText('Record'); // no finished weeks yet, so the record is blank
@@ -62,7 +65,7 @@ test.describe('History tab', () => {
 
   test('draws the chart with an accessible description and a hover tooltip', async ({ page }) => {
     await openHistory(page);
-    const card = await showLeague(page, SLEEPER_LEAGUE_NAME);
+    const card = await showLeague(page, SLEEPER_MY_TEAM);
 
     await expect(card.getByRole('img', { name: /your points each week/ })).toBeVisible();
     await card.locator('.recharts-bar-rectangle').nth(1).hover(); // week 2, a loss
@@ -75,7 +78,7 @@ test.describe('History tab', () => {
 
   test('the table view has every value without hovering', async ({ page }) => {
     await openHistory(page);
-    const card = await showLeague(page, SLEEPER_LEAGUE_NAME);
+    const card = await showLeague(page, SLEEPER_MY_TEAM);
     await card.getByRole('button', { name: 'table', exact: true }).click();
 
     const rows = card.getByRole('row');
@@ -92,7 +95,7 @@ test.describe('History tab', () => {
 
   test('can switch back from the table to the chart', async ({ page }) => {
     await openHistory(page);
-    const card = await showLeague(page, SLEEPER_LEAGUE_NAME);
+    const card = await showLeague(page, SLEEPER_MY_TEAM);
     await card.getByRole('button', { name: 'table', exact: true }).click();
     await expect(card.getByRole('table')).toBeVisible();
     await card.getByRole('button', { name: 'chart', exact: true }).click();
@@ -108,7 +111,7 @@ test.describe('History tab', () => {
     expect((await request.delete(`/api/manual-leagues/${id}`)).status()).toBe(204);
     await page.reload();
     await openTab(page, 'History');
-    await expect(sideListEntry(page, SLEEPER_LEAGUE_NAME)).toBeVisible();
+    await expect(sideListEntry(page, SLEEPER_MY_TEAM)).toBeVisible();
     await expect(sideListEntry(page, FFPC_TEAM)).toHaveCount(0);
   });
 });

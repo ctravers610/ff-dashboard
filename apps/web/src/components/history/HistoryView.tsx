@@ -1,7 +1,8 @@
+import type { LeagueSummary } from '@ffd/shared';
 import { useState } from 'react';
 import { useHistory, useOutlook, useRecap, useRecapSeason } from '../../api';
 import { percent } from '../outlook/UpNext';
-import { PLATFORM_LABEL } from '../../format';
+import { labelFor, leagueSubtitle, PLATFORM_LABEL } from '../../format';
 import { SideList, WithSideList } from '../SideList';
 import { LeagueHistoryCard, type HistoryMode } from './LeagueHistoryCard';
 import { RecapPanel } from './LineupRecap';
@@ -11,8 +12,10 @@ import { Awards, LuckTable } from '../outlook/SeasonCards';
 import { ResultChip } from './ResultChip';
 
 // League by league: pick a league on the left; on the right, its weekly
-// results (chart or table) and the lineup recap for a finished week.
-export function HistoryView() {
+// results (chart or table) and the lineup recap for a finished week. Leagues
+// are named by your team, from the dashboard's leagues (History only stores
+// the league's name).
+export function HistoryView({ leagues }: { leagues?: LeagueSummary[] }) {
   const { data, error, isPending, isFetching } = useHistory();
   const [mode, setMode] = useState<HistoryMode>('chart');
   const [selected, setSelected] = useState<string | null>(null);
@@ -30,6 +33,7 @@ export function HistoryView() {
 
   const keyOf = (h: { platform: string; leagueId: string }) => `${h.platform}:${h.leagueId}`;
   const league = data.leagues.find((h) => keyOf(h) === selected) ?? data.leagues[0]!;
+  const labelOf = (h: (typeof data.leagues)[number]) => labelFor(leagues, h);
   const recordText = (h: (typeof data.leagues)[number]) => {
     const { wins, losses, ties } = h.record;
     return wins + losses + ties ? `${wins}-${losses}${ties ? `-${ties}` : ''}` : 'no results yet';
@@ -46,11 +50,18 @@ export function HistoryView() {
             onChange={setSelected}
             items={data.leagues.map((h) => ({
               key: keyOf(h),
-              title: h.name,
-              optionLabel: `${h.name} · ${recordText(h)}`,
-              meta: `${PLATFORM_LABEL[h.platform]} · ${recordText(h)}${h.avgPoints != null ? ` · ${h.avgPoints.toFixed(1)} avg` : ''}${
-                oddsFor(h)?.playoffChance != null ? ` · ${percent(oddsFor(h)!.playoffChance!)} playoffs` : ''
-              }`,
+              title: labelOf(h).title,
+              optionLabel: `${labelOf(h).title} · ${recordText(h)}`,
+              meta: (
+                <>
+                  <span className="block truncate">{leagueSubtitle(labelOf(h), PLATFORM_LABEL[h.platform])}</span>
+                  <span className="block">
+                    {recordText(h)}
+                    {h.avgPoints != null ? ` · ${h.avgPoints.toFixed(1)} avg` : ''}
+                    {oddsFor(h)?.playoffChance != null ? ` · ${percent(oddsFor(h)!.playoffChance!)} playoffs` : ''}
+                  </span>
+                </>
+              ),
               extra: (
                 <span className="mt-1 flex flex-wrap gap-0.5" aria-hidden="true">
                   {h.weeks.slice(-6).map((w) => (
@@ -63,10 +74,11 @@ export function HistoryView() {
         }
       >
         {/* Refetching keeps the previous render, just dimmed: no skeleton, no layout jump. */}
-        <section aria-label={`History for ${league.name}`} className={`flex flex-col gap-4 transition-opacity ${isFetching ? 'opacity-70' : ''}`}>
+        <section aria-label={`History for ${labelOf(league).title}`} className={`flex flex-col gap-4 transition-opacity ${isFetching ? 'opacity-70' : ''}`}>
           <LeagueHistoryCard
             key={keyOf(league)}
             history={league}
+            label={labelOf(league)}
             mode={mode}
             onMode={setMode}
             season={season?.leagues.find((l) => keyOf(l) === keyOf(league)) ?? null}

@@ -1,5 +1,5 @@
 import { INTRUDER, OWNER } from '@ffd/demo/fixtures/github';
-import { SLEEPER_LEAGUE_NAME } from '@ffd/demo/fixtures/sleeper';
+import { SLEEPER_LEAGUE_NAME, SLEEPER_MY_TEAM } from '@ffd/demo/fixtures/sleeper';
 import { withDb } from '../support/database.js';
 import { expectSignedIn, sessionCookie, signIn, signInScreen } from './auth-helpers.js';
 import { expect, test } from './fixtures.js';
@@ -25,7 +25,7 @@ test.describe('Sign-in', () => {
     await signIn(page);
     await expect(page).toHaveURL('/');
     await expectSignedIn(page, OWNER.login);
-    await expect(leagueCard(page, SLEEPER_LEAGUE_NAME)).toBeVisible();
+    await expect(leagueCard(page, SLEEPER_MY_TEAM)).toBeVisible();
   });
 
   test('the session cookie is HttpOnly and SameSite=Lax, so page scripts cannot read it', async ({ page, context }) => {

@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
-import { ESPN_LEAGUE_NAME } from '@ffd/demo/fixtures/espn';
-import { SLEEPER_LEAGUE_NAME } from '@ffd/demo/fixtures/sleeper';
+import { ESPN_LEAGUE_NAME, ESPN_MY_TEAM } from '@ffd/demo/fixtures/espn';
+import { SLEEPER_LEAGUE_NAME, SLEEPER_MY_TEAM } from '@ffd/demo/fixtures/sleeper';
 import { FFPC_LEAGUE, FFPC_TEAM } from '@ffd/demo/fixtures/ffpc';
 import { CLAIM_WEEK, ESPN_FAAB, FFPC_FAAB_LEFT, ffpcWaiverPage, SLEEPER_FAAB } from '@ffd/demo/fixtures/waivers';
 import { expect, test } from './fixtures.js';
@@ -23,12 +23,12 @@ test.describe('Waivers', () => {
   });
 
   test('Sleeper: FAAB and priority, and a bye covered by a free agent, with a safe drop', async ({ page }) => {
-    const section = leagueSection(page, SLEEPER_LEAGUE_NAME);
+    const section = leagueSection(page, SLEEPER_MY_TEAM);
     await expect(section).toContainText(`$${SLEEPER_FAAB.budget - SLEEPER_FAAB.used} of $${SLEEPER_FAAB.budget} FAAB`);
     await expect(section).toContainText(`Priority ${SLEEPER_FAAB.position} of 4`);
 
-    await expect(moves(page, SLEEPER_LEAGUE_NAME)).toHaveCount(1);
-    const move = moves(page, SLEEPER_LEAGUE_NAME).first();
+    await expect(moves(page, SLEEPER_MY_TEAM)).toHaveCount(1);
+    const move = moves(page, SLEEPER_MY_TEAM).first();
     await expect(move).toContainText('On bye · FLEX');
     await expect(move).toContainText(`+10.0pts in week ${CLAIM_WEEK}`); // Rice 18 over Najee Harris's 8 from the bench
     await expect(move).toContainText('Add Rashee Rice WR · KC');
@@ -37,12 +37,12 @@ test.describe('Waivers', () => {
   });
 
   test('ESPN: open roster spots mean upgrades need no drop', async ({ page }) => {
-    await pickLeague(page, ESPN_LEAGUE_NAME);
-    const section = leagueSection(page, ESPN_LEAGUE_NAME);
+    await pickLeague(page, ESPN_MY_TEAM);
+    const section = leagueSection(page, ESPN_MY_TEAM);
     await expect(section).toContainText(`$${ESPN_FAAB.budget - ESPN_FAAB.spent} of $${ESPN_FAAB.budget} FAAB`);
     await expect(section).toContainText(`Priority ${ESPN_FAAB.waiverRank} of 4 · 2 open roster spots`);
 
-    const list = moves(page, ESPN_LEAGUE_NAME);
+    const list = moves(page, ESPN_MY_TEAM);
     await expect(list).toHaveCount(2);
     await expect(list.nth(0)).toContainText('Upgrade · WR');
     await expect(list.nth(0)).toContainText('Add Rashee Rice WR · KC · on waivers');
@@ -55,7 +55,7 @@ test.describe('Waivers', () => {
   });
 
   test('FAAB pacing: budget per week left, and what winning bids have cost', async ({ page }) => {
-    const pacing = leagueSection(page, SLEEPER_LEAGUE_NAME).getByRole('region', { name: 'FAAB pacing' });
+    const pacing = leagueSection(page, SLEEPER_MY_TEAM).getByRole('region', { name: 'FAAB pacing' });
     // $85 left, weeks 7-18.
     await expect(pacing).toContainText('$85 left for 12 weeks: about $7 a week.');
     await expect(pacing).toContainText('Spent 15% of your budget with 33% of the regular season gone: room to bid bigger.');
@@ -65,13 +65,13 @@ test.describe('Waivers', () => {
 
   test('lists the bye weeks ahead and whether the rest of the roster covers them', async ({ page }) => {
     // DEN is on bye in the claim week; Najee Harris can take Waddle's FLEX spot.
-    const byes = leagueSection(page, SLEEPER_LEAGUE_NAME).getByRole('region', { name: 'Bye weeks' });
+    const byes = leagueSection(page, SLEEPER_MY_TEAM).getByRole('region', { name: 'Bye weeks' });
     await expect(byes.getByRole('listitem')).toHaveCount(1);
     await expect(byes.getByRole('listitem')).toHaveText(`Week ${CLAIM_WEEK}Jaylen Waddle WRLineup covered`);
   });
 
   test('the Refresh button reloads the Waivers tab too', async ({ page }) => {
-    await expect(leagueSection(page, SLEEPER_LEAGUE_NAME)).toBeVisible();
+    await expect(leagueSection(page, SLEEPER_MY_TEAM)).toBeVisible();
     const reloaded = page.waitForResponse((r) => r.url().endsWith('/api/waivers') && r.ok());
     await page.getByRole('button', { name: 'Refresh' }).click();
     await reloaded;
@@ -79,10 +79,10 @@ test.describe('Waivers', () => {
   });
 
   test('ESPN: shows the claims you have in, with the bid and the drop', async ({ page }) => {
-    await pickLeague(page, ESPN_LEAGUE_NAME);
-    const claims = leagueSection(page, ESPN_LEAGUE_NAME).getByRole('region', { name: 'Your claims' }).getByRole('listitem');
+    await pickLeague(page, ESPN_MY_TEAM);
+    const claims = leagueSection(page, ESPN_MY_TEAM).getByRole('region', { name: 'Your claims' }).getByRole('listitem');
     await expect(claims).toHaveCount(2);
-    await expect(leagueSection(page, ESPN_LEAGUE_NAME)).toContainText('Your claims2 pending on ESPN');
+    await expect(leagueSection(page, ESPN_MY_TEAM)).toContainText('Your claims2 pending on ESPN');
     // Oldest first: Rice, then Geno Smith, who isn't in the free-agent list and is looked up by id.
     await expect(claims.nth(0)).toContainText('Add Rashee Rice WR · KC');
     await expect(claims.nth(0)).toContainText('No drop');
@@ -94,25 +94,25 @@ test.describe('Waivers', () => {
 
   test('puts leagues in order of their next waiver run, learned from processed claims', async ({ page }) => {
     const pills = page.getByRole('group', { name: 'League' }).getByRole('button');
-    await expect(pills.nth(0)).toContainText(`${SLEEPER_LEAGUE_NAME}Sleeper · Tue night, in`); // Wed 3 AM: overnight, so the night before
-    await expect(pills.nth(1)).toContainText(`${ESPN_LEAGUE_NAME}ESPN · schedule unknown`); // no claim history: unknown, so last
-    const runs = leagueSection(page, SLEEPER_LEAGUE_NAME).getByRole('definition').first();
+    await expect(pills.nth(0)).toContainText(`${SLEEPER_MY_TEAM}${SLEEPER_LEAGUE_NAME} · SleeperTue night, in`); // Wed 3 AM: overnight, so the night before
+    await expect(pills.nth(1)).toContainText(`${ESPN_MY_TEAM}${ESPN_LEAGUE_NAME} · ESPNschedule unknown`); // no claim history: unknown, so last
+    const runs = leagueSection(page, SLEEPER_MY_TEAM).getByRole('definition').first();
     await expect(runs).toContainText(/^Tue night \(Wed 3:00 AM\) ETnext in /);
     await expect(runs.locator('[title]')).toHaveAttribute('title', "Learned from this league's processed claims");
-    await pickLeague(page, ESPN_LEAGUE_NAME);
-    await expect(leagueSection(page, ESPN_LEAGUE_NAME).getByRole('definition').first()).toHaveText('Not known yet');
+    await pickLeague(page, ESPN_MY_TEAM);
+    await expect(leagueSection(page, ESPN_MY_TEAM).getByRole('definition').first()).toHaveText('Not known yet');
   });
 
   test('marking claims set for the next run sticks, and can be undone', async ({ page }) => {
-    const section = leagueSection(page, SLEEPER_LEAGUE_NAME);
+    const section = leagueSection(page, SLEEPER_MY_TEAM);
     await section.getByRole('button', { name: 'Claims set' }).click();
     await expect(section).toContainText('Set for this run');
 
     await page.reload();
     await openTab(page, 'Waivers');
-    await expect(leagueSection(page, SLEEPER_LEAGUE_NAME)).toContainText('Set for this run');
-    await leagueSection(page, SLEEPER_LEAGUE_NAME).getByRole('button', { name: 'Undo' }).click();
-    await expect(leagueSection(page, SLEEPER_LEAGUE_NAME).getByRole('button', { name: 'Claims set' })).toBeVisible();
+    await expect(leagueSection(page, SLEEPER_MY_TEAM)).toContainText('Set for this run');
+    await leagueSection(page, SLEEPER_MY_TEAM).getByRole('button', { name: 'Undo' }).click();
+    await expect(leagueSection(page, SLEEPER_MY_TEAM).getByRole('button', { name: 'Claims set' })).toBeVisible();
   });
 
   test('a league whose reminder time has come is flagged in red until its claims are set', async ({ page }) => {
@@ -129,9 +129,9 @@ test.describe('Waivers', () => {
     // Waivers load in the background on every tab; allow for that after the reload.
     await expect(nav.getByRole('button', { name: 'Waivers (1 league needs your claims)' })).toBeVisible({ timeout: 15_000 });
     await openTab(page, 'Waivers');
-    const pill = page.getByRole('group', { name: 'League' }).getByRole('button', { name: new RegExp(`^${SLEEPER_LEAGUE_NAME}`) });
+    const pill = page.getByRole('group', { name: 'League' }).getByRole('button', { name: new RegExp(`^${SLEEPER_MY_TEAM}`) });
     await expect(pill).toHaveAccessibleName(/claims not set/);
-    const section = leagueSection(page, SLEEPER_LEAGUE_NAME);
+    const section = leagueSection(page, SLEEPER_MY_TEAM);
     await expect(section.getByRole('status')).toContainText("Your claims for this run aren't set yet.");
 
     await section.getByRole('button', { name: 'Claims set' }).click();
@@ -142,11 +142,11 @@ test.describe('Waivers', () => {
 
   test('a reminder’s link opens the Waivers tab on its league', async ({ page }) => {
     await page.goto(`/?view=waivers&league=${encodeURIComponent('espn:900001')}`);
-    await expect(leagueSection(page, ESPN_LEAGUE_NAME)).toBeVisible();
+    await expect(leagueSection(page, ESPN_MY_TEAM)).toBeVisible();
   });
 
   test('best available can be ranked by this week, rest of season or trending adds', async ({ page }) => {
-    const section = leagueSection(page, SLEEPER_LEAGUE_NAME);
+    const section = leagueSection(page, SLEEPER_MY_TEAM);
     await section.getByRole('group', { name: 'Position' }).getByRole('button', { name: 'WR', exact: true }).click();
     const rows = section.getByRole('table').getByRole('row');
     await expect(rows.nth(1)).toContainText('Rashee Rice');
@@ -161,7 +161,7 @@ test.describe('Waivers', () => {
   });
 
   test('"All" groups the best available by position instead of mixing them', async ({ page }) => {
-    const table = leagueSection(page, SLEEPER_LEAGUE_NAME).getByRole('table');
+    const table = leagueSection(page, SLEEPER_MY_TEAM).getByRole('table');
     await expect(table.getByRole('rowheader', { name: 'QB' })).toBeVisible();
     await expect(table.getByRole('rowheader', { name: 'WR' })).toBeVisible();
     await expect(table.getByRole('row').filter({ hasText: 'Geno Smith' })).toHaveCount(1);

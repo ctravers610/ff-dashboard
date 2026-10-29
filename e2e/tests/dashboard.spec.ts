@@ -47,7 +47,7 @@ test.describe('Matchups', () => {
     await expect(hero).toContainText('no games played yet this week');
     await expect(hero).not.toContainText('winning');
     // The table shows projected scores, not 0.00 vs 0.00.
-    const espn = leagueCard(page, ESPN_LEAGUE_NAME);
+    const espn = leagueCard(page, ESPN_MY_TEAM);
     await expect(espn).toContainText(`${pts(ESPN_ME_PROJECTED)}proj.${pts(ESPN_OPP_PROJECTED)}`);
     await expect(espn).toContainText(`+${(ESPN_ME_PROJECTED - ESPN_OPP_PROJECTED).toFixed(1)}`);
   });
@@ -57,11 +57,13 @@ test.describe('Matchups', () => {
     await expect(rows).toHaveCount(2);
     // Sleeper's games are all final (decided: 100%); ESPN still has projected
     // points to come, so its 15.5-point projected lead is 99%, the less certain.
-    await expect(rows.nth(0)).toHaveAccessibleName(ESPN_LEAGUE_NAME);
+    await expect(rows.nth(0)).toHaveAccessibleName(ESPN_MY_TEAM);
     await expect(rows.nth(0)).toContainText('99%');
     await expect(rows.nth(1)).toContainText('100%');
     await expect(rows.nth(0)).toContainText(`+${(ESPN_ME_POINTS - ESPN_OPP_POINTS).toFixed(1)}`);
-    await expect(rows.nth(1)).toHaveAccessibleName(SLEEPER_LEAGUE_NAME);
+    await expect(rows.nth(1)).toHaveAccessibleName(SLEEPER_MY_TEAM);
+    // Named by your team, with the league's own name beneath it.
+    await expect(rows.nth(1)).toContainText(`${SLEEPER_MY_TEAM}${SLEEPER_LEAGUE_NAME} · Sleeper`);
     await expect(rows.nth(1)).toContainText(pts(SLEEPER_ME_POINTS));
     await expect(rows.nth(1)).toContainText(pts(SLEEPER_OPP_POINTS));
     await expect(rows.nth(1)).toContainText(`+${(SLEEPER_ME_POINTS - SLEEPER_OPP_POINTS).toFixed(1)}`);
@@ -70,15 +72,15 @@ test.describe('Matchups', () => {
   test('shows PMR for both sides of each matchup', async ({ page }) => {
     // The default test window is 1280 wide, where the PMR columns appear.
     const rows = page.getByRole('region', { name: 'Matchups' }).getByRole('article');
-    const espn = rows.filter({ has: page.getByText(ESPN_LEAGUE_NAME, { exact: true }) });
-    const sleeper = rows.filter({ has: page.getByText(SLEEPER_LEAGUE_NAME, { exact: true }) });
+    const espn = rows.filter({ has: page.getByText(ESPN_MY_TEAM, { exact: true }) });
+    const sleeper = rows.filter({ has: page.getByText(SLEEPER_MY_TEAM, { exact: true }) });
     // Player minutes remaining: Jayden Reed's GB game hasn't started (60); every other game is final.
     await expect(espn).toContainText('60 player minutes remaining for you0 for your opponent');
     await expect(sleeper).toContainText('0 player minutes remaining for you0 for your opponent');
   });
 
   test('opening the Sleeper league shows team, rank and projections', async ({ page }) => {
-    const card = await openLeague(page, SLEEPER_LEAGUE_NAME);
+    const card = await openLeague(page, SLEEPER_MY_TEAM);
     await expect(card).toContainText(`${SLEEPER_MY_TEAM} · @E2E Manager`);
     await expect(card).toContainText('2nd of 4');
     await expect(card).toContainText(SLEEPER_OPP_TEAM);
@@ -86,7 +88,7 @@ test.describe('Matchups', () => {
   });
 
   test('opening the ESPN league uses ESPN’s own team projections', async ({ page }) => {
-    const card = await openLeague(page, ESPN_LEAGUE_NAME);
+    const card = await openLeague(page, ESPN_MY_TEAM);
     await expect(card).toContainText(`${ESPN_MY_TEAM} · @e2e_espn`);
     await expect(card).toContainText(ESPN_OPP_TEAM);
     await expect(card).toContainText(`proj ${pts(ESPN_ME_PROJECTED)}`);
@@ -95,14 +97,14 @@ test.describe('Matchups', () => {
   });
 
   test('a row closes again, hiding its details', async ({ page }) => {
-    const card = await openLeague(page, SLEEPER_LEAGUE_NAME);
+    const card = await openLeague(page, SLEEPER_MY_TEAM);
     await expect(card.getByRole('button', { name: 'Standings' })).toBeVisible();
     await card.locator('button[aria-expanded]').click();
     await expect(card.getByRole('button', { name: 'Standings' })).toHaveCount(0);
   });
 
   test('opening a league shows lineups side by side, with a projection under each score', async ({ page }) => {
-    const card = await openLeague(page, SLEEPER_LEAGUE_NAME);
+    const card = await openLeague(page, SLEEPER_MY_TEAM);
     await expect(card.getByRole('button', { name: 'Lineups' })).toHaveAttribute('aria-pressed', 'true'); // open from the start
     await expect(card).toContainText('Josh Allen');
     await expect(card).toContainText('Patrick Mahomes'); // the opponent's quarterback
@@ -115,7 +117,7 @@ test.describe('Matchups', () => {
   });
 
   test('opens standings with my team highlighted', async ({ page }) => {
-    const card = await openLeague(page, SLEEPER_LEAGUE_NAME);
+    const card = await openLeague(page, SLEEPER_MY_TEAM);
     await card.getByRole('button', { name: 'Standings' }).click();
     const rows = card.getByRole('row');
     await expect(rows).toHaveCount(5); // header + 4 teams
@@ -133,8 +135,8 @@ test.describe('Matchups', () => {
     const status = page.getByLabel('Data sources');
     await expect(status).toContainText('Sleeper loaded');
     await expect(status).toContainText('ESPN cookies refused');
-    await expect(leagueCard(page, SLEEPER_LEAGUE_NAME)).toBeVisible();
-    await expect(leagueCard(page, ESPN_LEAGUE_NAME)).toBeVisible();
+    await expect(leagueCard(page, SLEEPER_MY_TEAM)).toBeVisible();
+    await expect(leagueCard(page, ESPN_MY_TEAM)).toBeVisible();
   });
 
   test('has no Yahoo prompt when Yahoo is not configured', async ({ page }) => {
@@ -171,9 +173,9 @@ test.describe('Lineup status', () => {
   const lineup = (page: import('@playwright/test').Page, name: string) => leagueCard(page, name).getAttribute('data-lineup');
 
   test('a questionable starter with a healthy bench swap turns the row yellow, with the fix inside', async ({ page }) => {
-    expect(await lineup(page, ESPN_LEAGUE_NAME)).toBe('yellow');
-    await expect(leagueCard(page, ESPN_LEAGUE_NAME)).toContainText('Jayden Reed questionable');
-    const issues = (await openLeague(page, ESPN_LEAGUE_NAME)).getByRole('region', { name: 'Lineup issues' });
+    expect(await lineup(page, ESPN_MY_TEAM)).toBe('yellow');
+    await expect(leagueCard(page, ESPN_MY_TEAM)).toContainText('Jayden Reed questionable');
+    const issues = (await openLeague(page, ESPN_MY_TEAM)).getByRole('region', { name: 'Lineup issues' });
     // Mike Evans is healthy on the bench too, but his game is over; Higgins's as well.
     await expect(issues).toContainText('Start Romeo Doubs (WR) from your bench instead');
     await expect(issues.getByRole('link', { name: /Fix it on ESPN/ })).toHaveAttribute('href', new RegExp(`leagueId=${ESPN_LEAGUE_ID}&teamId=1`));
@@ -181,8 +183,8 @@ test.describe('Lineup status', () => {
 
   test('a lineup with nothing to fix is green; a game that has started no longer counts', async ({ page }) => {
     // Jaylen Waddle is questionable in Sleeper, but DEN's game is final: the lineup is locked.
-    expect(await lineup(page, SLEEPER_LEAGUE_NAME)).toBe('green');
-    await expect(leagueCard(page, SLEEPER_LEAGUE_NAME)).not.toContainText('Jaylen Waddle');
+    expect(await lineup(page, SLEEPER_MY_TEAM)).toBe('green');
+    await expect(leagueCard(page, SLEEPER_MY_TEAM)).not.toContainText('Jaylen Waddle');
   });
 
   test('an Out starter, or a slot nobody can fill, turns it red; a slot a free agent can fill stays yellow', async ({ page }) => {
@@ -197,8 +199,8 @@ test.describe('Lineup status', () => {
     };
     // An empty RB slot with nobody on the bench: free agent Breece Hall can fill it.
     await withAlerts([{ slot: 'RB', playerId: null, playerName: null, reason: 'empty', detail: 'Empty RB slot', suggestion: null }]);
-    expect(await lineup(page, ESPN_LEAGUE_NAME)).toBe('yellow');
-    await expect((await openLeague(page, ESPN_LEAGUE_NAME)).getByRole('region', { name: 'Lineup issues' })).toContainText('Pick up Breece Hall (RB)');
+    expect(await lineup(page, ESPN_MY_TEAM)).toBe('yellow');
+    await expect((await openLeague(page, ESPN_MY_TEAM)).getByRole('region', { name: 'Lineup issues' })).toContainText('Pick up Breece Hall (RB)');
 
     // No kicker anywhere, and a starter who is out.
     await page.unrouteAll();
@@ -206,13 +208,13 @@ test.describe('Lineup status', () => {
       { slot: 'K', playerId: null, playerName: null, reason: 'empty', detail: 'Empty K slot', suggestion: null },
       { slot: 'WR', playerId: 'x', playerName: 'Jayden Reed', reason: 'injury', detail: 'Out', suggestion: null },
     ]);
-    expect(await lineup(page, ESPN_LEAGUE_NAME)).toBe('red');
-    await expect(leagueCard(page, ESPN_LEAGUE_NAME)).toContainText('Empty K · Jayden Reed out');
+    expect(await lineup(page, ESPN_MY_TEAM)).toBe('red');
+    await expect(leagueCard(page, ESPN_MY_TEAM)).toContainText('Empty K · Jayden Reed out');
 
     // Out, but with a healthy bench player to start instead: fixable, so yellow.
     await page.unrouteAll();
     await withAlerts([{ slot: 'WR', playerId: 'x', playerName: 'Jayden Reed', reason: 'injury', detail: 'Out', suggestion: { playerName: 'Romeo Doubs', position: 'WR', projected: 9 } }]);
-    expect(await lineup(page, ESPN_LEAGUE_NAME)).toBe('yellow');
+    expect(await lineup(page, ESPN_MY_TEAM)).toBe('yellow');
   });
 });
 
@@ -230,7 +232,7 @@ test.describe('On a phone', () => {
 
   test('every league row still fits, with its score', async ({ page }) => {
     await openDashboard(page);
-    const row = leagueCard(page, SLEEPER_LEAGUE_NAME);
+    const row = leagueCard(page, SLEEPER_MY_TEAM);
     await expect(row).toContainText(pts(SLEEPER_ME_POINTS));
     const box = await row.boundingBox();
     expect(box!.x + box!.width).toBeLessThanOrEqual(375);

@@ -1,10 +1,10 @@
 import { ByePlanner } from './ByePlanner';
 import { FaabPacing } from './FaabPacing';
-import { friendlyRun, friendlyRunWithTime, nextRun, type WaiverLeague, type WaiverMove, type WaiverPlayer, type WaiverRules } from '@ffd/shared';
+import { friendlyRun, friendlyRunWithTime, nextRun, type LeagueSummary, type WaiverLeague, type WaiverMove, type WaiverPlayer, type WaiverRules } from '@ffd/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState, type ReactNode } from 'react';
 import { api, useDemo, useWaivers } from '../../api';
-import { PLATFORM_LABEL } from '../../format';
+import { labelFor, leagueSubtitle, PLATFORM_LABEL, type LeagueLabel } from '../../format';
 import { SideList, WithSideList } from '../SideList';
 import { SourceErrors } from '../SourceErrors';
 import { FfpcWaiverPaste } from './FfpcWaiverPaste';
@@ -51,6 +51,7 @@ function budget(r: WaiverRules | null): string | null {
 
 interface Entry {
   league: WaiverLeague;
+  name: LeagueLabel; // your team's name, with the league's beneath it
   next: Date | null;
   label: string | null; // "Tue night", "Wed 11:00 PM"
 }
@@ -76,14 +77,19 @@ function LeaguePicker({ entries, value, onChange }: { entries: Entry[]; value: s
       label="League"
       value={value}
       onChange={onChange}
-      items={entries.map(({ league, next, label }) => ({
+      items={entries.map(({ league, name, next, label }) => ({
         key: keyOf(league),
-        title: league.name,
+        title: name.title,
         mark: <ClaimsMark league={league} />,
         alert: league.claims?.reminderDue,
-        meta: `${PLATFORM_LABEL[league.platform]} · ${label ? `${label}, ${countdown(next!)}` : 'schedule unknown'}`,
+        meta: (
+          <>
+            <span className="block truncate">{leagueSubtitle(name, PLATFORM_LABEL[league.platform])}</span>
+            <span className="block">{label ? `${label}, ${countdown(next!)}` : 'schedule unknown'}</span>
+          </>
+        ),
         extra: budget(league.rules) ? <span className="text-xs text-slate-400">{budget(league.rules)}</span> : undefined,
-        optionLabel: `${league.name}${label ? ` · ${label}` : ''}${league.claims?.reminderDue ? ' · claims not set' : ''}`,
+        optionLabel: `${name.title}${label ? ` · ${label}` : ''}${league.claims?.reminderDue ? ' · claims not set' : ''}`,
       }))}
     />
   );
@@ -148,13 +154,14 @@ function Claims({ league }: { league: WaiverLeague }) {
   );
 }
 
-function Header({ league, next }: { league: WaiverLeague; next: Date | null }) {
+function Header({ league, name, next }: { league: WaiverLeague; name: LeagueLabel; next: Date | null }) {
   const r = league.rules;
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900 p-5">
-      <h2 className="text-lg font-semibold">
-        {league.name} <span className="text-sm font-normal text-slate-400">· {PLATFORM_LABEL[league.platform]}</span>
-      </h2>
+      <div className="min-w-0">
+        <h2 className="truncate text-lg font-semibold">{name.title}</h2>
+        <p className="truncate text-sm text-slate-400">{leagueSubtitle(name, PLATFORM_LABEL[league.platform])}</p>
+      </div>
 
       {league.claims?.reminderDue && (
         <p role="status" className="rounded-md bg-rose-950/70 px-3 py-2 text-sm font-medium text-rose-200 ring-1 ring-rose-700">
@@ -376,7 +383,8 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function WaiversView() {
+// Leagues are named by your team, from the dashboard's leagues (the waivers data only has the league's name).
+export function WaiversView({ leagues }: { leagues?: LeagueSummary[] }) {
   const { data, error, isPending } = useWaivers();
   const demo = useDemo();
   // A reminder notification links straight to its league: /?view=waivers&league=sleeper:123
@@ -389,11 +397,12 @@ export function WaiversView() {
   const entries: Entry[] = data.leagues
     .map((l) => {
       const upcoming = nextRun(l.runs);
-      return { league: l, next: upcoming?.at ?? null, label: upcoming ? friendlyRun(upcoming.run) : null };
+      return { league: l, name: labelFor(leagues, l), next: upcoming?.at ?? null, label: upcoming ? friendlyRun(upcoming.run) : null };
     })
     .sort((a, b) => (a.next?.getTime() ?? Infinity) - (b.next?.getTime() ?? Infinity));
   const current = entries.find((e) => keyOf(e.league) === selected) ?? entries[0];
   const league = current?.league;
+  const name = current?.name;
 
   return (
     <div className="flex flex-col gap-4">
@@ -407,9 +416,9 @@ export function WaiversView() {
       <SourceErrors errors={data.errors} />
 
       <WithSideList list={entries.length > 1 && <LeaguePicker entries={entries} value={league ? keyOf(league) : ''} onChange={setSelected} />}>
-        {league && (
-          <section aria-label={`Waivers for ${league.name}`} className="flex flex-col gap-4">
-            <Header league={league} next={current?.next ?? null} />
+        {league && name && (
+          <section aria-label={`Waivers for ${name.title}`} className="flex flex-col gap-4">
+            <Header league={league} name={name} next={current?.next ?? null} />
             {league.pendingClaims && (
               <Card title="Your claims">
                 <PendingClaims league={league} week={data.week} />
