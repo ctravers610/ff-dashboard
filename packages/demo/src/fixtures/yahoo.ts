@@ -31,6 +31,8 @@ export const YAHOO_LINEUP: [FxPlayer, string, number][] = [
   [P.doubs, 'BN', 11.2],
   [P.brooks, 'IR', 0],
 ];
+// The league's lineup slots (leagues;out=settings): [position, count].
+const ROSTER_POSITIONS: [string, number][] = [['QB', 1], ['WR', 2], ['RB', 2], ['TE', 1], ['W/R/T', 1], ['K', 1], ['DEF', 1], ['BN', 6], ['IR', 1]];
 const STATUS: Partial<Record<string, string>> = { [P.higgins.id]: 'O', [P.waddle.id]: 'Q', [P.brooks.id]: 'IR' };
 
 /** Yahoo's one-key-object arrays: { a: 1, b: 2 } -> [{ a: 1 }, { b: 2 }]. */
@@ -57,7 +59,14 @@ export const userLeagues = () => ({
           games: collection('game', [
             [
               { game_key: YAHOO_GAME_KEY, code: 'nfl', season: SEASON },
-              { leagues: collection('league', [props({ league_key: YAHOO_LEAGUE_KEY, league_id: YAHOO_LEAGUE_ID, name: YAHOO_LEAGUE_NAME, num_teams: 10, current_week: String(WEEK), season: SEASON })]) },
+              {
+                leagues: collection('league', [
+                  [
+                    props({ league_key: YAHOO_LEAGUE_KEY, league_id: YAHOO_LEAGUE_ID, name: YAHOO_LEAGUE_NAME, num_teams: 10, current_week: String(WEEK), season: SEASON }),
+                    { settings: [{ roster_positions: ROSTER_POSITIONS.map(([position, count]) => ({ roster_position: { position, position_type: 'O', count } })) }] },
+                  ],
+                ]),
+              },
             ],
           ]),
         },
@@ -104,17 +113,38 @@ export const roster = () => ({
   },
 });
 
+// league/{key}/standings: each team with its manager, logo and record.
+const standingTeam = (key: string, name: string, manager: string, s: { rank: number; record: readonly [number, number, number]; pointsFor: number; pointsAgainst: number }) => [
+  [
+    ...team(key, name),
+    { team_logos: [{ team_logo: { size: 'large', url: `https://example.com/logos/${key}.png` } }] },
+    { managers: [{ manager: { manager_id: key.split('.t.')[1], nickname: manager } }] },
+  ],
+  {
+    team_standings: {
+      rank: String(s.rank),
+      points_for: String(s.pointsFor),
+      points_against: String(s.pointsAgainst),
+      outcome_totals: { wins: String(s.record[0]), losses: String(s.record[1]), ties: String(s.record[2]) },
+    },
+  },
+];
+
+export const YAHOO_OPP_STANDING = { rank: 1, record: [5, 1, 0] as const, pointsFor: 760.2, pointsAgainst: 610.4 };
+
 export const standings = () => ({
   fantasy_content: {
-    team: [
-      team(YAHOO_TEAM_KEY, YAHOO_MY_TEAM),
+    league: [
+      props({ league_key: YAHOO_LEAGUE_KEY, league_id: YAHOO_LEAGUE_ID, name: YAHOO_LEAGUE_NAME }),
       {
-        team_standings: {
-          rank: String(YAHOO_ME.rank),
-          points_for: String(YAHOO_ME.pointsFor),
-          points_against: String(YAHOO_ME.pointsAgainst),
-          outcome_totals: { wins: String(YAHOO_ME.record[0]), losses: String(YAHOO_ME.record[1]), ties: String(YAHOO_ME.record[2]) },
-        },
+        standings: [
+          {
+            teams: collection('team', [
+              standingTeam(YAHOO_TEAM_KEY, YAHOO_MY_TEAM, 'You Made Up', YAHOO_ME),
+              standingTeam(YAHOO_OPP_TEAM_KEY, YAHOO_OPP_TEAM, 'Pretend Pat', YAHOO_OPP_STANDING),
+            ]),
+          },
+        ],
       },
     ],
   },

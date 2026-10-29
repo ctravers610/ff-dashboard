@@ -8,7 +8,7 @@ import { describeChange, diffSnapshots, type Snapshot, type TrackedPlayer } from
 const snap = (stats: Record<string, Record<string, number>>, espn: Record<string, number> = {}): Snapshot => ({
   stats: new Map(Object.entries(stats)),
   games: new Map(),
-  espnPoints: new Map(Object.entries(espn)),
+  platformPoints: new Map(Object.entries(espn)),
 });
 
 const te: Player = { playerId: '9487', name: 'Brock Bowers', position: 'TE', nflTeam: 'LV', injuryStatus: null };
@@ -21,7 +21,7 @@ const bowers: TrackedPlayer = {
   appearances: [
     { leagueKey: 'sleeper:1', leagueName: 'Sleeper League', platform: 'sleeper', role: 'starter', pointsFor: (s) => scoreWithSettings(s.stats.get('9487') ?? {}, ppr) },
     { leagueKey: 'ffpc:2', leagueName: 'Club 223', platform: 'ffpc', role: 'bench', pointsFor: (s) => scoreStats(s.stats.get('9487') ?? {}, 'TE', FFPC_RULES) },
-    { leagueKey: 'espn:3', leagueName: 'Massholes', platform: 'espn', role: 'opponent', pointsFor: (s) => s.espnPoints.get('3:espn-bowers') ?? null },
+    { leagueKey: 'espn:3', leagueName: 'Massholes', platform: 'espn', role: 'opponent', pointsFor: (s) => s.platformPoints.get('3:espn-bowers') ?? null },
   ],
 };
 

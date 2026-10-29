@@ -1,6 +1,7 @@
 // GET /api/waivers: for each league, your waiver budget and priority, the best
 // available players, and suggested add/drop moves for the week a claim made now
-// would play in. FFPC leagues come from a pasted copy of FFPC's add/drop page.
+// would play in. FFPC leagues come from a pasted copy of FFPC's add/drop page;
+// Yahoo's are valued with Sleeper's projections (Yahoo has none).
 
 import type { ByeWeeksResponse, WaiverLeague, WaiversResponse } from '@ffd/shared';
 import { addDropStale } from '../reminders/ffpcPaste.js';
@@ -17,6 +18,7 @@ import { fetchEspnWaivers } from './espn.js';
 import { fetchFfpcWaivers } from './ffpc.js';
 import { claimWeek, LAST_REGULAR_WEEK } from './moves.js';
 import { fetchSleeperWaivers } from './sleeper.js';
+import { fetchYahooWaivers } from './yahoo.js';
 
 async function trendingAdds(): Promise<Map<string, number>> {
   const [trending, players] = await Promise.all([sleeperClient.trending('add'), sleeperClient.players()]);
@@ -51,6 +53,7 @@ export async function getWaivers(): Promise<WaiversResponse> {
     fetchSleeperWaivers(sources.sleeperUsernames, ctx),
     fetchEspnWaivers(sources.espnLeagueIds, config.espnAuth, ctx),
     fetchFfpcWaivers(ctx),
+    fetchYahooWaivers(ctx),
   ]);
   const [, espn] = results;
   const now = new Date();

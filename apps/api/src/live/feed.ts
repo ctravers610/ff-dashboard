@@ -11,7 +11,7 @@ type Stats = Record<string, number>;
 export interface Snapshot {
   stats: Map<string, Stats>; // Sleeper's live stat lines, by Sleeper player id
   games: Map<string, GameScore>; // for defenses' points allowed
-  espnPoints: Map<string, number>; // ESPN's own totals, by `${leagueId}:${espnPlayerId}`
+  platformPoints: Map<string, number>; // ESPN's and Yahoo's own totals, by `${leagueId}:${playerId}`
 }
 
 /** One place a player appears this week, and how that league scores him. */
@@ -89,10 +89,10 @@ export function diffSnapshots(before: Snapshot, after: Snapshot, tracked: Tracke
 
     events.push({
       player: t.player,
-      // Points can move with no new stats: ESPN catching up, or a defense's points allowed.
+      // Points can move with no new stats: ESPN or Yahoo catching up, or a defense's points allowed.
       description: description || (t.player.position === 'DEF' ? 'points allowed changed' : 'scoring update'),
       // Stats moved but a league shows no change yet: that platform hasn't caught up.
-      leagues: leagues.map((l) => (description && l.points === 0 && l.platform === 'espn' ? { ...l, points: null } : l)),
+      leagues: leagues.map((l) => (description && l.points === 0 && (l.platform === 'espn' || l.platform === 'yahoo') ? { ...l, points: null } : l)),
     });
   }
   return events;

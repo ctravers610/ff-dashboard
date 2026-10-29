@@ -41,10 +41,8 @@ export async function getDashboard(): Promise<DashboardResponse> {
   const leagues = withMinutesLeft(advised, nfl.week, await nflGames(nfl.season, nfl.week).catch(() => null));
 
   // Record history in the background: a database problem must never break the dashboard.
-  // Never Yahoo's: its API agreement doesn't allow storing what it returns.
-  const storable = leagues.filter((l) => l.platform !== 'yahoo');
-  recordSnapshots(storable).catch((e) => console.error('Could not save league snapshots:', e));
-  backfillHistory(storable).catch((e) => console.error('Could not backfill past weeks:', e));
+  recordSnapshots(leagues).catch((e) => console.error('Could not save league snapshots:', e));
+  backfillHistory(leagues).catch((e) => console.error('Could not backfill past weeks:', e));
 
   return {
     season: nfl.season,

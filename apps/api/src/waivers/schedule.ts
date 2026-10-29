@@ -1,7 +1,8 @@
 // What each league's processed claims tell us: when its waivers actually run
-// (neither Sleeper nor ESPN documents the time in its settings: ESPN's "process
-// hour" doesn't match Eastern time, and Sleeper gives only a day), and, in FAAB
-// leagues, what winning bids have cost.
+// (neither Sleeper, ESPN nor Yahoo documents the time in its settings: ESPN's
+// "process hour" doesn't match Eastern time, Sleeper gives only a day, and Yahoo
+// only how long a dropped player waits), and, in FAAB leagues, what winning bids
+// have cost.
 
 import { inferWaiverRuns, type Player, type WaiverBids, type WaiverLeague, type WaiverRun } from '@ffd/shared';
 import { toEspnPlayer } from '../adapters/espn/mapper.js';
@@ -10,6 +11,8 @@ import { toPlayer } from '../adapters/sleeper/mapper.js';
 import { espnClient, type EspnAuth } from '../adapters/espn/client.js';
 import { sleeperClient } from '../adapters/sleeper/client.js';
 import type { SleeperLeague } from '../adapters/sleeper/types.js';
+import type { YahooAdd } from '../adapters/yahoo/parse.js';
+import { DAY } from '../cache.js';
 
 type Schedule = Pick<WaiverLeague, 'runs' | 'runsSource' | 'bids'>;
 
@@ -59,6 +62,19 @@ export async function sleeperSchedule(league: SleeperLeague, week: number): Prom
   if (day == null) return { runs: [], runsSource: null, bids };
   const estimate: WaiverRun = { day: (day + 1) % 7, time: '03:00' };
   return { runs: [estimate], runsSource: 'settings', bids };
+}
+
+/**
+ * Yahoo's runs, from when its claims processed, and in FAAB leagues the winning
+ * bids. A claim is credited to the week it plays in: the week it processed in,
+ * counted back from this week a week at a time (runs fall between games).
+ */
+export function yahooSchedule(adds: YahooAdd[], faab: boolean, currentWeek: number, now = new Date()): Schedule {
+  const claims = adds.filter((a) => a.fromWaivers);
+  const runs = inferWaiverRuns(claims.map((a) => a.at));
+  const weekOf = (at: Date) => Math.max(1, currentWeek - Math.floor((now.getTime() - at.getTime()) / (7 * DAY)));
+  const bids = faab ? summarizeBids(claims.map((a) => ({ player: a.player, bid: a.bid ?? 0, week: weekOf(a.at) }))) : null;
+  return runs.length > 0 ? { runs, runsSource: 'history', bids } : { runs: [], runsSource: null, bids };
 }
 
 export async function espnSchedule(leagueId: string, season: string, week: number, auth: EspnAuth, league?: EspnLeague): Promise<Schedule> {

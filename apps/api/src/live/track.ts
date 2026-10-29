@@ -30,8 +30,8 @@ async function sleeperScoring(season: string): Promise<Map<string, Record<string
 
 /** How one league scores one player, read off a snapshot. */
 function scorer(league: LeagueSummary, player: Player, sleeperId: string | null, settings: Map<string, Record<string, number>>): Appearance['pointsFor'] {
-  if (league.platform === 'espn') {
-    return (snap) => snap.espnPoints.get(`${league.leagueId}:${player.playerId}`) ?? null;
+  if (league.platform === 'espn' || league.platform === 'yahoo') {
+    return (snap) => snap.platformPoints.get(`${league.leagueId}:${player.playerId}`) ?? null;
   }
   if (!sleeperId) return () => null;
   if (league.platform === 'sleeper') {
@@ -50,13 +50,14 @@ function scorer(league: LeagueSummary, player: Player, sleeperId: string | null,
 export async function trackedPlayers(dashboard: DashboardResponse): Promise<TrackedPlayer[]> {
   const [players, settings] = await Promise.all([sleeperClient.players(), sleeperScoring(dashboard.season)]);
 
-  // ESPN uses its own player ids; match them to Sleeper's by position and name.
+  // ESPN and Yahoo use their own player ids; match them to Sleeper's by position and name.
   const sleeperIdByKey = new Map<string, string>();
   for (const id of Object.keys(players)) {
     const p = toPlayer(id, players);
     if (p?.position) sleeperIdByKey.set(playerKey(p), id);
   }
-  const sleeperIdOf = (league: LeagueSummary, p: Player) => (league.platform === 'espn' ? (sleeperIdByKey.get(playerKey(p)) ?? null) : p.playerId);
+  const sleeperIdOf = (league: LeagueSummary, p: Player) =>
+    league.platform === 'espn' || league.platform === 'yahoo' ? (sleeperIdByKey.get(playerKey(p)) ?? null) : p.playerId;
 
   const byKey = new Map<string, TrackedPlayer>();
   const add = (league: LeagueSummary, player: Player, role: Role) => {
@@ -69,8 +70,7 @@ export async function trackedPlayers(dashboard: DashboardResponse): Promise<Trac
     byKey.set(key, entry);
   };
 
-  // Not Yahoo leagues: the feed saves its events, and Yahoo's API agreement doesn't allow storing its data.
-  for (const league of dashboard.leagues.filter((l) => l.platform !== 'yahoo')) {
+  for (const league of dashboard.leagues) {
     for (const s of league.matchup?.me.starters ?? []) if (s.player) add(league, s.player, 'starter');
     for (const r of league.roster) if (r.status !== 'starter') add(league, r.player, 'bench');
     for (const s of league.matchup?.opponent?.starters ?? []) if (s.player) add(league, s.player, 'opponent');
@@ -78,10 +78,10 @@ export async function trackedPlayers(dashboard: DashboardResponse): Promise<Trac
   return [...byKey.values()];
 }
 
-/** ESPN's own point totals for everyone in your ESPN matchups, by `${leagueId}:${playerId}`. */
-export function espnPoints(dashboard: DashboardResponse): Snapshot['espnPoints'] {
+/** ESPN's and Yahoo's own point totals for everyone in your matchups there, by `${leagueId}:${playerId}`. */
+export function platformPoints(dashboard: DashboardResponse): Snapshot['platformPoints'] {
   const out = new Map<string, number>();
-  for (const league of dashboard.leagues.filter((l) => l.platform === 'espn')) {
+  for (const league of dashboard.leagues.filter((l) => l.platform === 'espn' || l.platform === 'yahoo')) {
     for (const side of [league.matchup?.me, league.matchup?.opponent]) {
       for (const s of side?.starters ?? []) if (s.player) out.set(`${league.leagueId}:${s.player.playerId}`, s.points);
     }

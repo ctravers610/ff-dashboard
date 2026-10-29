@@ -9,7 +9,7 @@ import { liveEvents } from '../db/schema.js';
 import { nflGames } from '../scoring/games.js';
 import { fetchStats } from '../scoring/live.js';
 import { diffSnapshots, type FeedEvent, type Snapshot } from './feed.js';
-import { espnPoints, trackedPlayers } from './track.js';
+import { platformPoints, trackedPlayers } from './track.js';
 
 export function liveEventStore(db: Db) {
   return {
@@ -46,7 +46,7 @@ export async function pollLive(store = liveEventRepo): Promise<FeedEvent[]> {
   const dashboard = await getDashboard();
   const { season, week } = dashboard;
   const [tracked, stats, games] = await Promise.all([trackedPlayers(dashboard), fetchStats(season, week), nflGames(season, week)]);
-  const snapshot: Snapshot = { stats, games, espnPoints: espnPoints(dashboard) };
+  const snapshot: Snapshot = { stats, games, platformPoints: platformPoints(dashboard) };
   lastCheckedAt = new Date();
 
   if (!previous || previous.season !== season || previous.week !== week) {

@@ -3,6 +3,7 @@
 import type { LeagueSummary } from '@ffd/shared';
 import { espnPastWeeks } from './adapters/espn/history.js';
 import { sleeperPastWeeks } from './adapters/sleeper/history.js';
+import { yahooPastWeeks } from './adapters/yahoo/history.js';
 import { config } from './config.js';
 import type { NewSnapshot } from './db/schema.js';
 import { snapshotRepo } from './snapshots.js';
@@ -16,7 +17,7 @@ export const missingWeeks = (current: number, have: number[]) =>
 
 export async function backfillHistory(leagues: LeagueSummary[], store = snapshotRepo): Promise<void> {
   for (const league of leagues) {
-    if (league.platform !== 'sleeper' && league.platform !== 'espn') continue;
+    if (league.platform === 'ffpc') continue;
     const key = `${league.platform}:${league.leagueId}:${league.season}`;
     if (attempted.has(key)) continue;
     attempted.add(key);
@@ -29,7 +30,9 @@ export async function backfillHistory(leagues: LeagueSummary[], store = snapshot
       rows =
         league.platform === 'sleeper'
           ? await sleeperPastWeeks(league, missing)
-          : await espnPastWeeks(league, missing, config.espnAuth);
+          : league.platform === 'espn'
+            ? await espnPastWeeks(league, missing, config.espnAuth)
+            : await yahooPastWeeks(league, missing);
     } catch (e) {
       attempted.delete(key); // try again on a later load
       throw e;
