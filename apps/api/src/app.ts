@@ -25,6 +25,7 @@ import { sourceRoutes } from './sources/routes.js';
 import { liveRoutes } from './live/routes.js';
 import { manualLeagueRoutes } from './routes/manualLeagues.js';
 import { yahooAuthRoutes } from './routes/yahooAuth.js';
+import { warehouseRoutes } from './warehouse/routes.js';
 
 export interface AppOptions {
   logger?: FastifyServerOptions['logger'];
@@ -101,6 +102,7 @@ export async function buildApp({ logger = true, webDist = config.webDist, auth, 
   await app.register(yahooAuthRoutes);
   await app.register(manualLeagueRoutes());
   await app.register(historyRoutes);
+  await app.register(warehouseRoutes());
   await app.register(reminderRoutes());
   await app.register(sourceRoutes());
   await app.register(liveRoutes);

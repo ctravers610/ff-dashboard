@@ -25,6 +25,8 @@ unit_tests:
         rows: []
       - input: ref('dim_team')
         rows: []
+      - input: ref('dim_week')
+        rows: []
     expect:
       rows:
         - {week: 1, roster_id: 1, is_final: true, result: win, median_result: win, all_play_wins: 3, all_play_ties: 0, all_play_losses: 0}
@@ -135,3 +137,31 @@ unit_tests:
         - {transaction_id: tx1, action: add, waiver_bid: 12, dropped_week: 4, weeks_rostered: 3, weeks_started: 2, points_started: 15}
         - {transaction_id: tx2, action: drop, waiver_bid: null, dropped_week: null, weeks_rostered: null, weeks_started: null, points_started: null}
         - {transaction_id: tx3, action: add, waiver_bid: null, dropped_week: null, weeks_rostered: 2, weeks_started: 2, points_started: 35}
+
+  - name: team_season_luck_is_wins_beyond_what_the_scores_earned
+    description: >
+      A 4-team league, two final weeks. Team 1 outscored 2 of 3 teams both
+      weeks (expected 1.3333 wins) but won both games: luck +0.6667. A playoff
+      week and an unfinished week don't count.
+    model: agg_team_season
+    given:
+      - input: ref('fct_team_week')
+        rows:
+          - {team_key: t1, league_id: L1, week: 1, is_final: true, is_playoffs: false, result: win, points: 90, opponent_points: 80, all_play_wins: 2, all_play_losses: 1, all_play_ties: 0, best_lineup_points: 100, points_left_on_bench: 10}
+          - {team_key: t1, league_id: L1, week: 2, is_final: true, is_playoffs: false, result: win, points: 95, opponent_points: 70, all_play_wins: 2, all_play_losses: 1, all_play_ties: 0, best_lineup_points: 95, points_left_on_bench: 0}
+          - {team_key: t1, league_id: L1, week: 15, is_final: true, is_playoffs: true, result: loss, points: 60, opponent_points: 99, all_play_wins: 0, all_play_losses: 3, all_play_ties: 0, best_lineup_points: 60, points_left_on_bench: 0}
+          - {team_key: t1, league_id: L1, week: 3, is_final: false, is_playoffs: false, result: null, points: 40, opponent_points: 30}
+      - input: ref('dim_team')
+        rows:
+          - {team_key: t1, team_name: Mine, is_mine: true}
+      - input: ref('dim_league')
+        rows:
+          - {league_id: L1, league_lineage_id: L1, season: 2026, teams: 4, plays_median: false}
+      - input: ref('fct_transaction_moves')
+        rows:
+          - {team_key: t1, action: add, status: complete, transaction_type: waiver, waiver_bid: 12, points_started: 30}
+          - {team_key: t1, action: add, status: failed, transaction_type: waiver, waiver_bid: 50, points_started: null}
+          - {team_key: t1, action: add, status: complete, transaction_type: trade, waiver_bid: null, points_started: 40}
+    expect:
+      rows:
+        - {team_key: t1, weeks_played: 2, wins: 2, losses: 0, expected_wins: 1.3333, luck: 0.6667, points_for: 185, points_left_on_bench: 10, lineup_efficiency: 0.9487, pickups: 1, faab_spent: 12, pickup_points_started: 30, median_wins: null, regular_season_rank: 1}

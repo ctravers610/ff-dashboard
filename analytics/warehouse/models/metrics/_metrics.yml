@@ -1,0 +1,135 @@
+version: 2
+
+# The semantic layer: metrics defined once, in MetricFlow, so any question
+# ("my all-play win % by season", "luck by manager") is a query, not new SQL.
+# Query locally with the mf CLI, e.g.
+#   mf query --metrics win_pct,all_play_win_pct,luck_pct --group-by team__is_mine,league__season --where "{{ Dimension('team_week__is_final') }}"
+
+models:
+  - name: metricflow_time_spine
+    description: One row per day from 2017 to 2035, for MetricFlow's time calculations.
+    time_spine:
+      standard_granularity_column: date_day
+    columns:
+      - name: date_day
+        granularity: day
+
+semantic_models:
+  - name: team_week
+    description: A team's league week (fct_team_week).
+    model: ref('fct_team_week')
+    defaults:
+      agg_time_dimension: week_starts_on
+    entities:
+      - name: team_week
+        type: primary
+        expr: "team_key || '-' || week"
+      - name: team
+        type: foreign
+        expr: team_key
+      - name: league
+        type: foreign
+        expr: league_id
+    dimensions:
+      - name: week_starts_on
+        type: time
+        type_params:
+          time_granularity: week
+      - {name: nfl_week, type: categorical, expr: week}  # "week" is reserved for time grains
+      - {name: is_final, type: categorical}
+      - {name: is_playoffs, type: categorical}
+      - {name: result, type: categorical}
+    measures:
+      - name: games
+        description: Head-to-head games with a result.
+        agg: sum
+        expr: "case when result is not null then 1 else 0 end"
+      - name: game_wins
+        description: Head-to-head wins, a tie counting half.
+        agg: sum
+        expr: "case result when 'win' then 1 when 'tie' then 0.5 else 0 end"
+      - name: all_play_games
+        agg: sum
+        expr: "all_play_wins + all_play_ties + all_play_losses"
+      - name: all_play_wins
+        description: All-play wins, a tie counting half.
+        agg: sum
+        expr: "all_play_wins + 0.5 * all_play_ties"
+      - {name: points, agg: sum}
+      - {name: best_lineup_points, agg: sum}
+      - {name: points_left_on_bench, agg: sum}
+
+  - name: team
+    description: A fantasy team in one league season (dim_team).
+    model: ref('dim_team')
+    entities:
+      - name: team
+        type: primary
+        expr: team_key
+    dimensions:
+      - {name: team_name, type: categorical}
+      - {name: manager_name, type: categorical}
+      - {name: is_mine, type: categorical}
+
+  - name: league
+    description: A league season (dim_league).
+    model: ref('dim_league')
+    entities:
+      - name: league
+        type: primary
+        expr: league_id
+    dimensions:
+      - {name: league_name, type: categorical}
+      - {name: league_lineage_id, type: categorical}
+      - {name: season, type: categorical}
+      - {name: plays_median, type: categorical}
+
+metrics:
+  # Counts and sums, one per measure; the rates below divide these.
+  - {name: games, label: Games, type: simple, type_params: {measure: games}}
+  - {name: game_wins, label: Wins, type: simple, type_params: {measure: game_wins}}
+  - {name: all_play_games, label: All-play games, type: simple, type_params: {measure: all_play_games}}
+  - {name: all_play_wins, label: All-play wins, type: simple, type_params: {measure: all_play_wins}}
+  - {name: points, label: Points, type: simple, type_params: {measure: points}}
+  - {name: best_lineup_points, label: Best-lineup points, type: simple, type_params: {measure: best_lineup_points}}
+
+  - name: win_pct
+    label: Win %
+    description: Head-to-head wins over games played (ties count half).
+    type: ratio
+    type_params:
+      numerator: game_wins
+      denominator: games
+
+  - name: all_play_win_pct
+    label: All-play win %
+    description: How often a team's weekly score beat each other team's, as if it played everyone every week.
+    type: ratio
+    type_params:
+      numerator: all_play_wins
+      denominator: all_play_games
+
+  - name: luck_pct
+    label: Luck (win % points)
+    description: Win % minus all-play win %. Positive means more wins than the scoring earned.
+    type: derived
+    type_params:
+      expr: win_pct - all_play_win_pct
+      metrics:
+        - name: win_pct
+        - name: all_play_win_pct
+
+  - name: lineup_efficiency
+    label: Lineup efficiency
+    description: Points scored over what the best lineups would have scored.
+    type: ratio
+    type_params:
+      numerator: points
+      denominator: best_lineup_points
+
+  - name: points_left_on_bench
+    label: Points left on the bench
+    description: What better lineups would have added.
+    type: simple
+    type_params:
+      measure: points_left_on_bench

@@ -9,6 +9,7 @@ import { TradeFinder } from './TradeFinder';
 import { TradesPanel } from './TradesPanel';
 import { Awards, LuckTable } from '../outlook/SeasonCards';
 import { ResultChip } from './ResultChip';
+import { AllSeasonsPanel } from './AllSeasonsPanel';
 
 // League by league: pick a league on the left; on the right, its weekly
 // results (chart or table) and the lineup recap for a finished week.
@@ -77,6 +78,7 @@ export function HistoryView() {
           <RecapPanel leagueKey={keyOf(league)} week={week} onWeek={setWeek} />
           {oddsFor(league) && <Awards outlook={oddsFor(league)!} />}
           {oddsFor(league) && <LuckTable outlook={oddsFor(league)!} />}
+          <AllSeasonsPanel platform={league.platform} leagueId={league.leagueId} />
           <TradesPanel leagueKey={keyOf(league)} />
           <TradeFinder leagueKey={keyOf(league)} />
         </section>

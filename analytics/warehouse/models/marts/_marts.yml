@@ -223,6 +223,7 @@ models:
               arguments:
                 to: ref('dim_week')
                 field: week_key
+      - {name: week_starts_on, data_type: date, description: The Tuesday the NFL week starts (dim_week); the time dimension for metrics.}
       - {name: roster_id, data_type: integer}
       - {name: matchup_id, data_type: integer}
       - {name: is_playoffs, data_type: boolean, description: On or after the league's playoff_week_start.}
@@ -393,3 +394,62 @@ models:
       - {name: description, data_type: text, description: 'What happened, e.g. "1 sack".'}
       - {name: role, data_type: text, description: 'starter, bench, or opponent (starting against you).'}
       - {name: points, data_type: numeric}
+
+  # Aggregates
+
+  - name: agg_team_season
+    description: >
+      One row per team per league season, regular season only (final weeks
+      before the playoffs): the record head to head, against the median and
+      all-play; the wins its scoring earned and the luck that leaves; how
+      close its lineups came to the best possible; its waiver pickups; and
+      where it finished. The app's History tab reads it for your teams.
+    config:
+      contract: {enforced: true}
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "wins + losses + ties = games"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "all_play_wins + all_play_losses + all_play_ties = weeks_played * (teams - 1)"
+    columns:
+      - name: team_key
+        data_type: text
+        constraints: [{type: primary_key}]
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_team')
+                field: team_key
+      - {name: league_id, data_type: text, constraints: [{type: not_null}]}
+      - {name: league_lineage_id, data_type: text, description: Groups a league's seasons (see dim_league).}
+      - {name: season, data_type: integer}
+      - {name: team_name, data_type: text}
+      - {name: manager_id, data_type: text}
+      - {name: manager_name, data_type: text}
+      - {name: is_mine, data_type: boolean}
+      - {name: teams, data_type: integer, description: Teams in the league.}
+      - {name: weeks_played, data_type: integer, description: Final regular-season weeks.}
+      - {name: games, data_type: integer, description: Head-to-head games (weeks with an opponent).}
+      - {name: wins, data_type: integer}
+      - {name: losses, data_type: integer}
+      - {name: ties, data_type: integer}
+      - {name: median_wins, data_type: integer, description: Against the league median; null in leagues that don't play it.}
+      - {name: median_losses, data_type: integer}
+      - {name: median_ties, data_type: integer}
+      - {name: all_play_wins, data_type: integer, description: 'Every week, every team this score beat.'}
+      - {name: all_play_losses, data_type: integer}
+      - {name: all_play_ties, data_type: integer}
+      - {name: expected_wins, data_type: numeric, description: "The wins the team's scores earned: each week's share of the league it outscored, summed."}
+      - {name: luck, data_type: numeric, description: 'Head-to-head wins (a tie is half) minus expected_wins.'}
+      - {name: points_for, data_type: numeric}
+      - {name: points_against, data_type: numeric}
+      - {name: points_left_on_bench, data_type: numeric, description: What better lineups would have added.}
+      - {name: lineup_efficiency, data_type: numeric, description: Points scored over the best lineups' points (1 = never left a point on the bench).}
+      - {name: pickups, data_type: integer, description: Waiver claims and free-agent adds that went through.}
+      - {name: faab_spent, data_type: integer}
+      - {name: pickup_points_started, data_type: numeric, description: Points those pickups scored as starters for this team before it dropped them.}
+      - {name: regular_season_rank, data_type: integer, description: 'Finish: total wins (head to head plus median), then points for.'}

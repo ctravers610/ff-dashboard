@@ -105,6 +105,9 @@ function baseConfig(env: Env) {
         : null,
     // Matches docker-compose.yml, so `docker compose up -d` works with no setup.
     databaseUrl: env.DATABASE_URL ?? 'postgres://ffd:ffd_dev_password@127.0.0.1:5432/ffd',
+    // The analytics warehouse (analytics/), read for History's past seasons.
+    // Optional: without it, that panel just doesn't show. Use a read-only role.
+    warehouseUrl: env.ANALYTICS_DATABASE_URL?.trim() || null,
     migrationsDir: path.join(rootDir, 'apps', 'api', 'drizzle'),
     // Where the data comes from. Overridable so end-to-end tests can point the
     // whole app at a fake server with fixture data instead of the real services.

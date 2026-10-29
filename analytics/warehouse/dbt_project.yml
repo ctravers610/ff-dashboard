@@ -28,3 +28,7 @@ models:
       # The star schema: dim_ and fct_ tables, the layer to query.
       +schema: marts
       +materialized: table
+    metrics:
+      # MetricFlow's time spine; the semantic models and metrics live beside it.
+      +schema: marts
+      +materialized: table

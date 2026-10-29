@@ -78,5 +78,33 @@ services:
     ports:
       - '127.0.0.1:8090:3001'
 
+  # The analytics warehouse on Airflow (analytics/orchestration): the daily DAG
+  # that loads, builds and tests it. `docker compose --profile airflow up --build`,
+  # then http://localhost:8081, signing in as admin with the password in
+  # `docker compose logs airflow`. Uses the local database above.
+  airflow:
+    profiles: [airflow]
+    build:
+      context: ./analytics
+      dockerfile: orchestration/Dockerfile
+    command: standalone
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/analytics/orchestration/dags
+      # The loader: where to write, and the app database it reads (Sleeper
+      # accounts added in the app, History, the live feed).
+      ANALYTICS_DATABASE_URL: postgres://ffd:${POSTGRES_PASSWORD:-ffd_dev_password}@db:5432/ffd_analytics
+      APP_DATABASE_URL: postgres://ffd:${POSTGRES_PASSWORD:-ffd_dev_password}@db:5432/ffd
+      # dbt's profile (analytics/warehouse/profiles.yml).
+      ANALYTICS_DB_HOST: db
+      ANALYTICS_DB_PASSWORD: ${POSTGRES_PASSWORD:-ffd_dev_password}
+    volumes:
+      - ./analytics:/opt/analytics
+    ports:
+      - '127.0.0.1:8081:8080'
+
 volumes:
   pgdata:
