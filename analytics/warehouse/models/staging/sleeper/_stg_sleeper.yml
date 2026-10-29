@@ -207,6 +207,12 @@ models:
       - name: player_id
         data_tests: [not_null]
 
+  - name: stg_sleeper__player_versions
+    description: Every version of every player the loader has seen, oldest first by version_id. Feeds dim_player_history.
+    columns:
+      - name: version_id
+        data_tests: [unique, not_null]
+
   - name: stg_sleeper__players
     description: Every NFL player Sleeper knows, as of the latest load. Team defenses are players keyed by team ("SF").
     columns:

@@ -211,6 +211,17 @@ In `analytics/warehouse` (dbt Core 1.12 with dbt-postgres). Its profile defaults
 
 - **Sources** (`models/staging/_sources.yml`) describe the raw tables, with a freshness check on `raw.load_runs`.
 - **Staging** (schema `staging`, views): one model per raw table, each reading the latest version of every item and turning the JSON into typed columns. Arrays become rows: `stg_sleeper__matchup_players` has one row per player per team per week, `stg_sleeper__transaction_moves` one per player added or dropped.
-- **Tests:** primary keys, relationships between models, allowed values, and `tests/assert_starter_points_add_up_to_team_score.sql`, which checks that the per-player rows add back up to Sleeper's team scores.
+- **Intermediate** (schema `intermediate`, views): each league's lineup slots, each team's opponent, and `int_best_lineups`, the best lineup each team could have set each week. It fills slots by the same rules as the app's Lineup Recap (narrowest first: QB, RB, … then FLEX, then SUPER_FLEX; see `macros/lineup_slots.sql`), and gives the same totals.
+- **Marts** (schema `marts`, tables): a star schema to query.
+  - Dimensions: `dim_league` (with `league_lineage_id` tying a league's seasons together), `dim_team`, `dim_manager`, `dim_player`, `dim_player_history` (type 2: team, status and injury over time) and `dim_week` (from the `nfl_seasons` seed).
+  - Facts: `fct_team_week` (score, result, median result, all-play record, best lineup and points left on the bench), `fct_player_week` (who started where, and where the best lineup would have used him), `fct_transaction_moves` (every add and drop, with what each pickup then scored for that team) and `fct_live_event_scores` (the app's live feed).
+  - `fct_player_week` and `fct_live_event_scores` are incremental: a run processes only league weeks with new matchups, or new events. After changing their logic, rebuild with `dbt build --full-refresh`.
+- **Tests:** primary keys, relationships between models, allowed values, and checks in `tests/`:
+  - starters' points add up to Sleeper's team scores
+  - every best lineup is legal
+  - the two teams in a game have opposite results
+  - each all-play record covers the whole league
+
+`dim_player_history` is built from the raw versions rather than a dbt snapshot, since the loader already keeps every version Sleeper has served. Its history starts with the first load.
 
 CI builds and tests every model on an empty raw schema, so SQL that doesn't compile or run fails the build.

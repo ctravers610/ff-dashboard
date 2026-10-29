@@ -10,9 +10,21 @@ seed-paths: [seeds]
 snapshot-paths: [snapshots]
 clean-targets: [target, dbt_packages, logs]
 
+seeds:
+  ffd:
+    +schema: reference
+
 models:
   ffd:
     staging:
       # One model per raw table: the current version of each item, as typed columns.
       +schema: staging
       +materialized: view
+    intermediate:
+      # Building blocks the marts share: lineup slots, best lineups, paired matchups.
+      +schema: intermediate
+      +materialized: view
+    marts:
+      # The star schema: dim_ and fct_ tables, the layer to query.
+      +schema: marts
+      +materialized: table

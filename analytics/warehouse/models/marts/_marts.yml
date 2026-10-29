@@ -1,0 +1,211 @@
+version: 2
+
+models:
+  # Dimensions
+
+  - name: dim_week
+    description: One row per NFL regular-season week, Tuesday to Monday. week_key is season * 100 + week.
+    columns:
+      - name: week_key
+        data_tests: [unique, not_null]
+
+  - name: dim_league
+    description: >
+      One row per Sleeper league per season. league_lineage_id groups a
+      league's seasons together (Sleeper gives each renewal a new league_id).
+    columns:
+      - name: league_id
+        data_tests: [unique, not_null]
+      - name: league_lineage_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_league')
+                field: league_id
+
+  - name: dim_manager
+    description: One row per person who has managed a team in a loaded league. is_me marks the loaded accounts.
+    columns:
+      - name: manager_id
+        data_tests: [unique, not_null]
+
+  - name: dim_team
+    description: One row per fantasy team (a roster in one league season), keyed by team_key.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [league_id, roster_id]
+    columns:
+      - name: team_key
+        data_tests: [unique, not_null]
+      - name: league_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_league')
+                field: league_id
+      - name: manager_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_manager')
+                field: manager_id
+
+  - name: dim_player
+    description: One row per NFL player as he is now.
+    columns:
+      - name: player_id
+        data_tests: [unique, not_null]
+
+  - name: dim_player_history
+    description: >
+      Type 2 slowly changing dimension: one row per stretch of time a player's
+      name, position, team, status and injury stayed the same. Join on
+      player_id where a time falls in [valid_from, valid_to). History starts
+      when the loader first ran.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [player_id, valid_from]
+    columns:
+      - name: player_version_key
+        data_tests: [unique, not_null]
+      - name: player_id
+        data_tests:
+          - unique:
+              config:
+                where: is_current  # exactly one current row per player
+          - relationships:
+              arguments:
+                to: ref('dim_player')
+                field: player_id
+
+  # Facts
+
+  - name: fct_team_week
+    description: >
+      One row per team per league week: score, result, median result, all-play
+      record and the best lineup in hindsight. Results and all-play are null
+      until the week is final.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [team_key, week]
+      # A best lineup below what was actually started means the lineup rules
+      # missed a way the team could field a player. Worth a look, not a failure.
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "best_lineup_points >= points - 0.01"
+          config:
+            severity: warn
+    columns:
+      - name: team_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_team')
+                field: team_key
+      - name: opponent_team_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_team')
+                field: team_key
+      - name: week_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_week')
+                field: week_key
+      - name: result
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [win, loss, tie]
+      - name: median_result
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [win, loss, tie]
+      - name: best_lineup_points
+        data_tests: [not_null]
+
+  - name: fct_player_week
+    description: >
+      One row per player on each team each league week, with the slot he
+      started in and the one the best lineup would have used. Incremental:
+      rebuilds only league weeks with new matchup data.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [league_id, week, roster_id, player_id]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "is_starter = (lineup_slot is not null)"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "is_in_best_lineup = (best_lineup_slot is not null)"
+    columns:
+      - name: team_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_team')
+                field: team_key
+      - name: player_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_player')
+                field: player_id
+              config:
+                severity: warn  # a player Sleeper has since removed shouldn't stop the build
+      - name: week_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_week')
+                field: week_key
+
+  - name: fct_transaction_moves
+    description: >
+      One row per player added or dropped in a transaction, failed claims
+      included. Completed adds carry what the player did for that team until
+      it dropped him (weeks_rostered, weeks_started, points_started).
+    columns:
+      - name: move_key
+        data_tests: [unique, not_null]
+      - name: team_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_team')
+                field: team_key
+      - name: week_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_week')
+                field: week_key
+      - name: action
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [add, drop]
+
+  - name: fct_live_event_scores
+    description: >
+      The app's live scoring feed across every platform, one row per scoring
+      change per league. Incremental: each run adds only newer events.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [event_id, league_key]
+    columns:
+      - name: week_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_week')
+                field: week_key
