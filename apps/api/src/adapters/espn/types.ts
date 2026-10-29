@@ -103,6 +103,7 @@ export interface EspnFreeAgents {
 
 // From the mTransactions2 view. Signed in as you, pending waiver claims are yours.
 export interface EspnTransaction {
+  id?: string;
   type: string; // 'WAIVER', 'FREEAGENT', ...
   status?: string; // 'PENDING', 'EXECUTED', ...
   teamId?: number;
@@ -111,4 +112,7 @@ export interface EspnTransaction {
   processDate?: number;
   scoringPeriodId?: number;
   items?: { type: 'ADD' | 'DROP' | string; playerId: number }[];
+  // A processed claim is a new transaction pointing back at the claim, which keeps
+  // its PENDING status for good.
+  relatedTransactionId?: string;
 }

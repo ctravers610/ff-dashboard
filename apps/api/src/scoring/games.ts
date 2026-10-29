@@ -68,9 +68,7 @@ const NFL_TEAMS = [
 /** Teams with no game in a week's schedule are on bye. */
 export function byes(games: Map<string, unknown>): Set<string> | null {
   if (games.size === 0) return null; // no schedule: can't tell
-  const out = new Set(NFL_TEAMS.filter((t) => !games.has(t)));
-  if (out.has('WAS')) out.add('WSH'); // ESPN's code for Washington
-  return out;
+  return new Set(NFL_TEAMS.filter((t) => !games.has(t)));
 }
 
 /** Each week's bye teams (null where that week's schedule couldn't be loaded). The schedule rarely changes, so it's kept for hours. */

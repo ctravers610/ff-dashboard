@@ -79,6 +79,18 @@ export function espnWaiverLeague(league: EspnLeague, freeAgents: EspnFreeAgents,
 }
 
 /**
+ * Your claims still waiting for a run. ESPN never updates a claim: processing it
+ * (won, failed or canceled) adds a transaction that points back at it, and the
+ * claim itself stays PENDING, so those are left out.
+ */
+export function myPendingClaims(transactions: EspnTransaction[], myTeamId: number): EspnTransaction[] {
+  const resolved = new Set(transactions.map((t) => t.relatedTransactionId).filter(Boolean));
+  return transactions.filter(
+    (t) => t.type === 'WAIVER' && t.status === 'PENDING' && t.teamId === myTeamId && !(t.id && resolved.has(t.id)),
+  );
+}
+
+/**
  * Your pending claims, with names and projections. ESPN gives only player ids,
  * so they're looked up on the league's rosters and free agents, and any left
  * over are fetched by id.
@@ -140,7 +152,7 @@ export async function fetchEspnWaivers(
         const base = espnWaiverLeague(league, freeAgents, myTeamId, name, ctx);
         let pendingClaims: PendingClaim[] | null = null;
         if (pending) {
-          const mine = (pending.transactions ?? []).filter((t) => t.type === 'WAIVER' && t.status === 'PENDING' && t.teamId === myTeamId);
+          const mine = myPendingClaims(pending.transactions ?? [], myTeamId);
           result.pendingClaims.set(String(league.id), mine.length);
           const fetchPlayers = (ids: number[]) => espnClient.players(leagueId, ctx.season, ctx.week, ids, auth).then((r) => r.players.map((p) => p.player));
           pendingClaims = await espnPendingClaims(mine, league, freeAgents, base.rules?.type === 'faab', ctx, fetchPlayers);

@@ -1,8 +1,7 @@
 import { unfilledSlots, type Platform } from '@ffd/shared';
 import { useByeWeeks, useDashboard } from '../../api';
 
-// ESPN and Sleeper spell Washington differently.
-const onBye = (team: string | null, teams: Set<string>) => !!team && (teams.has(team) || (team === 'WSH' && teams.has('WAS')));
+const onBye = (team: string | null, teams: Set<string>) => !!team && teams.has(team);
 
 /**
  * The bye weeks left for one league: who's out each week and whether the rest
