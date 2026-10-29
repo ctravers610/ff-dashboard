@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: stg_app__league_snapshots
+    description: >
+      The app's History: your result in each league each week, on every
+      platform (Sleeper, ESPN, FFPC), as last captured.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [platform, league_id, season, week]
+    columns:
+      - name: platform
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [sleeper, espn, ffpc, yahoo]
+      - name: points
+        data_tests: [not_null]
+
+  - name: stg_app__live_event_scores
+    description: The live scoring feed, one row per scoring change per league it counted in.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [event_id, league_key]
+    columns:
+      - name: role
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [starter, bench, opponent]
+      - name: occurred_at
+        data_tests: [not_null]

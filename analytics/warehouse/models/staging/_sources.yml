@@ -1,0 +1,58 @@
+version: 2
+
+sources:
+  - name: raw
+    description: >
+      What the loader (analytics/loader) fetched, exactly as the source sent it.
+      Every table but load_runs has the same shape: the columns that identify an
+      item, `payload` (JSON), `payload_hash`, `run_id` and `loaded_at`. A row is
+      added only when an item's payload changes, so each table holds every
+      version of every item; staging reads the latest.
+    schema: raw
+    tables:
+      - name: load_runs
+        description: One row per loader run.
+        config:
+          loaded_at_field: finished_at
+          # Is the loader still running? Checked on successful runs only. In
+          # season it should run at least weekly (after Monday night).
+          freshness:
+            warn_after: {count: 8, period: day}
+            error_after: {count: 15, period: day}
+            filter: "status = 'succeeded'"
+        columns:
+          - name: run_id
+            data_tests: [unique, not_null]
+          - name: status
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: [running, succeeded, failed]
+
+      - name: sleeper_state
+        description: The NFL season and week as Sleeper sees them (GET /state/nfl).
+      - name: sleeper_users
+        description: The Sleeper accounts the loader was asked to load (GET /user/{username}).
+      - name: sleeper_leagues
+        description: Every league those accounts are in, each season (GET /user/{id}/leagues/nfl/{season}).
+      - name: sleeper_league_users
+        description: Everyone in a league, as one JSON array per league (GET /league/{id}/users).
+      - name: sleeper_rosters
+        description: Each league's rosters as they stand now, one array per league (GET /league/{id}/rosters).
+      - name: sleeper_matchups
+        description: One array per league and week, one element per team (GET /league/{id}/matchups/{week}).
+      - name: sleeper_transactions
+        description: Waiver claims, free-agent moves and trades, one array per league and week (GET /league/{id}/transactions/{week}).
+      - name: sleeper_drafts
+        description: A league's drafts, one array per league (GET /league/{id}/drafts).
+      - name: sleeper_draft_picks
+        description: Every pick in a draft, one array per draft (GET /draft/{id}/picks).
+      - name: sleeper_players
+        description: Sleeper's player list (GET /players/nfl), one row per player per change.
+      - name: app_league_snapshots
+        description: >
+          The app's league_snapshots table: one row per league per week, for
+          every platform including FFPC. The app overwrites a week's row as the
+          week plays out; each version is kept here.
+      - name: app_live_events
+        description: The app's live_events table (the live scoring feed), which the app clears weekly.

@@ -1,0 +1,216 @@
+version: 2
+
+models:
+  - name: stg_sleeper__nfl_state
+    description: The current NFL season and week, from Sleeper. One row.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "week between 0 and 18"
+    columns:
+      - name: season
+        data_tests: [not_null]
+      - name: season_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [pre, regular, post, off]
+
+  - name: stg_sleeper__users
+    description: The Sleeper accounts the loader loads. Teams these own are "mine".
+    columns:
+      - name: user_id
+        data_tests: [unique, not_null]
+
+  - name: stg_sleeper__leagues
+    description: One row per league per season. A league that carries over gets a new league_id each season, linked by previous_league_id.
+    columns:
+      - name: league_id
+        data_tests: [unique, not_null]
+      - name: season
+        data_tests: [not_null]
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [pre_draft, drafting, in_season, complete]
+      - name: waiver_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [rolling, reverse_standings, faab]
+      - name: league_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [redraft, keeper, dynasty]
+
+  - name: stg_sleeper__league_members
+    description: One row per user per league.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [league_id, user_id]
+    columns:
+      - name: league_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_sleeper__leagues')
+                field: league_id
+
+  - name: stg_sleeper__rosters
+    description: One row per team per league as it stands now, with season-to-date record and points.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [league_id, roster_id]
+    columns:
+      - name: league_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_sleeper__leagues')
+                field: league_id
+      - name: points_for
+        data_tests: [not_null]
+
+  - name: stg_sleeper__roster_players
+    description: One row per player on each roster now.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [league_id, roster_id, player_id]
+    columns:
+      - name: slot
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [starter, bench, reserve, taxi]
+
+  - name: stg_sleeper__matchups
+    description: One row per team per league week. Teams in the same game share a matchup_id; it's null for a team without a game (eliminated from the playoffs, say).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [league_id, week, roster_id]
+    columns:
+      - name: league_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_sleeper__leagues')
+                field: league_id
+      - name: week
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+                quote: false
+      - name: points
+        data_tests: [not_null]
+
+  - name: stg_sleeper__matchup_players
+    description: One row per player on each team each league week, with his points and whether he started.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [league_id, week, roster_id, player_id]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "is_starter = (starter_index is not null)"
+    columns:
+      - name: player_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_sleeper__players')
+                field: player_id
+              config:
+                severity: warn  # a player Sleeper has since removed shouldn't stop the build
+
+  - name: stg_sleeper__empty_lineup_slots
+    description: Starting slots a team left empty, one row per slot per league week.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [league_id, week, roster_id, starter_index]
+
+  - name: stg_sleeper__transactions
+    description: One row per waiver claim, free-agent move, trade or commissioner move, including failed claims.
+    columns:
+      - name: transaction_id
+        data_tests: [unique, not_null]
+      - name: league_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_sleeper__leagues')
+                field: league_id
+      - name: transaction_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [waiver, free_agent, trade, commissioner]
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [complete, failed, pending]
+
+  - name: stg_sleeper__transaction_moves
+    description: One row per player added to or dropped from a roster in a transaction.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [transaction_id, action, player_id]
+    columns:
+      - name: transaction_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_sleeper__transactions')
+                field: transaction_id
+      - name: action
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [add, drop]
+
+  - name: stg_sleeper__drafts
+    description: One row per draft.
+    columns:
+      - name: draft_id
+        data_tests: [unique, not_null]
+      - name: league_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_sleeper__leagues')
+                field: league_id
+
+  - name: stg_sleeper__draft_picks
+    description: One row per pick in each draft.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [draft_id, pick_no]
+    columns:
+      - name: draft_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_sleeper__drafts')
+                field: draft_id
+      - name: player_id
+        data_tests: [not_null]
+
+  - name: stg_sleeper__players
+    description: Every NFL player Sleeper knows, as of the latest load. Team defenses are players keyed by team ("SF").
+    columns:
+      - name: player_id
+        data_tests: [unique, not_null]
+      - name: full_name
+        data_tests: [not_null]

@@ -1,0 +1,18 @@
+# The warehouse: dbt models over the raw schema the loader fills (../loader).
+name: ffd
+version: '1.0.0'
+profile: ffd
+
+model-paths: [models]
+macro-paths: [macros]
+test-paths: [tests]
+seed-paths: [seeds]
+snapshot-paths: [snapshots]
+clean-targets: [target, dbt_packages, logs]
+
+models:
+  ffd:
+    staging:
+      # One model per raw table: the current version of each item, as typed columns.
+      +schema: staging
+      +materialized: view
