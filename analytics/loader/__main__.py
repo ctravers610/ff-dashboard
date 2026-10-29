@@ -19,11 +19,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--refetch', action='store_true', help='fetch finished leagues and weeks again, too')
     parser.add_argument('--skip-players', action='store_true', help="don't fetch Sleeper's player list")
     parser.add_argument('--skip-app', action='store_true', help="don't read the app's database")
+    parser.add_argument('--schema-only', action='store_true',
+                        help='create the database and raw tables, then stop (for CI, or a new host)')
     args = parser.parse_args(argv)
 
     cfg = load_config()
     if ensure_database(cfg.analytics_url):
         print('Created the analytics database')
+    if args.schema_only:
+        with psycopg.connect(cfg.analytics_url) as conn:
+            create_schema(conn)
+        print('Raw schema is ready')
+        return 0
 
     app = None
     if not args.skip_app:

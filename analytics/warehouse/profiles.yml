@@ -1,0 +1,15 @@
+# Defaults are the local docker compose Postgres. For another database (Neon),
+# set the ANALYTICS_DB_* variables; ANALYTICS_DB_SSLMODE=require for Neon.
+ffd:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('ANALYTICS_DB_HOST', '127.0.0.1') }}"
+      port: "{{ env_var('ANALYTICS_DB_PORT', '5432') | as_number }}"
+      user: "{{ env_var('ANALYTICS_DB_USER', 'ffd') }}"
+      password: "{{ env_var('ANALYTICS_DB_PASSWORD', 'ffd_dev_password') }}"
+      dbname: "{{ env_var('ANALYTICS_DB_NAME', 'ffd_analytics') }}"
+      sslmode: "{{ env_var('ANALYTICS_DB_SSLMODE', 'prefer') }}"
+      schema: analytics
+      threads: 4

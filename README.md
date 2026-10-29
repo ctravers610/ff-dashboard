@@ -175,15 +175,22 @@ Create an app at [developer.yahoo.com/apps](https://developer.yahoo.com/apps/cre
 
 ## Analytics
 
-`analytics/` is the start of a warehouse for league history: a Python loader that copies raw data into a separate `ffd_analytics` database, which dbt models will build on. The app never reads it.
+`analytics/` is a warehouse for league history, in a separate `ffd_analytics` database that the app never reads. A Python loader (`analytics/loader`) copies raw data in, and dbt models (`analytics/warehouse`) turn it into tables.
 
 ```bash
 cd analytics
 python -m venv .venv
-.venv/Scripts/pip install -e ".[dev]"   # macOS/Linux: .venv/bin/pip
+.venv/Scripts/pip install -e ".[dev]"   # the loader and dbt; macOS/Linux: .venv/bin/pip
 .venv/Scripts/python -m loader          # first run creates ffd_analytics and loads every season
-.venv/Scripts/python -m pytest
+.venv/Scripts/python -m pytest          # loader tests
+
+cd warehouse
+../.venv/Scripts/dbt deps               # once: installs dbt_utils
+../.venv/Scripts/dbt build              # builds every model and runs its tests
+../.venv/Scripts/dbt source freshness   # warns if the loader hasn't succeeded in 8 days
 ```
+
+### Loader
 
 What it loads, into the `raw` schema:
 
@@ -195,3 +202,15 @@ ESPN, Yahoo and FFPC aren't fetched: ESPN's API is unofficial and needs your coo
 Each table holds the payload exactly as the source sent it, plus the columns that identify the item (`league_id`, `week`, …). A row is only added when the payload differs from that item's latest one, so loading again is safe and changes such as stat corrections are kept as versions. Finished leagues and weeks are fetched once; leagues in season refetch their rosters and the last two weeks. Every run is recorded in `raw.load_runs` (status, rows added, Sleeper calls, error), and an advisory lock stops two loads overlapping.
 
 Settings: `ANALYTICS_DATABASE_URL` (default: `ffd_analytics` on the local Postgres) and `APP_DATABASE_URL` (default: `DATABASE_URL`, read-only).
+
+`python -m loader --schema-only` creates the database and raw tables without loading anything (CI uses it).
+
+### dbt models
+
+In `analytics/warehouse` (dbt Core 1.12 with dbt-postgres). Its profile defaults to the local Postgres; for another database set `ANALYTICS_DB_HOST`, `ANALYTICS_DB_PORT`, `ANALYTICS_DB_USER`, `ANALYTICS_DB_PASSWORD`, `ANALYTICS_DB_NAME` and `ANALYTICS_DB_SSLMODE` (`require` for Neon).
+
+- **Sources** (`models/staging/_sources.yml`) describe the raw tables, with a freshness check on `raw.load_runs`.
+- **Staging** (schema `staging`, views): one model per raw table, each reading the latest version of every item and turning the JSON into typed columns. Arrays become rows: `stg_sleeper__matchup_players` has one row per player per team per week, `stg_sleeper__transaction_moves` one per player added or dropped.
+- **Tests:** primary keys, relationships between models, allowed values, and `tests/assert_starter_points_add_up_to_team_score.sql`, which checks that the per-player rows add back up to Sleeper's team scores.
+
+CI builds and tests every model on an empty raw schema, so SQL that doesn't compile or run fails the build.
