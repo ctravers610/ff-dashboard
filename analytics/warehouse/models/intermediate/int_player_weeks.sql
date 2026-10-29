@@ -1,6 +1,18 @@
 -- Every player on every team each league week, with the slot he started in.
 with player_weeks as (
     select * from {{ ref('stg_sleeper__matchup_players') }}
+),
+
+leagues as (
+    select * from {{ ref('stg_sleeper__leagues') }}
+),
+
+players as (
+    select * from {{ ref('stg_sleeper__players') }}
+),
+
+slots as (
+    select * from {{ ref('int_lineup_slots') }}
 )
 
 select
@@ -17,10 +29,11 @@ select
     player_weeks.points,
     player_weeks.loaded_at
 from player_weeks
-inner join {{ ref('stg_sleeper__leagues') }} as leagues
+inner join leagues
     on leagues.league_id = player_weeks.league_id
-left join {{ ref('stg_sleeper__players') }} as players
+left join players
     on players.player_id = player_weeks.player_id
-left join {{ ref('int_lineup_slots') }} as slots
-    on slots.league_id = player_weeks.league_id
-    and slots.slot_index = player_weeks.starter_index
+left join slots
+    on
+        slots.league_id = player_weeks.league_id
+        and slots.slot_index = player_weeks.starter_index

@@ -1,0 +1,91 @@
+name: Warehouse docs
+
+# The dbt docs site (models, columns, tests, lineage graph) on GitHub Pages,
+# rebuilt whenever the warehouse changes on main. It's built on the made-up
+# fixture league, so no real league data is published. The site also serves
+# manifest.json, main's state for comparing a branch against (dbt --state).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'analytics/**'
+      - '.github/workflows/warehouse-docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: ffd
+          POSTGRES_PASSWORD: ffd_dev_password
+          POSTGRES_DB: ffd
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ffd -d ffd"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    defaults:
+      run:
+        working-directory: analytics
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: analytics/pyproject.toml
+
+      - name: Install the loader and dbt
+        run: pip install -e .
+
+      - name: Load the fixture league
+        run: python -m loader.fixture
+
+      - name: Build and document the warehouse
+        working-directory: analytics/warehouse
+        run: |
+          dbt deps
+          dbt seed
+          dbt run --empty  # so unit tests of incremental models can read their columns
+          dbt build
+          dbt docs generate --static
+
+      - name: Assemble the site
+        working-directory: analytics/warehouse
+        run: |
+          mkdir -p site
+          cp target/static_index.html site/index.html
+          cp target/manifest.json target/catalog.json site/
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: analytics/warehouse/site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

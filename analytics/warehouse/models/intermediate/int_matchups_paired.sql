@@ -19,7 +19,8 @@ select
     opponent.points as opponent_points
 from matchups as team
 left join matchups as opponent
-    on opponent.league_id = team.league_id
-    and opponent.week = team.week
-    and opponent.matchup_id = team.matchup_id
-    and opponent.roster_id <> team.roster_id
+    on
+        opponent.league_id = team.league_id
+        and opponent.week = team.week
+        and opponent.matchup_id = team.matchup_id
+        and opponent.roster_id <> team.roster_id

@@ -11,16 +11,22 @@ with picks as (
 slot_counts as (
     select league_id, slot, count(*) as slots
     from {{ ref('int_lineup_slots') }}
-    group by 1, 2
+    group by league_id, slot
 ),
 
 overfilled as (
-    select picks.league_id, picks.week, picks.roster_id, picks.best_slot, 'more players than slots' as problem
+    select
+        picks.league_id,
+        picks.week,
+        picks.roster_id,
+        picks.best_slot,
+        'more players than slots' as problem
     from picks
     left join slot_counts
-        on slot_counts.league_id = picks.league_id
-        and slot_counts.slot = picks.best_slot
-    group by 1, 2, 3, 4, slot_counts.slots
+        on
+            slot_counts.league_id = picks.league_id
+            and slot_counts.slot = picks.best_slot
+    group by picks.league_id, picks.week, picks.roster_id, picks.best_slot, slot_counts.slots
     having count(*) > coalesce(slot_counts.slots, 0)
 ),
 
@@ -29,7 +35,7 @@ ineligible as (
     from picks
     where case best_slot
         {%- for rule in flex %}
-        when '{{ rule.slot }}' then position not in ('{{ rule.positions | join("', '") }}')
+            when '{{ rule.slot }}' then position not in ({{ sql_list(rule.positions) }})
         {%- endfor %}
         else position is distinct from best_slot
     end

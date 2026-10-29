@@ -15,6 +15,7 @@ select
     (teams.team ->> 'roster_id')::int as roster_id,
     s.starter_index::int as starter_index
 from teams
-cross join jsonb_array_elements_text({{ jsonb_array("teams.team -> 'starters'") }})
+cross join
+    jsonb_array_elements_text({{ jsonb_array("teams.team -> 'starters'") }})
     with ordinality as s (player_id, starter_index)
 where s.player_id = '0'

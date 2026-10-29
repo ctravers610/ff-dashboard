@@ -12,6 +12,10 @@ nfl_state as (
     select * from {{ ref('stg_sleeper__nfl_state') }}
 ),
 
+teams as (
+    select * from {{ ref('dim_team') }}
+),
+
 best_lineups as (
     select team_key, week, sum(points) as best_lineup_points
     from {{ ref('int_best_lineups') }}
@@ -36,8 +40,8 @@ scored as (
         -- A week is final once it's over: the league is finished, it's an
         -- earlier season, or it's before the current NFL week.
         leagues.status = 'complete'
-            or leagues.season < nfl_state.season
-            or weeks.week < nfl_state.week as is_final,
+        or leagues.season < nfl_state.season
+        or weeks.week < nfl_state.week as is_final,
         medians.league_median_points
     from weeks
     inner join leagues on leagues.league_id = weeks.league_id
@@ -49,16 +53,17 @@ ranked as (
     select
         scored.*,
         -- All-play: this score against every other team's that week.
-        rank() over (partition by league_id, week order by points) - 1 as teams_outscored,
-        count(*) over (partition by league_id, week, points) - 1 as teams_tied,
-        count(*) over (partition by league_id, week) - 1 as other_teams
+        (rank() over (partition by scored.league_id, scored.week order by scored.points) - 1)::int as teams_outscored,
+        (count(*) over (partition by scored.league_id, scored.week, scored.points) - 1)::int as teams_tied,
+        (count(*) over (partition by scored.league_id, scored.week) - 1)::int as other_teams
     from scored
 )
 
 select
     {{ dbt_utils.generate_surrogate_key(['ranked.league_id', 'ranked.roster_id']) }} as team_key,
-    case when ranked.opponent_roster_id is not null then
-        {{ dbt_utils.generate_surrogate_key(['ranked.league_id', 'ranked.opponent_roster_id']) }}
+    case
+        when ranked.opponent_roster_id is not null then
+            {{ dbt_utils.generate_surrogate_key(['ranked.league_id', 'ranked.opponent_roster_id']) }}
     end as opponent_team_key,
     ranked.league_id,
     ranked.season,
@@ -90,14 +95,18 @@ select
 
     case when ranked.is_final then ranked.teams_outscored end as all_play_wins,
     case when ranked.is_final then ranked.teams_tied end as all_play_ties,
-    case when ranked.is_final then ranked.other_teams - ranked.teams_outscored - ranked.teams_tied end as all_play_losses,
+    case
+        when ranked.is_final then ranked.other_teams - ranked.teams_outscored - ranked.teams_tied
+    end as all_play_losses,
 
     best_lineups.best_lineup_points,
     greatest(0, best_lineups.best_lineup_points - ranked.points) as points_left_on_bench
 from ranked
 left join best_lineups
-    on best_lineups.team_key = {{ dbt_utils.generate_surrogate_key(['ranked.league_id', 'ranked.roster_id']) }}
-    and best_lineups.week = ranked.week
-left join {{ ref('dim_team') }} as teams
-    on teams.league_id = ranked.league_id
-    and teams.roster_id = ranked.roster_id
+    on
+        best_lineups.team_key = {{ dbt_utils.generate_surrogate_key(['ranked.league_id', 'ranked.roster_id']) }}
+        and best_lineups.week = ranked.week
+left join teams
+    on
+        teams.league_id = ranked.league_id
+        and teams.roster_id = ranked.roster_id

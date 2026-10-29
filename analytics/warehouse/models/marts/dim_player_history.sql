@@ -17,7 +17,12 @@ with versions as (
         player_id,
         {{ tracked | join(', ') }},
         loaded_at,
-        md5(concat_ws('|', {% for col in tracked %}coalesce({{ col }}, '~'){{ ', ' if not loop.last }}{% endfor %})) as tracked_hash
+        md5(concat_ws(
+            '|',
+            {%- for col in tracked %}
+                coalesce({{ col }}, '~'){{ ',' if not loop.last }}
+            {%- endfor %}
+        )) as tracked_hash
     from {{ ref('stg_sleeper__player_versions') }}
 ),
 

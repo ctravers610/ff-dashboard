@@ -1,0 +1,34 @@
+# SQL style for the dbt models, checked in CI: `sqlfluff lint models tests`.
+# Templated through dbt, so macros and refs resolve as they do in a build.
+[sqlfluff]
+templater = dbt
+dialect = postgres
+max_line_length = 120
+# Style choices this project makes differently from sqlfluff's defaults:
+# LT09: short CTEs keep their columns on one line ("select league_id, slot, count(*)").
+# ST06: columns are ordered by meaning (keys, then attributes), not by kind.
+# RF04: column names like week, position and action are the domain's words.
+exclude_rules = LT09, ST06, RF04
+
+[sqlfluff:templater:dbt]
+project_dir = .
+profiles_dir = .
+
+[sqlfluff:rules:structure.join_condition_order]
+# "join leagues on leagues.league_id = weeks.league_id": the joined table first.
+preferred_first_table_in_join_clause = later
+
+[sqlfluff:indentation]
+tab_space_size = 4
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.functions]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.literals]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.types]
+extended_capitalisation_policy = lower

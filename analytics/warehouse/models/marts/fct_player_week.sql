@@ -7,7 +7,6 @@
   so a player who left a roster mid-week doesn't linger. After changing this
   model's logic, rebuild everything: dbt build --full-refresh -s fct_player_week
 -#}
--- depends_on: {{ ref('stg_sleeper__matchups') }}
 {{
     config(
         materialized='incremental',
@@ -17,14 +16,30 @@
     )
 }}
 
-with player_weeks as (
+with all_player_weeks as (
     select * from {{ ref('int_player_weeks') }}
+),
+
+matchups as (  -- noqa: ST03 (only incremental runs read it)
+    select * from {{ ref('stg_sleeper__matchups') }}
+),
+
+best as (
+    select * from {{ ref('int_best_lineups') }}
+),
+
+player_weeks as (
+    select all_player_weeks.*
+    from all_player_weeks
     {% if is_incremental() %}
-    where (league_id, week) in (
-        select league_id, week
-        from {{ ref('stg_sleeper__matchups') }}
-        where loaded_at > (select coalesce(max(loaded_at), '-infinity') from {{ this }})
-    )
+        where (all_player_weeks.league_id, all_player_weeks.week) in (
+            select matchups.league_id, matchups.week
+            from matchups
+            where matchups.loaded_at > (
+                select coalesce(max(existing.loaded_at), '-infinity')
+                from {{ this }} as existing
+            )
+        )
     {% endif %}
 )
 
@@ -44,7 +59,8 @@ select
     player_weeks.points,
     player_weeks.loaded_at
 from player_weeks
-left join {{ ref('int_best_lineups') }} as best
-    on best.team_key = player_weeks.team_key
-    and best.week = player_weeks.week
-    and best.player_id = player_weeks.player_id
+left join best
+    on
+        best.team_key = player_weeks.team_key
+        and best.week = player_weeks.week
+        and best.player_id = player_weeks.player_id

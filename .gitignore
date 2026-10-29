@@ -26,3 +26,4 @@ analytics/warehouse/target/
 analytics/warehouse/dbt_packages/
 analytics/warehouse/logs/
 analytics/warehouse/.user.yml
+analytics/warehouse/site/

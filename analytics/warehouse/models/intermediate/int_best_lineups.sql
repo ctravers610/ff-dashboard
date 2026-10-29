@@ -34,25 +34,28 @@ single_position as (
             players.*,
             row_number() over (
                 partition by players.team_key, players.week, players.position
-                order by players.points desc, players.player_id
+                order by players.points desc, players.player_id asc
             ) as position_rank
         from players
     ) as ranked
     inner join slot_counts
-        on slot_counts.league_id = ranked.league_id
-        and slot_counts.slot = ranked.position
-    where ranked.position_rank <= slot_counts.slots
-      and slot_counts.slot not in ('{{ flex_names | join("', '") }}')
+        on
+            slot_counts.league_id = ranked.league_id
+            and slot_counts.slot = ranked.position
+    where
+        ranked.position_rank <= slot_counts.slots
+        and slot_counts.slot not in ({{ sql_list(flex_names) }})
 ),
 
 picked_0 as (
     select * from single_position
-)
+),
 
-{%- for rule in flex %}
-
-, filled_{{ loop.index }} as (
-    -- {{ rule.slot }}: the best {{ rule.positions | join('/') }} left.
+-- The loop writes top-level CTEs, so they aren't indented under it.
+-- noqa: disable=LT02
+{% for rule in flex %}
+-- {{ rule.slot }}: the best {{ rule.positions | join('/') }} left.
+filled_{{ loop.index }} as (
     select
         ranked.team_key, ranked.league_id, ranked.week, ranked.roster_id,
         ranked.player_id, ranked.position, ranked.points,
@@ -62,21 +65,24 @@ picked_0 as (
             players.*,
             row_number() over (
                 partition by players.team_key, players.week
-                order by players.points desc, players.player_id
+                order by players.points desc, players.player_id asc
             ) as slot_rank
         from players
-        where players.position in ('{{ rule.positions | join("', '") }}')
-          and not exists (
-              select 1
-              from picked_{{ loop.index0 }} as picked
-              where picked.team_key = players.team_key
-                and picked.week = players.week
-                and picked.player_id = players.player_id
-          )
+        where
+            players.position in ({{ sql_list(rule.positions) }})
+            and not exists (
+                select 1
+                from picked_{{ loop.index0 }} as picked
+                where
+                    picked.team_key = players.team_key
+                    and picked.week = players.week
+                    and picked.player_id = players.player_id
+            )
     ) as ranked
     inner join slot_counts
-        on slot_counts.league_id = ranked.league_id
-        and slot_counts.slot = '{{ rule.slot }}'
+        on
+            slot_counts.league_id = ranked.league_id
+            and slot_counts.slot = '{{ rule.slot }}'
     where ranked.slot_rank <= slot_counts.slots
 ),
 
@@ -84,7 +90,8 @@ picked_{{ loop.index }} as (
     select * from picked_{{ loop.index0 }}
     union all
     select * from filled_{{ loop.index }}
-)
-{%- endfor %}
+){{ "," if not loop.last }}
+{% endfor %}
+-- noqa: enable=LT02
 
 select * from picked_{{ flex | length }}

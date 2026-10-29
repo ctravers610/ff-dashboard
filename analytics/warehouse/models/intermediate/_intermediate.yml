@@ -1,0 +1,83 @@
+version: 2
+
+models:
+  - name: int_lineup_slots
+    description: Each league's starting lineup, one row per slot. slot_index counts starting slots only, matching matchup_players.starter_index.
+  - name: int_player_weeks
+    description: Every player on every team each league week, with his position and the slot he started in (null on the bench).
+  - name: int_matchups_paired
+    description: Each team's week next to its opponent's. Commissioner overrides (custom_points) replace the score.
+  - name: int_best_lineups
+    description: >
+      The best lineup each team could have set each week in hindsight, one row
+      per player it would have started. Same rules and totals as the app's
+      Lineup Recap.
+
+unit_tests:
+  - name: best_lineup_fills_single_position_slots_before_flex
+    description: The best RB takes the RB slot; FLEX then gets the best RB, WR or TE left.
+    model: int_best_lineups
+    given:
+      - input: ref('int_player_weeks')
+        rows:
+          - {team_key: t1, league_id: L1, week: 1, roster_id: 1, player_id: qb, position: QB, points: 20}
+          - {team_key: t1, league_id: L1, week: 1, roster_id: 1, player_id: rb1, position: RB, points: 30}
+          - {team_key: t1, league_id: L1, week: 1, roster_id: 1, player_id: rb2, position: RB, points: 25}
+          - {team_key: t1, league_id: L1, week: 1, roster_id: 1, player_id: rb3, position: RB, points: 24}
+          - {team_key: t1, league_id: L1, week: 1, roster_id: 1, player_id: wr1, position: WR, points: 10}
+          - {team_key: t1, league_id: L1, week: 1, roster_id: 1, player_id: wr2, position: WR, points: 5}
+          - {team_key: t1, league_id: L1, week: 1, roster_id: 1, player_id: te, position: TE, points: 8}
+          - {team_key: t1, league_id: L1, week: 1, roster_id: 1, player_id: k, position: K, points: 3}
+      - input: ref('int_lineup_slots')
+        rows:
+          - {league_id: L1, slot_index: 1, slot: QB}
+          - {league_id: L1, slot_index: 2, slot: RB}
+          - {league_id: L1, slot_index: 3, slot: WR}
+          - {league_id: L1, slot_index: 4, slot: FLEX}
+          - {league_id: L1, slot_index: 5, slot: K}
+          - {league_id: L1, slot_index: 6, slot: DEF}  # no defense on the roster: left empty
+    expect:
+      rows:
+        - {player_id: qb, best_slot: QB}
+        - {player_id: rb1, best_slot: RB}
+        - {player_id: wr1, best_slot: WR}
+        - {player_id: rb2, best_slot: FLEX}
+        - {player_id: k, best_slot: K}
+
+  - name: best_lineup_fills_flex_before_superflex
+    description: >
+      Filling SUPER_FLEX first would spend the RB there and leave FLEX the WR
+      (40 + 30 + 10). Narrowest first puts the RB at FLEX and the backup QB at
+      SUPER_FLEX (40 + 30 + 25).
+    model: int_best_lineups
+    given:
+      - input: ref('int_player_weeks')
+        rows:
+          - {team_key: t1, league_id: L1, week: 1, roster_id: 1, player_id: qb1, position: QB, points: 40}
+          - {team_key: t1, league_id: L1, week: 1, roster_id: 1, player_id: rb, position: RB, points: 30}
+          - {team_key: t1, league_id: L1, week: 1, roster_id: 1, player_id: qb2, position: QB, points: 25}
+          - {team_key: t1, league_id: L1, week: 1, roster_id: 1, player_id: wr, position: WR, points: 10}
+      - input: ref('int_lineup_slots')
+        rows:
+          - {league_id: L1, slot_index: 1, slot: QB}
+          - {league_id: L1, slot_index: 2, slot: FLEX}
+          - {league_id: L1, slot_index: 3, slot: SUPER_FLEX}
+    expect:
+      rows:
+        - {player_id: qb1, best_slot: QB}
+        - {player_id: rb, best_slot: FLEX}
+        - {player_id: qb2, best_slot: SUPER_FLEX}
+
+  - name: matchups_pair_each_team_with_its_opponent
+    model: int_matchups_paired
+    given:
+      - input: ref('stg_sleeper__matchups')
+        rows:
+          - {league_id: L1, week: 1, roster_id: 1, matchup_id: 1, points: 100}
+          - {league_id: L1, week: 1, roster_id: 2, matchup_id: 1, points: 90, custom_points: 95}  # overridden
+          - {league_id: L1, week: 1, roster_id: 3, matchup_id: null, points: 80}  # no game
+    expect:
+      rows:
+        - {roster_id: 1, points: 100, opponent_roster_id: 2, opponent_points: 95}
+        - {roster_id: 2, points: 95, opponent_roster_id: 1, opponent_points: 100}
+        - {roster_id: 3, points: 80, opponent_roster_id: null, opponent_points: null}

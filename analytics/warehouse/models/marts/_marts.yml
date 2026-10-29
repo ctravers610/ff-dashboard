@@ -1,62 +1,142 @@
 version: 2
 
+# Every mart has an enforced contract: its columns and their types are fixed
+# here, and dbt refuses to build one whose SQL returns anything else. Primary
+# keys and not-null columns are created as real Postgres constraints.
+
 models:
   # Dimensions
 
   - name: dim_week
-    description: One row per NFL regular-season week, Tuesday to Monday. week_key is season * 100 + week.
+    description: One row per NFL regular-season week, Tuesday to Monday.
+    config:
+      contract: {enforced: true}
     columns:
       - name: week_key
+        description: season * 100 + week, e.g. 202608.
+        data_type: integer
+        constraints: [{type: primary_key}]
         data_tests: [unique, not_null]
+      - {name: season, data_type: integer, constraints: [{type: not_null}]}
+      - {name: week, data_type: integer, constraints: [{type: not_null}]}
+      - {name: starts_on, data_type: date, description: The Tuesday the week starts.}
+      - {name: ends_on, data_type: date, description: The Monday it ends (Monday Night Football).}
+      - {name: is_last_week, data_type: boolean, description: The last week of the NFL regular season.}
 
   - name: dim_league
     description: >
       One row per Sleeper league per season. league_lineage_id groups a
       league's seasons together (Sleeper gives each renewal a new league_id).
+    config:
+      contract: {enforced: true}
     columns:
       - name: league_id
+        data_type: text
+        constraints: [{type: primary_key}]
         data_tests: [unique, not_null]
+      - {name: platform, data_type: text}
+      - {name: season, data_type: integer, constraints: [{type: not_null}]}
+      - {name: league_name, data_type: text}
       - name: league_lineage_id
+        description: The league_id of the first loaded season of this league.
+        data_type: text
+        constraints: [{type: not_null}]
         data_tests:
-          - not_null
           - relationships:
               arguments:
                 to: ref('dim_league')
                 field: league_id
+      - {name: season_number, data_type: integer, description: 1 for the first loaded season, 2 for the next, ...}
+      - {name: status, data_type: text, description: 'pre_draft, drafting, in_season or complete.'}
+      - {name: league_type, data_type: text, description: 'redraft, keeper or dynasty.'}
+      - {name: teams, data_type: integer}
+      - {name: starting_slots, data_type: integer}
+      - {name: is_superflex, data_type: boolean}
+      - {name: points_per_reception, data_type: numeric}
+      - {name: plays_median, data_type: boolean, description: Each week also plays the league median.}
+      - {name: waiver_type, data_type: text, description: 'rolling, reverse_standings or faab.'}
+      - {name: waiver_budget, data_type: integer, description: FAAB budget, for FAAB leagues.}
+      - {name: playoff_week_start, data_type: integer}
+      - {name: playoff_teams, data_type: integer}
+      - {name: trade_deadline_week, data_type: integer}
+      - {name: is_best_ball, data_type: boolean}
 
   - name: dim_manager
-    description: One row per person who has managed a team in a loaded league. is_me marks the loaded accounts.
+    description: One row per person who has managed a team in a loaded league.
+    config:
+      contract: {enforced: true}
     columns:
       - name: manager_id
+        description: Sleeper user id.
+        data_type: text
+        constraints: [{type: primary_key}]
         data_tests: [unique, not_null]
+      - {name: display_name, data_type: text, description: As of the latest season.}
+      - {name: leagues_played, data_type: integer, description: League seasons played in.}
+      - {name: first_season, data_type: integer}
+      - {name: last_season, data_type: integer}
+      - {name: is_me, data_type: boolean, description: One of the accounts the loader loads.}
 
   - name: dim_team
-    description: One row per fantasy team (a roster in one league season), keyed by team_key.
+    description: One row per fantasy team (a roster in one league season).
+    config:
+      contract: {enforced: true}
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [league_id, roster_id]
     columns:
       - name: team_key
+        description: Surrogate key of league_id and roster_id.
+        data_type: text
+        constraints: [{type: primary_key}]
         data_tests: [unique, not_null]
       - name: league_id
+        data_type: text
+        constraints: [{type: not_null}]
         data_tests:
           - relationships:
               arguments:
                 to: ref('dim_league')
                 field: league_id
+      - {name: roster_id, data_type: integer, constraints: [{type: not_null}]}
+      - {name: season, data_type: integer}
       - name: manager_id
+        data_type: text
         data_tests:
           - relationships:
               arguments:
                 to: ref('dim_manager')
                 field: manager_id
+      - {name: team_name, data_type: text}
+      - {name: manager_name, data_type: text}
+      - {name: has_co_owners, data_type: boolean}
+      - {name: is_mine, data_type: boolean, description: Owned or co-owned by one of the loaded accounts.}
 
   - name: dim_player
     description: One row per NFL player as he is now.
+    config:
+      contract: {enforced: true}
     columns:
       - name: player_id
+        description: Sleeper player id; team abbreviation for defenses.
+        data_type: text
+        constraints: [{type: primary_key}]
         data_tests: [unique, not_null]
+      - {name: full_name, data_type: text}
+      - {name: position, data_type: text}
+      - {name: nfl_team, data_type: text, description: Null for free agents.}
+      - {name: status, data_type: text}
+      - {name: is_active, data_type: boolean}
+      - {name: injury_status, data_type: text}
+      - {name: age, data_type: integer}
+      - {name: years_exp, data_type: integer}
+      - {name: birth_date, data_type: date}
+      - {name: depth_chart_position, data_type: text}
+      - {name: depth_chart_order, data_type: integer}
+      - {name: espn_id, data_type: text}
+      - {name: yahoo_id, data_type: text}
+      - {name: gsis_id, data_type: text, description: The NFL's id.}
 
   - name: dim_player_history
     description: >
@@ -64,14 +144,20 @@ models:
       name, position, team, status and injury stayed the same. Join on
       player_id where a time falls in [valid_from, valid_to). History starts
       when the loader first ran.
+    config:
+      contract: {enforced: true}
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [player_id, valid_from]
     columns:
       - name: player_version_key
+        data_type: text
+        constraints: [{type: primary_key}]
         data_tests: [unique, not_null]
       - name: player_id
+        data_type: text
+        constraints: [{type: not_null}]
         data_tests:
           - unique:
               config:
@@ -80,6 +166,14 @@ models:
               arguments:
                 to: ref('dim_player')
                 field: player_id
+      - {name: full_name, data_type: text}
+      - {name: position, data_type: text}
+      - {name: nfl_team, data_type: text}
+      - {name: status, data_type: text}
+      - {name: injury_status, data_type: text}
+      - {name: valid_from, data_type: timestamp with time zone, constraints: [{type: not_null}]}
+      - {name: valid_to, data_type: timestamp with time zone, description: Null for the current row.}
+      - {name: is_current, data_type: boolean}
 
   # Facts
 
@@ -88,6 +182,10 @@ models:
       One row per team per league week: score, result, median result, all-play
       record and the best lineup in hindsight. Results and all-play are null
       until the week is final.
+    config:
+      contract: {enforced: true}
+    constraints:
+      - {type: primary_key, columns: [team_key, week]}
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -101,41 +199,71 @@ models:
             severity: warn
     columns:
       - name: team_key
+        data_type: text
         data_tests:
           - relationships:
               arguments:
                 to: ref('dim_team')
                 field: team_key
       - name: opponent_team_key
+        description: Null for a team without a game that week.
+        data_type: text
         data_tests:
           - relationships:
               arguments:
                 to: ref('dim_team')
                 field: team_key
+      - {name: league_id, data_type: text, constraints: [{type: not_null}]}
+      - {name: season, data_type: integer}
+      - {name: week, data_type: integer}
       - name: week_key
+        data_type: integer
         data_tests:
           - relationships:
               arguments:
                 to: ref('dim_week')
                 field: week_key
+      - {name: roster_id, data_type: integer}
+      - {name: matchup_id, data_type: integer}
+      - {name: is_playoffs, data_type: boolean, description: On or after the league's playoff_week_start.}
+      - {name: is_final, data_type: boolean, description: 'The week is over: the league is complete, the season has passed, or it is before the current NFL week.'}
+      - {name: is_mine, data_type: boolean}
+      - {name: points, data_type: numeric, description: The score; a commissioner override if there is one.}
+      - {name: opponent_points, data_type: numeric}
+      - {name: margin, data_type: numeric}
       - name: result
+        description: 'win, loss or tie; null until final, and for a team without a game.'
+        data_type: text
         data_tests:
           - accepted_values:
               arguments:
                 values: [win, loss, tie]
       - name: median_result
+        description: Against the league median, in leagues that play it.
+        data_type: text
         data_tests:
           - accepted_values:
               arguments:
                 values: [win, loss, tie]
+      - {name: league_median_points, data_type: numeric}
+      - {name: all_play_wins, data_type: integer, description: Teams in the league this score beat that week.}
+      - {name: all_play_ties, data_type: integer}
+      - {name: all_play_losses, data_type: integer}
       - name: best_lineup_points
+        description: What the best lineup from this roster would have scored.
+        data_type: numeric
         data_tests: [not_null]
+      - {name: points_left_on_bench, data_type: numeric, description: best_lineup_points minus points, never below 0.}
 
   - name: fct_player_week
     description: >
       One row per player on each team each league week, with the slot he
       started in and the one the best lineup would have used. Incremental:
       rebuilds only league weeks with new matchup data.
+    config:
+      contract: {enforced: true}
+    constraints:
+      - {type: primary_key, columns: [league_id, week, roster_id, player_id]}
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -148,12 +276,25 @@ models:
             expression: "is_in_best_lineup = (best_lineup_slot is not null)"
     columns:
       - name: team_key
+        data_type: text
         data_tests:
           - relationships:
               arguments:
                 to: ref('dim_team')
                 field: team_key
+      - {name: league_id, data_type: text}
+      - {name: season, data_type: integer}
+      - {name: week, data_type: integer}
+      - name: week_key
+        data_type: integer
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_week')
+                field: week_key
+      - {name: roster_id, data_type: integer}
       - name: player_id
+        data_type: text
         data_tests:
           - relationships:
               arguments:
@@ -161,51 +302,94 @@ models:
                 field: player_id
               config:
                 severity: warn  # a player Sleeper has since removed shouldn't stop the build
-      - name: week_key
-        data_tests:
-          - relationships:
-              arguments:
-                to: ref('dim_week')
-                field: week_key
+      - {name: position, data_type: text}
+      - {name: is_starter, data_type: boolean}
+      - {name: lineup_slot, data_type: text, description: The slot he started in; null on the bench.}
+      - {name: best_lineup_slot, data_type: text, description: Where the best lineup would have started him; null if it wouldn't have.}
+      - {name: is_in_best_lineup, data_type: boolean}
+      - {name: points, data_type: numeric}
+      - {name: loaded_at, data_type: timestamp with time zone, description: When this league week's matchups were loaded; drives incremental runs.}
 
   - name: fct_transaction_moves
     description: >
       One row per player added or dropped in a transaction, failed claims
       included. Completed adds carry what the player did for that team until
-      it dropped him (weeks_rostered, weeks_started, points_started).
+      it dropped him.
+    config:
+      contract: {enforced: true}
     columns:
       - name: move_key
+        data_type: text
+        constraints: [{type: primary_key}]
         data_tests: [unique, not_null]
+      - {name: transaction_id, data_type: text, constraints: [{type: not_null}]}
       - name: team_key
+        data_type: text
         data_tests:
           - relationships:
               arguments:
                 to: ref('dim_team')
                 field: team_key
+      - {name: league_id, data_type: text}
+      - {name: season, data_type: integer}
+      - {name: week, data_type: integer}
       - name: week_key
+        data_type: integer
         data_tests:
           - relationships:
               arguments:
                 to: ref('dim_week')
                 field: week_key
+      - {name: roster_id, data_type: integer}
+      - {name: player_id, data_type: text}
       - name: action
+        data_type: text
         data_tests:
           - accepted_values:
               arguments:
                 values: [add, drop]
+      - {name: transaction_type, data_type: text, description: 'waiver, free_agent, trade or commissioner.'}
+      - {name: status, data_type: text, description: complete or failed.}
+      - {name: created_at, data_type: timestamp with time zone}
+      - {name: processed_at, data_type: timestamp with time zone}
+      - {name: waiver_bid, data_type: integer, description: FAAB bid, on waiver adds.}
+      - {name: is_mine, data_type: boolean}
+      - {name: dropped_week, data_type: integer, description: 'Completed adds: the week the same team next dropped him.'}
+      - {name: weeks_rostered, data_type: integer, description: 'Completed adds: weeks on that roster until the drop.'}
+      - {name: weeks_started, data_type: integer}
+      - {name: points_started, data_type: numeric, description: 'Completed adds: points he scored in those weeks as a starter.'}
 
   - name: fct_live_event_scores
     description: >
       The app's live scoring feed across every platform, one row per scoring
       change per league. Incremental: each run adds only newer events.
+    config:
+      contract: {enforced: true}
+    constraints:
+      - {type: primary_key, columns: [event_id, league_key]}
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [event_id, league_key]
     columns:
+      - {name: event_id, data_type: bigint}
+      - {name: season, data_type: integer}
+      - {name: week, data_type: integer}
       - name: week_key
+        data_type: integer
         data_tests:
           - relationships:
               arguments:
                 to: ref('dim_week')
                 field: week_key
+      - {name: occurred_at, data_type: timestamp with time zone}
+      - {name: platform, data_type: text}
+      - {name: league_key, data_type: text, description: 'The app''s league key, e.g. "espn:13396297".'}
+      - {name: league_name, data_type: text}
+      - {name: player_id, data_type: text, description: The platform's player id.}
+      - {name: player_name, data_type: text}
+      - {name: position, data_type: text}
+      - {name: nfl_team, data_type: text}
+      - {name: description, data_type: text, description: 'What happened, e.g. "1 sack".'}
+      - {name: role, data_type: text, description: 'starter, bench, or opponent (starting against you).'}
+      - {name: points, data_type: numeric}

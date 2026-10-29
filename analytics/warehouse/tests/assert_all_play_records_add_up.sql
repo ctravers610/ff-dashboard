@@ -8,5 +8,6 @@ select
     leagues.teams - 1 as other_teams
 from {{ ref('fct_team_week') }} as weeks
 inner join {{ ref('dim_league') }} as leagues on leagues.league_id = weeks.league_id
-where weeks.is_final
-  and weeks.all_play_wins + weeks.all_play_ties + weeks.all_play_losses is distinct from leagues.teams - 1
+where
+    weeks.is_final
+    and weeks.all_play_wins + weeks.all_play_ties + weeks.all_play_losses is distinct from leagues.teams - 1
