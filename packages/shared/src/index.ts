@@ -562,3 +562,35 @@ export interface RecapResponse {
   leagues: LineupRecap[];
   errors: SourceError[];
 }
+
+// Every season of each of your Sleeper leagues, from the analytics warehouse
+// (analytics/, its agg_team_season table). Regular season only.
+export interface WarehouseSeason {
+  leagueId: string; // that season's Sleeper league id
+  season: number;
+  teamName: string;
+  teams: number;
+  finish: number; // regular-season rank: total wins, then points for
+  record: { wins: number; losses: number; ties: number };
+  medianRecord: { wins: number; losses: number; ties: number } | null; // leagues that also play the median
+  allPlay: { wins: number; losses: number; ties: number };
+  expectedWins: number; // what the scores earned
+  luck: number; // wins minus expectedWins
+  pointsFor: number;
+  pointsLeftOnBench: number;
+  lineupEfficiency: number | null; // points over the best lineups' points
+  pickups: number; // waiver and free-agent adds
+  faabSpent: number;
+  pickupPoints: number; // what those pickups scored as your starters
+}
+
+export interface WarehouseLeague {
+  lineageId: string; // the same league across seasons
+  name: string; // as of its latest season
+  seasons: WarehouseSeason[]; // newest first
+}
+
+export interface AllSeasonsResponse {
+  available: boolean; // false when the app isn't connected to the warehouse
+  leagues: WarehouseLeague[];
+}

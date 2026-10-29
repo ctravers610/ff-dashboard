@@ -16,6 +16,10 @@ teams as (
     select * from {{ ref('dim_team') }}
 ),
 
+calendar as (
+    select * from {{ ref('dim_week') }}
+),
+
 best_lineups as (
     select team_key, week, sum(points) as best_lineup_points
     from {{ ref('int_best_lineups') }}
@@ -69,6 +73,7 @@ select
     ranked.season,
     ranked.week,
     ranked.season * 100 + ranked.week as week_key,
+    calendar.starts_on as week_starts_on,
     ranked.roster_id,
     ranked.matchup_id,
     ranked.is_playoffs,
@@ -110,3 +115,5 @@ left join teams
     on
         teams.league_id = ranked.league_id
         and teams.roster_id = ranked.roster_id
+left join calendar
+    on calendar.week_key = ranked.season * 100 + ranked.week

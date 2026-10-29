@@ -175,7 +175,12 @@ Create an app at [developer.yahoo.com/apps](https://developer.yahoo.com/apps/cre
 
 ## Analytics
 
-`analytics/` is a warehouse for league history, in a separate `ffd_analytics` database that the app never reads. A Python loader (`analytics/loader`) copies raw data in, and dbt models (`analytics/warehouse`) turn it into tables.
+`analytics/` is a warehouse for league history, in a separate `ffd_analytics` database:
+- a Python loader (`analytics/loader`) copies raw data in
+- dbt models (`analytics/warehouse`) turn it into tables, with metrics defined in MetricFlow
+- an Airflow DAG (`analytics/orchestration`), or a daily GitHub Actions workflow, keeps it current
+
+The app reads one table from it, for History's **All seasons** panel, and only if `ANALYTICS_DATABASE_URL` is set.
 
 ```bash
 cd analytics
@@ -189,7 +194,10 @@ cd warehouse
 ../.venv/Scripts/dbt build              # builds every model and runs its tests
 ../.venv/Scripts/dbt source freshness   # warns if the loader hasn't succeeded in 8 days
 ../.venv/Scripts/sqlfluff lint models tests   # SQL style, as CI checks it
+../.venv/Scripts/mf query --metrics win_pct,all_play_win_pct,luck_pct --group-by team__team_name,league__season
 ```
+
+(`mf`, MetricFlow's command line, works on Linux and macOS but currently fails on Windows. On Windows, run it in the Airflow container, described under Orchestration below.)
 
 ### Loader
 
@@ -217,6 +225,13 @@ In `analytics/warehouse` (dbt Core 1.12 with dbt-postgres). Its profile defaults
   - Dimensions: `dim_league` (with `league_lineage_id` tying a league's seasons together), `dim_team`, `dim_manager`, `dim_player`, `dim_player_history` (type 2: team, status and injury over time) and `dim_week` (from the `nfl_seasons` seed).
   - Facts: `fct_team_week` (score, result, median result, all-play record, best lineup and points left on the bench), `fct_player_week` (who started where, and where the best lineup would have used him), `fct_transaction_moves` (every add and drop, with what each pickup then scored for that team) and `fct_live_event_scores` (the app's live feed).
   - `fct_player_week` and `fct_live_event_scores` are incremental: a run processes only league weeks with new matchups, or new events. After changing their logic, rebuild with `dbt build --full-refresh`.
+  - Aggregate: `agg_team_season`, one row per team per league season (regular season only). It has the record head to head, against the median and all-play; expected wins and luck; points left on the bench and lineup efficiency; pickups and FAAB; and the finish. For the current season its luck numbers match the app's own luck table.
+- **Metrics** (`models/metrics/_metrics.yml`): MetricFlow semantic models over the team weeks, teams and leagues. Each metric is defined once, so new questions are queries rather than new SQL:
+  - `win_pct` and `all_play_win_pct`
+  - `luck_pct`: the first minus the second
+  - `lineup_efficiency`
+  - `points_left_on_bench`
+  - plus the counts they're built from
 - **Contracts:** every mart has an enforced contract (`models/marts/_marts.yml`). Its columns and their types are fixed, dbt refuses to build one whose SQL returns anything else, and primary keys and not-null columns are real Postgres constraints.
 - **Unit tests** (`_intermediate.yml`, `_marts_unit_tests.yml`) run a model's SQL on a few hand-written rows and compare the output exactly. They cover:
   - the best-lineup fill order, including the case where filling SUPER_FLEX before FLEX gives a worse lineup
@@ -226,6 +241,7 @@ In `analytics/warehouse` (dbt Core 1.12 with dbt-postgres). Its profile defaults
   - league lineage across seasons
   - an incremental run of `fct_player_week`
   - pickups credited only until they're dropped
+  - a season's luck, with playoff and unfinished weeks left out
 - **Data tests:** primary keys, relationships between models, allowed values, and checks in `tests/`:
   - starters' points add up to Sleeper's team scores
   - every best lineup is legal
@@ -240,3 +256,51 @@ CI loads the fixture league, lints the SQL, creates every model empty (`dbt run 
 ### Docs site
 
 The `Warehouse docs` workflow publishes the dbt docs (models, columns, tests and the lineage graph) to GitHub Pages whenever `analytics/` changes on `main`. It's built on the fixture league, so no real league data is published. It needs Pages turned on once, with **Settings → Pages → Source: GitHub Actions**.
+
+### Orchestration
+
+`analytics/orchestration/dags/ffd_warehouse.py` is an Airflow DAG that runs daily at 11:00 UTC:
+1. **load:** runs the loader.
+2. **dbt:** the whole dbt project as an Airflow task group, built with [Astronomer Cosmos](https://github.com/astronomer/astronomer-cosmos). Each model is a task, followed by that model's tests. A test that reads several models runs as its own task once all of them are built.
+3. **source_freshness:** checks the loader is still succeeding.
+
+To run it on this computer, against the local Postgres:
+
+```bash
+docker compose --profile airflow up --build    # then http://localhost:8081
+docker compose logs airflow | grep -i password  # the admin password
+```
+
+dbt and the loader run in their own virtualenv inside the Airflow image, so their dependencies don't clash with Airflow's. `analytics/` is mounted into the container, so edits to models or the DAG don't need a rebuild.
+
+To run the whole DAG once from the command line:
+
+```bash
+docker compose --profile airflow run --rm airflow bash -c "airflow db migrate && airflow dags test ffd_warehouse"
+```
+
+### Hosting the warehouse
+
+For a warehouse that stays current without this computer, the `Warehouse load` workflow runs the same steps as the DAG every morning on GitHub Actions. It doesn't need an Airflow host. It does nothing until it has a database to write to:
+
+1. **Create the database.** In the Neon project that holds the app's database, create a database called `ffd_analytics`.
+2. **Create a read-only role for the app.** In Neon's SQL editor, connected to `ffd_analytics`, replace `<owner>` with the role that owns the database (the one the workflow will connect as) and run:
+
+   ```sql
+   create role ffd_reader with login password '<a new password>';
+   create schema if not exists marts;
+   grant connect on database ffd_analytics to ffd_reader;
+   grant usage on schema marts to ffd_reader;
+   grant select on all tables in schema marts to ffd_reader;
+   -- dbt rebuilds tables on every run, so new ones need the grant too.
+   alter default privileges for role <owner> in schema marts grant select on tables to ffd_reader;
+   ```
+
+3. **Add the repository secrets** (Settings → Secrets and variables → Actions):
+   - `ANALYTICS_DATABASE_URL`: `ffd_analytics` as the owner role, so the workflow can write.
+   - `APP_DATABASE_URL`: the app's database, read for Sleeper accounts added in the app, History and the live feed. A read-only role is enough.
+   - `SLEEPER_USERNAMES` (optional): more accounts, comma-separated.
+4. **Run it once:** Actions → Warehouse load → Run workflow. The first run loads every season.
+5. **Connect the app.** In Render, set the app's `ANALYTICS_DATABASE_URL` to `ffd_analytics` as `ffd_reader`. History then shows **All seasons** for your Sleeper leagues.
+
+The two `ANALYTICS_DATABASE_URL`s point at the same database as different roles: the workflow's can write, the app's can only read. The app also opens every warehouse connection as read-only, whatever role it's given.

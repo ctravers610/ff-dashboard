@@ -1,0 +1,100 @@
+name: Warehouse load
+
+# The analytics warehouse, kept current: every morning, the loader copies
+# what's new from Sleeper and the app's database, then dbt rebuilds and tests
+# every model. The same steps as the Airflow DAG (analytics/orchestration),
+# for a warehouse hosted on Neon. Set up in the README under "Hosting the
+# warehouse"; until the secrets exist, this does nothing.
+
+on:
+  schedule:
+    - cron: '0 11 * * *' # 11:00 UTC, after Sleeper's overnight stat corrections
+  workflow_dispatch:
+
+concurrency:
+  group: warehouse-load
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      # The warehouse, as a role that can write to it.
+      ANALYTICS_DATABASE_URL: ${{ secrets.ANALYTICS_DATABASE_URL }}
+      # The app's database, read for Sleeper accounts added in the app, History and the live feed.
+      APP_DATABASE_URL: ${{ secrets.APP_DATABASE_URL }}
+      # Optional: more Sleeper accounts, comma-separated.
+      SLEEPER_USERNAMES: ${{ secrets.SLEEPER_USERNAMES }}
+
+    defaults:
+      run:
+        working-directory: analytics
+
+    steps:
+      - name: Check the warehouse is set up
+        id: setup
+        run: |
+          if [ -z "$ANALYTICS_DATABASE_URL" ]; then
+            echo "::notice::No ANALYTICS_DATABASE_URL secret, so there's no warehouse to load. See 'Hosting the warehouse' in the README."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+        working-directory: .
+
+      - uses: actions/checkout@v7
+        if: steps.setup.outputs.ready == 'true'
+
+      - uses: actions/setup-python@v7
+        if: steps.setup.outputs.ready == 'true'
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: analytics/pyproject.toml
+
+      - name: Install the loader and dbt
+        if: steps.setup.outputs.ready == 'true'
+        run: pip install -e .
+
+      - name: Load
+        if: steps.setup.outputs.ready == 'true'
+        run: python -m loader
+
+      # dbt's profile takes the connection in parts (ANALYTICS_DB_*), so they're
+      # read out of the same URL the loader uses.
+      - name: Point dbt at the warehouse
+        if: steps.setup.outputs.ready == 'true'
+        shell: python
+        run: |
+          import os
+          from urllib.parse import parse_qs, unquote, urlparse
+
+          url = urlparse(os.environ['ANALYTICS_DATABASE_URL'])
+          print(f'::add-mask::{unquote(url.password or "")}')
+          settings = {
+              'ANALYTICS_DB_HOST': url.hostname,
+              'ANALYTICS_DB_PORT': str(url.port or 5432),
+              'ANALYTICS_DB_USER': unquote(url.username or ''),
+              'ANALYTICS_DB_PASSWORD': unquote(url.password or ''),
+              'ANALYTICS_DB_NAME': url.path.lstrip('/'),
+              'ANALYTICS_DB_SSLMODE': parse_qs(url.query).get('sslmode', ['require'])[0],
+          }
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.writelines(f'{key}={value}\n' for key, value in settings.items())
+
+      - name: Build and test the warehouse
+        if: steps.setup.outputs.ready == 'true'
+        working-directory: analytics/warehouse
+        run: |
+          dbt deps
+          dbt build
+
+      - name: Check the sources are fresh
+        if: steps.setup.outputs.ready == 'true'
+        working-directory: analytics/warehouse
+        run: dbt source freshness

@@ -21,6 +21,8 @@ services:
         sync: false
       - key: DATABASE_URL # Neon connection string for the ffd database
         sync: false
+      - key: ANALYTICS_DATABASE_URL # optional: ffd_analytics as its read-only role (README, "Hosting the warehouse")
+        sync: false
       - key: GITHUB_CLIENT_ID
         sync: false
       - key: GITHUB_CLIENT_SECRET

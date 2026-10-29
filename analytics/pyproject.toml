@@ -10,7 +10,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "sqlfluff>=3.4", "sqlfluff-templater-dbt>=3.4"]
+dev = ["pytest>=8", "sqlfluff>=3.4", "sqlfluff-templater-dbt>=3.4", "dbt-metricflow>=0.15"]
+metrics = ["dbt-metricflow>=0.15"]  # the mf command, for querying the semantic layer
 
 [build-system]
 requires = ["setuptools>=69"]
