@@ -83,6 +83,6 @@ export async function getByeWeeks(): Promise<ByeWeeksResponse> {
   const all = await byeWeeks(state.season, from, LAST_REGULAR_WEEK);
   return {
     season: state.season,
-    weeks: all.flatMap(({ week, teams }) => (teams ? [{ week, teams: [...teams].filter((t) => t !== 'WSH') }] : [])),
+    weeks: all.flatMap(({ week, teams }) => (teams ? [{ week, teams: [...teams] }] : [])),
   };
 }

@@ -8,7 +8,7 @@ const games = new Map([
   ['KC', game(0)], // not started: 60
   ['BUF', game(0.5)], // halftime: 30
   ['SF', game(1)], // final: 0
-  ['WAS', game(0.25)], // ESPN calls them WSH: 45
+  ['WAS', game(0.25)], // a quarter played: 45
 ]);
 const p = (nflTeam: string | null): Player => ({ playerId: String(nflTeam), name: 'x', position: 'WR', nflTeam, injuryStatus: null });
 const side = (teams: (string | null)[]): MatchupSide => ({
@@ -20,7 +20,7 @@ const side = (teams: (string | null)[]): MatchupSide => ({
 
 describe('minutesLeft', () => {
   it('counts 60 per starter, less what his game has played', () => {
-    expect(minutesLeft(side(['KC', 'BUF', 'SF', 'WSH']), games)).toBe(60 + 30 + 0 + 45);
+    expect(minutesLeft(side(['KC', 'BUF', 'SF', 'WAS']), games)).toBe(60 + 30 + 0 + 45);
   });
 
   it('counts nothing for a bye or an empty slot', () => {

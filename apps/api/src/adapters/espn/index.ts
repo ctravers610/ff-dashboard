@@ -28,7 +28,7 @@ export async function fetchEspnLeagues(
         // Game clocks for per-player live projections; optional if the scoreboard is down.
         const games = await nflGames(season, league.scoringPeriodId).catch(() => null);
         const progressFor = games
-          ? (team: string | null) => (team ? (games.get(team === 'WSH' ? 'WAS' : team)?.progress ?? 0) : 0)
+          ? (team: string | null) => (team ? (games.get(team)?.progress ?? 0) : 0)
           : undefined;
         result.leagues.push(
           toLeagueSummary({ league, myTeamId, account: member?.displayName ?? 'espn', progressFor }),

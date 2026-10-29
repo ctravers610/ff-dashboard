@@ -8,7 +8,7 @@ export function minutesLeft(side: MatchupSide, games: Map<string, GameScore>): n
   let minutes = 0;
   for (const s of side.starters) {
     const team = s.player?.nflTeam;
-    const game = team ? games.get(team === 'WSH' ? 'WAS' : team) : undefined;
+    const game = team ? games.get(team) : undefined;
     if (!game) continue; // empty slot, or a bye: no minutes to come
     minutes += 60 * (1 - game.progress);
   }

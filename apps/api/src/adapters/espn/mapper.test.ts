@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildStarters, findMyTeamId, teamName, toLeagueSummary } from './mapper.js';
+import { buildStarters, findMyTeamId, teamName, toEspnPlayer, toLeagueSummary } from './mapper.js';
 import type { EspnLeague, EspnRosterEntry } from './types.js';
 
 const entry = (
@@ -81,6 +81,12 @@ describe('ESPN mapper', () => {
     const [mine, theirs] = league().teams!;
     expect(teamName(mine!)).toBe('My Squad');
     expect(teamName(theirs!)).toBe('Big Rivals');
+  });
+
+  // ESPN says WSH; the NFL schedule (and so bye and game lookups) uses WAS.
+  it('spells Washington the way the schedule and other platforms do', () => {
+    const commanders = entry(-16028, 16, 'Commanders D/ST', { pos: 16, team: 28 }).playerPoolEntry!.player;
+    expect(toEspnPlayer(commanders).nflTeam).toBe('WAS');
   });
 
   it('fills starter slots in order, leaving unfilled slots empty and skipping the bench', () => {
