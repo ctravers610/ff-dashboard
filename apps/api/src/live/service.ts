@@ -1,7 +1,7 @@
 // Runs the live feed: while games are on, take a snapshot every 30 seconds,
 // compare it with the last one, and store the scoring changes as events.
 
-import type { LiveEvent } from '@ffd/shared';
+import type { LeagueSummary, LiveEvent } from '@ffd/shared';
 import { desc, eq, and } from 'drizzle-orm';
 import { getDashboard } from '../dashboard.js';
 import { db as appDb, type Db } from '../db/client.js';
@@ -9,7 +9,7 @@ import { liveEvents } from '../db/schema.js';
 import { nflGames } from '../scoring/games.js';
 import { fetchStats } from '../scoring/live.js';
 import { diffSnapshots, type FeedEvent, type Snapshot } from './feed.js';
-import { platformPoints, trackedPlayers } from './track.js';
+import { failingLeagues, platformPoints, trackedPlayers } from './track.js';
 
 export function liveEventStore(db: Db) {
   return {
@@ -31,7 +31,11 @@ export const liveEventRepo = liveEventStore(appDb);
 
 // The last snapshot, kept in memory: after a restart the first look only sets
 // the starting point, so a restart never floods the feed with old scoring.
-let previous: { season: string; week: number; snapshot: Snapshot } | null = null;
+// `leagues` is this week's last good copy of each league, for when one fails to
+// load. A failed league's points stay out of the snapshot, so the look where it
+// comes back only sets its new starting point instead of reporting everything
+// it missed at once.
+let previous: { season: string; week: number; snapshot: Snapshot; leagues: LeagueSummary[] } | null = null;
 let lastCheckedAt: Date | null = null;
 export const lastLiveCheck = () => lastCheckedAt;
 
@@ -45,16 +49,15 @@ export async function gamesLive(season: string, week: number): Promise<boolean> 
 export async function pollLive(store = liveEventRepo): Promise<FeedEvent[]> {
   const dashboard = await getDashboard();
   const { season, week } = dashboard;
-  const [tracked, stats, games] = await Promise.all([trackedPlayers(dashboard), fetchStats(season, week), nflGames(season, week)]);
+  const last = previous?.season === season && previous.week === week ? previous : null;
+  const failing = failingLeagues(dashboard, last?.leagues ?? []);
+  const [tracked, stats, games] = await Promise.all([trackedPlayers(dashboard, failing), fetchStats(season, week), nflGames(season, week)]);
   const snapshot: Snapshot = { stats, games, platformPoints: platformPoints(dashboard) };
   lastCheckedAt = new Date();
 
-  if (!previous || previous.season !== season || previous.week !== week) {
-    previous = { season, week, snapshot };
-    return [];
-  }
-  const events = diffSnapshots(previous.snapshot, snapshot, tracked);
-  previous = { season, week, snapshot };
+  previous = { season, week, snapshot, leagues: [...dashboard.leagues, ...failing] };
+  if (!last) return [];
+  const events = diffSnapshots(last.snapshot, snapshot, tracked);
   await store.add(season, week, events);
   return events;
 }

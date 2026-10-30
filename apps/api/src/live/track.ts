@@ -47,7 +47,21 @@ function scorer(league: LeagueSummary, player: Player, sleeperId: string | null,
   };
 }
 
-export async function trackedPlayers(dashboard: DashboardResponse): Promise<TrackedPlayer[]> {
+/** Whether a dashboard error is about this league. Sleeper reports by account, which doesn't say which leagues it had, so any failing account counts. */
+function reportsFailing(source: string, league: LeagueSummary): boolean {
+  if (league.manual) return source === 'manual';
+  if (league.platform === 'sleeper') return source.startsWith('sleeper:');
+  return source === league.platform || source === `${league.platform}:${league.leagueId}`;
+}
+
+/** Leagues known from earlier in the week that didn't load this time because their source failed, not because they're gone. */
+export function failingLeagues(dashboard: DashboardResponse, lastGood: LeagueSummary[]): LeagueSummary[] {
+  const loaded = new Set(dashboard.leagues.map((l) => `${l.platform}:${l.leagueId}`));
+  return lastGood.filter((l) => !loaded.has(`${l.platform}:${l.leagueId}`) && dashboard.errors.some((e) => reportsFailing(e.source, l)));
+}
+
+/** `failing` leagues are listed from their last good rosters, with points unknown until they load again. */
+export async function trackedPlayers(dashboard: DashboardResponse, failing: LeagueSummary[] = []): Promise<TrackedPlayer[]> {
   const [players, settings] = await Promise.all([sleeperClient.players(), sleeperScoring(dashboard.season)]);
 
   // ESPN and Yahoo use their own player ids; match them to Sleeper's by position and name.
@@ -60,21 +74,23 @@ export async function trackedPlayers(dashboard: DashboardResponse): Promise<Trac
     league.platform === 'espn' || league.platform === 'yahoo' ? (sleeperIdByKey.get(playerKey(p)) ?? null) : p.playerId;
 
   const byKey = new Map<string, TrackedPlayer>();
-  const add = (league: LeagueSummary, player: Player, role: Role) => {
+  const add = (league: LeagueSummary, player: Player, role: Role, scored: boolean) => {
     const sleeperId = sleeperIdOf(league, player);
     const key = sleeperId ?? playerKey(player);
     const entry = byKey.get(key) ?? { sleeperId, player, appearances: [] };
     const leagueKey = `${league.platform}:${league.leagueId}`;
     if (entry.appearances.some((a) => a.leagueKey === leagueKey)) return; // already counted, as a starter
-    entry.appearances.push({ leagueKey, leagueName: league.name, platform: league.platform, role, pointsFor: scorer(league, player, sleeperId, settings) });
+    entry.appearances.push({ leagueKey, leagueName: league.name, platform: league.platform, role, pointsFor: scored ? scorer(league, player, sleeperId, settings) : () => null });
     byKey.set(key, entry);
   };
+  const addLeague = (league: LeagueSummary, scored: boolean) => {
+    for (const s of league.matchup?.me.starters ?? []) if (s.player) add(league, s.player, 'starter', scored);
+    for (const r of league.roster) if (r.status !== 'starter') add(league, r.player, 'bench', scored);
+    for (const s of league.matchup?.opponent?.starters ?? []) if (s.player) add(league, s.player, 'opponent', scored);
+  };
 
-  for (const league of dashboard.leagues) {
-    for (const s of league.matchup?.me.starters ?? []) if (s.player) add(league, s.player, 'starter');
-    for (const r of league.roster) if (r.status !== 'starter') add(league, r.player, 'bench');
-    for (const s of league.matchup?.opponent?.starters ?? []) if (s.player) add(league, s.player, 'opponent');
-  }
+  for (const league of dashboard.leagues) addLeague(league, true);
+  for (const league of failing) addLeague(league, false);
   return [...byKey.values()];
 }
 
