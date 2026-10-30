@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SnapshotRow } from './db/schema.js';
-import { buildHistory, weekResult } from './history.js';
+import { buildHistory, weekEndsAt, weekResult } from './history.js';
 
 const row = (week: number, points: number, opponentPoints: number | null, extra: Partial<SnapshotRow> = {}): SnapshotRow => ({
   id: week,
@@ -22,8 +22,18 @@ const row = (week: number, points: number, opponentPoints: number | null, extra:
   ties: null,
   standingRank: null,
   standingTeams: null,
-  capturedAt: new Date('2026-10-19T12:00:00Z'),
+  capturedAt: new Date('2026-10-21T12:00:00Z'), // Wednesday after week 6
   ...extra,
+});
+
+describe('weekEndsAt', () => {
+  it('is 9 AM Eastern the Tuesday after Monday night', () => {
+    expect(weekEndsAt('2026', 1).toISOString()).toBe('2026-09-15T13:00:00.000Z'); // Labor Day is Sep 7
+    expect(weekEndsAt('2026', 6).toISOString()).toBe('2026-10-20T13:00:00.000Z');
+    expect(weekEndsAt('2026', 7).toISOString()).toBe('2026-10-27T13:00:00.000Z');
+    expect(weekEndsAt('2026', 18).toISOString()).toBe('2027-01-12T14:00:00.000Z'); // into January, on standard time
+    expect(weekEndsAt('2025', 1).toISOString()).toBe('2025-09-09T13:00:00.000Z'); // Labor Day on Sep 1
+  });
 });
 
 describe('weekResult', () => {
@@ -39,6 +49,20 @@ describe('weekResult', () => {
 
   it('has no result without an opponent', () => {
     expect(weekResult(row(1, 100, null), 3)).toBeNull();
+  });
+
+  it('has no result for a week captured before it ended', () => {
+    const thursday = { capturedAt: new Date('2026-10-22T20:00:00Z') }; // before week 7's first game
+    const sundayNight = { capturedAt: new Date('2026-10-19T02:30:00Z') }; // during week 6's Sunday night game
+    expect(weekResult(row(7, 0, 0, thursday), 8)).toBeNull();
+    expect(weekResult(row(6, 114.68, 100.2, sundayNight), 8)).toBeNull();
+    expect(weekResult(row(6, 114.68, 100.2, { capturedAt: new Date('2026-10-20T13:00:00Z') }), 8)).toBe('win'); // Tuesday 9 AM
+  });
+
+  it('calls 0-0 nothing played, not a tie', () => {
+    expect(weekResult(row(1, 0, 0), 3)).toBeNull();
+    expect(weekResult(row(1, 0, null), 3)).toBeNull();
+    expect(weekResult(row(1, 0, 12.5), 3)).toBe('loss');
   });
 
   it('decides an all-play week by finishing in the top half, ignoring the opponent', () => {
@@ -69,6 +93,20 @@ describe('buildHistory', () => {
     expect(sleeper!.record).toEqual({ wins: 1, losses: 1, ties: 0 });
     expect(sleeper!.avgPoints).toBe(105); // (120 + 90) / 2, the live week excluded
     expect(sleeper!.weeks.map((w) => w.result)).toEqual(['win', 'loss', 'live']);
+  });
+
+  it('leaves ungraded weeks out of the record and average', () => {
+    const history = buildHistory(
+      [
+        row(1, 120, 100),
+        row(2, 0, 0), // nothing played
+        row(7, 0, 0, { capturedAt: new Date('2026-10-22T20:00:00Z') }), // captured before kickoff
+      ],
+      8,
+    );
+    expect(history[0]!.weeks.map((w) => w.result)).toEqual(['win', null, null]);
+    expect(history[0]!.record).toEqual({ wins: 1, losses: 0, ties: 0 });
+    expect(history[0]!.avgPoints).toBe(120);
   });
 
   it('has no average before any week has finished', () => {

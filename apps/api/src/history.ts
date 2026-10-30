@@ -1,10 +1,30 @@
-import type { HistoryWeek, LeagueHistory, Platform, WeekResult } from '@ffd/shared';
+import { easternTime, type HistoryWeek, type LeagueHistory, type Platform, type WeekResult } from '@ffd/shared';
 import type { SnapshotRow } from './db/schema.js';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+// When a week's scores are final: 9 AM Eastern on the Tuesday after Monday
+// night's game. Week 1 opens the Thursday after Labor Day (the first Monday in
+// September), so week N ends N weeks and a day after Labor Day.
+export function weekEndsAt(season: string, week: number): Date {
+  const year = Number(season);
+  const laborDay = 1 + ((8 - new Date(Date.UTC(year, 8, 1)).getUTCDay()) % 7);
+  const tuesday = new Date(Date.UTC(year, 8, laborDay + 1 + 7 * week)); // rolls into later months
+  return easternTime(tuesday.getUTCFullYear(), tuesday.getUTCMonth() + 1, tuesday.getUTCDate(), 9, 0);
+}
+
+// Whether a finished week's row can be graded. A row captured before the week
+// ended holds whatever the score was then (0-0 before kickoff, Sunday night's
+// partial total); Sleeper and ESPN weeks get refetched (backfill.ts), FFPC's
+// can't be. And 0-0 means nothing was played, not a tie.
+export function isFinal(row: SnapshotRow): boolean {
+  if (row.capturedAt < weekEndsAt(row.season, row.week)) return false;
+  return !(row.points === 0 && !row.opponentPoints);
+}
+
 export function weekResult(row: SnapshotRow, currentWeek: number): WeekResult {
   if (row.week >= currentWeek) return 'live';
+  if (!isFinal(row)) return null;
   // All-play week: the top half of the league wins.
   if (row.allPlayRank != null && row.allPlayWinSlots != null) {
     return row.allPlayRank <= row.allPlayWinSlots ? 'win' : 'loss';
@@ -39,7 +59,8 @@ export function buildHistory(rows: SnapshotRow[], currentWeek: number): LeagueHi
       capturedAt: r.capturedAt.toISOString(),
     }));
 
-    const finished = weeks.filter((w) => w.result !== 'live');
+    // Ungraded weeks stay listed but don't count: their points aren't the final ones.
+    const finished = weeks.filter((w, i) => w.result !== 'live' && isFinal(sorted[i]!));
     const count = (r: WeekResult) => finished.filter((w) => w.result === r).length;
     return {
       platform: latest.platform as Platform,
