@@ -5,7 +5,7 @@
 One place to follow all of my fantasy football teams across platforms, instead of checking each site separately.
 
 - **Add league:** add Sleeper accounts and ESPN leagues from the dashboard (each is checked against the platform first), connect Yahoo, or paste an FFPC league. `SLEEPER_USERNAMES` and `ESPN_LEAGUE_IDS` in `.env` still work too, for a fresh setup
-- **Live scoring** (a column beside the matchups): while games are on, every scoring change for your players and this week's opponents, checked every 30 seconds and scored by each league's own rules (green for your starters, red against you, gray on your bench)
+- **Live scoring** (a column beside the matchups): while games are on, every scoring change for your players and this week's opponents, checked every 30 seconds and scored by each league's own rules (green helps you, red hurts you, gray has no effect; scoring plays stand out and small gains shrink to one line)
 - **Matchups:** every league in one scoreboard table (my score, the opponent's, the margin), opening into projections, standings and side-by-side lineups
 - **Lineup alerts:** empty slots and injured starters whose games haven't kicked off yet, each with the best healthy bench player who could still fill in
 - **Waivers:** per league (Sleeper and ESPN), your FAAB and claim priority, the best available players ranked by next week, rest of season or Sleeper's trending adds, and suggested add/drop moves for byes, injuries and upgrades. A player is only suggested as a drop when someone as good at his position is still available

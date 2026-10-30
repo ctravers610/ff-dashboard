@@ -16,7 +16,7 @@ const upstream = (path: string) => fetch(`http://127.0.0.1:${UPSTREAM_PORT}${pat
 const feed = (page: Page) => page.getByRole('region', { name: 'Live scoring' });
 
 // Drake Maye throws a 25-yard touchdown. He's on the bench in Sleeper and FFPC
-// and starts in ESPN, so one play shows every kind of league chip.
+// and starts in ESPN, so one play shows several kinds of league line.
 async function mayeThrowsATouchdown(request: APIRequestContext) {
   await request.post('/api/live/poll'); // the starting point
   await upstream(`/_live/play?player=${P.maye.id}&pass_td=1&pass_yd=25`);
@@ -42,11 +42,12 @@ test.describe('Live feed', () => {
     await feed(page).getByRole('button', { name: 'Check now' }).click();
 
     const event = feed(page).getByRole('listitem').filter({ hasText: 'Drake Maye' }).first();
-    await expect(event).toContainText('QB · NE 1 pass TD, 25 pass yds');
-    const chips = event.getByRole('list', { name: 'Points by league' });
-    await expect(chips).toContainText(`+5.0 ${SLEEPER_LEAGUE_NAME} · bench`); // 4 + 25 × 0.04
-    await expect(chips).toContainText(`+5.3 ${FFPC_TEAM} · bench`); // FFPC: 4 + 25 × 0.05
-    await expect(chips).toContainText(`ESPN catching up ${ESPN_LEAGUE_NAME}`); // ESPN's own total hasn't moved yet
+    await expect(event).toContainText('QB · NE');
+    await expect(event).toContainText('1 pass TD, 25 pass yds');
+    const lines = event.getByRole('list', { name: 'Points by league' });
+    await expect(lines).toContainText(`${SLEEPER_LEAGUE_NAME} · bench +5.0`); // 4 + 25 × 0.04
+    await expect(lines).toContainText(`${FFPC_TEAM} · bench +5.3`); // FFPC: 4 + 25 × 0.05
+    await expect(lines).toContainText(`${ESPN_LEAGUE_NAME} pending`); // ESPN's own total hasn't moved yet
 
     // Checking again with nothing new adds nothing.
     await feed(page).getByRole('button', { name: 'Check now' }).click();
@@ -63,7 +64,10 @@ test.describe('Live feed', () => {
     const show = feed(page).getByLabel('Show');
     await show.selectOption({ label: 'My starters' });
     await expect(feed(page)).toContainText('Drake Maye'); // he starts in ESPN
+    const lines = feed(page).getByRole('list', { name: 'Points by league' }).first();
+    await expect(lines).not.toContainText(SLEEPER_LEAGUE_NAME); // he's on that bench
     await show.selectOption({ label: FFPC_TEAM });
     await expect(feed(page)).toContainText('Drake Maye');
+    await expect(lines).not.toContainText(ESPN_LEAGUE_NAME);
   });
 });
