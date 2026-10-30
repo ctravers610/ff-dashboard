@@ -9,6 +9,9 @@ import type { EspnPlayer } from '../adapters/espn/types.js';
 import { buildPlayerIndex, parseRosterText, resolvePlayer } from '../adapters/manual/parse.js';
 import { manualLeagueRepo } from '../adapters/manual/store.js';
 import { sleeperClient } from '../adapters/sleeper/client.js';
+import { yahooGet } from '../adapters/yahoo/client.js';
+import { myYahooTeams, yahooReady } from '../adapters/yahoo/index.js';
+import { parseLeaguePlayers, parseMatchup, parseRoster } from '../adapters/yahoo/parse.js';
 import { NON_STARTER_SLOTS, toPlayer } from '../adapters/sleeper/mapper.js';
 import { cached, HOUR, MINUTE } from '../cache.js';
 import { config } from '../config.js';
@@ -166,6 +169,46 @@ async function espnRecap(leagueId: string, season: string, week: number, auth: E
   );
 }
 
+// Yahoo: your roster and points that week, and the best available players at each position, scored by Yahoo.
+async function yahooRecaps(week: number, errors: SourceError[]): Promise<LineupRecap[]> {
+  if (!(await yahooReady())) return [];
+  const out: LineupRecap[] = [];
+  for (const { team, league } of await myYahooTeams()) {
+    try {
+      const positions = [...startablePositions(league.slots)];
+      const [roster, matchup, ...available] = await Promise.all([
+        yahooGet(`team/${team.teamKey}/roster;week=${week}/players/stats;type=week;week=${week}`),
+        yahooGet(`team/${team.teamKey}/matchups;weeks=${week}`),
+        ...positions.map((pos) =>
+          yahooGet(`league/${league.leagueKey}/players;status=A;position=${pos};sort=PTS;sort_type=week;sort_week=${week};count=10/stats;type=week;week=${week}`),
+        ),
+      ]);
+      const rostered: RosteredPlayer[] = parseRoster(roster)
+        .filter((r) => r.slot !== 'IR')
+        .map((r) => ({ player: r.player, points: r.points, startedAt: r.slot === 'BN' ? null : r.slot }));
+      const freeAgents: RosteredPlayer[] = available
+        .flatMap(parseLeaguePlayers)
+        .filter((fa) => fa.points > 0)
+        .map((fa) => ({ player: fa.player, points: fa.points, startedAt: null }));
+      const game = parseMatchup(matchup, team.teamKey);
+      out.push(
+        recap(
+          { platform: 'yahoo', leagueId: league.leagueKey, leagueName: league.name, week },
+          league.slots,
+          rostered,
+          game?.me.points ?? null,
+          game?.opponent?.points ?? null,
+          missedPickups(league.slots, rostered, freeAgents),
+          "Based on Yahoo's current free agents; anyone picked up since isn't counted.",
+        ),
+      );
+    } catch (e) {
+      errors.push({ source: `yahoo:${league.leagueKey}`, message: errorMessage(e) });
+    }
+  }
+  return out;
+}
+
 // FFPC: only the week whose Live Scoring page was pasted, scored with FFPC's rules.
 async function ffpcRecaps(season: string, week: number): Promise<LineupRecap[]> {
   const leagues = (await manualLeagueRepo.list()).filter((l) => l.matchup?.week === week);
@@ -216,6 +259,7 @@ export async function getRecap(requested?: number): Promise<RecapResponse> {
   const results = await Promise.all([
     settle('sleeper', sleeperRecaps(state.season, week)),
     settle('espn', espnRecaps(state.season, week, config.espnAuth, errors)),
+    settle('yahoo', yahooRecaps(week, errors)),
     settle('ffpc', ffpcRecaps(state.season, week)),
   ]);
   return { season: state.season, week, weeks, leagues: results.flat(), errors };

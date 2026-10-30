@@ -78,7 +78,15 @@ function YahooPanel() {
     return <p className="text-sm text-slate-300">Yahoo isn't set up on this server: add YAHOO_CLIENT_ID and YAHOO_CLIENT_SECRET to .env (see the README).</p>;
   }
   if (data.connected) {
-    return <p className="text-sm text-slate-300">Your Yahoo account is connected. Its leagues appear once Yahoo approves the app for Fantasy data.</p>;
+    // Reconnecting replaces the saved tokens, e.g. after switching to a new Yahoo app in .env.
+    return (
+      <p className="text-sm text-slate-300">
+        Your Yahoo account is connected. Your Yahoo leagues appear on the dashboard.{' '}
+        <a href="/api/auth/yahoo/login" className="font-medium text-slate-300 underline hover:text-slate-100">
+          Reconnect Yahoo
+        </a>
+      </p>
+    );
   }
   return (
     // A plain link: the browser itself has to visit Yahoo's sign-in page.

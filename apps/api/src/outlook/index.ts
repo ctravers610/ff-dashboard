@@ -1,10 +1,20 @@
 // GET /api/outlook: for each league, your chance of making the playoffs (the
 // rest of the regular season simulated from everyone's scoring so far), a
 // preview of your next opponent, how lucky every team has been, and the
-// season's awards. Sleeper and ESPN only: FFPC has no standings or schedule
+// season's awards. Sleeper, ESPN and Yahoo: FFPC has no standings or schedule
 // we can see.
 
-import type { LeagueOutlook, OpponentPreview, OutlookResponse, SourceError } from '@ffd/shared';
+import type { LeagueOutlook, OpponentPreview, OutlookResponse, SourceError, TeamStanding } from '@ffd/shared';
+import { yahooGet } from '../adapters/yahoo/client.js';
+import { myYahooTeams, yahooReady } from '../adapters/yahoo/index.js';
+import {
+  parseLeagueRosters,
+  parseLeagueSchedule,
+  parseLeagueSettings,
+  parseStandings,
+  type YahooMatchup,
+  type YahooRosterSpot,
+} from '../adapters/yahoo/parse.js';
 import { espnClient, espnSourceError, type EspnAuth } from '../adapters/espn/client.js';
 import { BENCH_SLOT, findMyTeamId, IR_SLOT, teamName as espnTeamName, toEspnPlayer } from '../adapters/espn/mapper.js';
 import type { EspnLeague } from '../adapters/espn/types.js';
@@ -254,6 +264,72 @@ async function espnOutlooks(leagueIds: string[], season: string, auth: EspnAuth 
   return out;
 }
 
+// ── Yahoo ───────────────────────────────────────────────────────────────
+
+/** A Yahoo league's season, from its standings, every team's schedule, its rosters and its playoff settings. */
+export function yahooSeason(
+  standings: TeamStanding[],
+  schedule: Map<string, YahooMatchup[]>,
+  rosters: Map<string, YahooRosterSpot[]>,
+  settings: Pick<ReturnType<typeof parseLeagueSettings>, 'playoffTeams' | 'playoffStartWeek'>,
+  myTeamId: string,
+): LoadedSeason {
+  const lastWeek = (settings.playoffStartWeek ?? 15) - 1;
+  // In week order: the preview takes the first remaining game that involves you.
+  const games = [...schedule.values()]
+    .flat()
+    .filter((m) => m.week <= lastWeek && m.opponent)
+    .sort((a, b) => a.week - b.week);
+  const finished = (m: YahooMatchup) => m.status === 'postevent';
+  // Each game is listed under both teams; keep it once.
+  const once = (m: YahooMatchup) => m.me.teamKey < m.opponent!.teamKey;
+
+  const teams: SeasonTeam[] = standings.map((t) => ({
+    teamId: t.teamId,
+    name: t.teamName,
+    wins: t.wins,
+    losses: t.losses,
+    ties: t.ties,
+    pointsFor: t.pointsFor,
+    results: (schedule.get(t.teamId) ?? [])
+      .filter((m) => finished(m) && m.week <= lastWeek && m.opponent)
+      .sort((a, b) => a.week - b.week)
+      .map((m) => (m.me.points > m.opponent!.points ? 'W' : m.me.points < m.opponent!.points ? 'L' : 'T')),
+  }));
+  const played: PlayedGame[] = games
+    .filter((m) => finished(m) && once(m))
+    .map((m) => ({ week: m.week, a: m.me.teamKey, b: m.opponent!.teamKey, pa: m.me.points, pb: m.opponent!.points }));
+  const remaining: Game[] = games.filter((m) => !finished(m) && once(m)).map((m) => ({ week: m.week, a: m.me.teamKey, b: m.opponent!.teamKey }));
+  const injured = new Map(
+    [...rosters].map(([teamId, roster]) => [
+      teamId,
+      roster.flatMap((r) =>
+        r.slot !== 'BN' && r.slot !== 'IR' && r.player.injuryStatus ? [{ name: r.player.name, position: r.player.position, status: r.player.injuryStatus }] : [],
+      ),
+    ]),
+  );
+  return { teams, remaining, playoffTeams: settings.playoffTeams, myTeamId, injured, played };
+}
+
+async function yahooOutlooks(previewWeek: number, errors: SourceError[]): Promise<LeagueOutlook[]> {
+  if (!(await yahooReady())) return [];
+  const out: LeagueOutlook[] = [];
+  for (const { team, league } of await myYahooTeams()) {
+    try {
+      const [setup, schedule, rosters] = await Promise.all([
+        yahooGet(`league/${league.leagueKey};out=settings,standings`),
+        yahooGet(`league/${league.leagueKey}/teams/matchups`),
+        yahooGet(`league/${league.leagueKey}/teams/roster`),
+      ]);
+      const season = yahooSeason(parseStandings(setup), parseLeagueSchedule(schedule), parseLeagueRosters(rosters), parseLeagueSettings(setup), team.teamKey);
+      out.push(outlookFor({ platform: 'yahoo', leagueId: league.leagueKey }, season, previewWeek));
+    } catch (e) {
+      errors.push({ source: `yahoo:${league.leagueKey}`, message: errorMessage(e) });
+    }
+  }
+  return out;
+}
+
 async function sleeperOutlooks(usernames: string[], season: string, currentWeek: number, previewWeek: number): Promise<LeagueOutlook[]> {
   const players = await sleeperClient.players();
   const out: LeagueOutlook[] = [];
@@ -287,6 +363,7 @@ export async function getOutlook(): Promise<OutlookResponse> {
   const results = await Promise.all([
     settle('sleeper', sleeperOutlooks(sources.sleeperUsernames, state.season, state.week, previewWeek)),
     settle('espn', espnOutlooks(sources.espnLeagueIds, state.season, config.espnAuth, previewWeek, errors)),
+    settle('yahoo', yahooOutlooks(previewWeek, errors)),
   ]);
   return { season: state.season, leagues: results.flat(), errors };
 }

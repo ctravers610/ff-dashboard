@@ -1,5 +1,5 @@
-// Which positions each lineup slot accepts, across Sleeper, ESPN and FFPC slot
-// names, and whether a set of players can fill a lineup.
+// Which positions each lineup slot accepts, across Sleeper, ESPN, Yahoo and FFPC
+// slot names, and whether a set of players can fill a lineup.
 
 const FLEX = ['RB', 'WR', 'TE'];
 const SUPERFLEX = ['QB', 'RB', 'WR', 'TE'];
@@ -8,12 +8,15 @@ const ELIGIBLE: Record<string, string[]> = {
   FLEX,
   'W/R/T': FLEX,
   'RB/WR': ['RB', 'WR'],
+  'W/R': ['RB', 'WR'],
   WRRB_FLEX: ['RB', 'WR'],
   'WR/TE': ['WR', 'TE'],
+  'W/T': ['WR', 'TE'],
   REC_FLEX: ['WR', 'TE'],
   SUPER_FLEX: SUPERFLEX,
   SUPERFLEX,
   OP: SUPERFLEX,
+  'Q/W/R/T': SUPERFLEX,
   DEF: DEFENSE,
   'D/ST': DEFENSE,
 };
