@@ -42,7 +42,7 @@ function WeekTooltip({ active, payload }: { active?: boolean; payload?: { payloa
     <div className="rounded-lg border px-3 py-2 text-sm shadow-md border-slate-700 bg-slate-900">
       <div className="mb-1 text-xs text-slate-400">
         Week {w.week}
-        {w.result && ` · ${RESULT_TEXT[w.result]}`}
+        {w.result && ` · ${RESULT_TEXT[w.result]}${w.estimated ? ' (estimate)' : ''}`}
       </div>
       <div className="flex items-center gap-2">
         <span className="h-0.5 w-3 rounded" style={{ background: 'var(--chart-series)' }} />

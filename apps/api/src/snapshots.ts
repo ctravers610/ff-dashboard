@@ -61,14 +61,17 @@ export function snapshotStore(db: Db) {
             ties: sql`excluded.ties`,
             standingRank: sql`excluded.standing_rank`,
             standingTeams: sql`excluded.standing_teams`,
+            estimated: sql`excluded.estimated`,
             capturedAt: sql`now()`,
           },
         });
     },
 
-    // A finished week rebuilt from the platform's history: fills a missing week,
-    // or replaces the score of one captured before it ended. Projections, record
-    // and standing stay as captured; the platform's history doesn't have them.
+    // A finished week rebuilt from the platform's history, or re-scored from an
+    // FFPC paste: fills a missing week, or replaces the score of one captured
+    // before it ended. Projections, record and standing stay as captured; the
+    // platform's history doesn't have them. So does an all-play rank, unless the
+    // re-score worked one out.
     async saveFinal(rows: NewSnapshot[]): Promise<void> {
       if (rows.length === 0) return;
       await db
@@ -81,6 +84,10 @@ export function snapshotStore(db: Db) {
             points: sql`excluded.points`,
             opponentName: sql`coalesce(excluded.opponent_name, ${leagueSnapshots.opponentName})`,
             opponentPoints: sql`excluded.opponent_points`,
+            allPlayRank: sql`coalesce(excluded.all_play_rank, ${leagueSnapshots.allPlayRank})`,
+            allPlayTeams: sql`coalesce(excluded.all_play_teams, ${leagueSnapshots.allPlayTeams})`,
+            allPlayWinSlots: sql`coalesce(excluded.all_play_win_slots, ${leagueSnapshots.allPlayWinSlots})`,
+            estimated: sql`excluded.estimated`,
             capturedAt: sql`now()`,
           },
         });

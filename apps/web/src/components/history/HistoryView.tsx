@@ -66,7 +66,7 @@ export function HistoryView({ leagues }: { leagues?: LeagueSummary[] }) {
               extra: (
                 <span className="mt-1 flex flex-wrap gap-0.5" aria-hidden="true">
                   {h.weeks.slice(-6).map((w) => (
-                    <ResultChip key={w.week} result={w.result} week={w.week} />
+                    <ResultChip key={w.week} result={w.result} week={w.week} estimated={w.estimated} />
                   ))}
                 </span>
               ),

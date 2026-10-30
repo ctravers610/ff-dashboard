@@ -46,7 +46,8 @@ export function WeeklyTable({
               )}
             </td>
             <td className="py-1.5">
-              <ResultChip result={w.result} week={w.week} />
+              <ResultChip result={w.result} week={w.week} estimated={w.estimated} />
+              {w.estimated && <span className="ml-2 text-xs text-slate-400">estimate</span>}
               {winnable.includes(w.week) && <span className="ml-2 text-xs text-amber-300">winnable</span>}
             </td>
             <td className="py-1.5 text-right tabular-nums">{pts(w.points)}</td>

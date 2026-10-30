@@ -1,6 +1,7 @@
 import type { ManualMatchup } from '@ffd/shared';
 import {
   bigint,
+  boolean,
   doublePrecision,
   index,
   integer,
@@ -29,6 +30,23 @@ export const manualLeagues = pgTable('manual_leagues', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Every week's pasted matchup, not just the latest one in manual_leagues, so a
+// week that ended unrecorded can be re-scored from its starters (backfill.ts).
+// A later paste of the same week replaces an earlier one.
+export const manualMatchupWeeks = pgTable(
+  'manual_matchup_weeks',
+  {
+    leagueId: uuid('league_id')
+      .notNull()
+      .references(() => manualLeagues.id, { onDelete: 'cascade' }),
+    season: text('season').notNull(),
+    week: integer('week').notNull(),
+    matchup: jsonb('matchup').$type<ManualMatchup>().notNull(),
+    capturedAt: timestamp('captured_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.leagueId, t.season, t.week] })],
+);
 
 // One row per league per week, overwritten as the week plays out, so after the
 // week ends it holds the last values we saw. This is what the History tab reads.
@@ -59,6 +77,11 @@ export const leagueSnapshots = pgTable(
     ties: integer('ties'),
     standingRank: integer('standing_rank'),
     standingTeams: integer('standing_teams'),
+
+    // Re-scored by the app from a pasted lineup that could still have changed
+    // (a late swap) or an all-play scoreboard pasted mid-week, rather than read
+    // from the platform or captured after the week ended.
+    estimated: boolean('estimated').notNull().default(false),
 
     capturedAt: timestamp('captured_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -94,6 +117,7 @@ export const oauthTokens = pgTable('oauth_tokens', {
 });
 
 export type ManualLeagueRow = typeof manualLeagues.$inferSelect;
+export type ManualMatchupWeekRow = typeof manualMatchupWeeks.$inferSelect;
 export type SessionRow = typeof sessions.$inferSelect;
 export type NewSnapshot = typeof leagueSnapshots.$inferInsert;
 export type SnapshotRow = typeof leagueSnapshots.$inferSelect;

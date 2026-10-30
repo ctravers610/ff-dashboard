@@ -1,14 +1,14 @@
 // Integration tests against a real Postgres (see db/testing.ts). They are skipped
 // when no database is reachable, except in CI, where a missing database is a failure.
 
-import type { LeagueSummary, ManualLeague, ManualLeagueInput } from '@ffd/shared';
+import type { LeagueSummary, ManualLeague, ManualLeagueInput, ManualMatchup } from '@ffd/shared';
 import { sql } from 'drizzle-orm';
 import Fastify from 'fastify';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { manualLeagueStore } from '../adapters/manual/store.js';
+import { manualLeagueStore, matchupSeason } from '../adapters/manual/store.js';
 import { buildApp } from '../app.js';
 import crypto from 'node:crypto';
 import { hashToken } from '../auth/crypto.js';
@@ -101,6 +101,60 @@ describe.skipIf(!enabled)('Postgres', () => {
       };
       const created = await store.create({ ...input, matchup });
       expect((await store.list()).find((l) => l.id === created.id)?.matchup).toEqual(matchup);
+    });
+
+    describe("each week's paste", () => {
+      const pasted = (week: number, capturedAt: string, points = 10): ManualMatchup => ({
+        week,
+        capturedAt,
+        me: { teamName: 'Team A', points, starters: [{ slot: 'QB', name: 'Josh Allen', points }] },
+        opponent: { teamName: 'Rival', points: 5, starters: [{ slot: 'QB', name: 'Drake Maye', points: 5 }] },
+      });
+
+      it("keeps every week's paste after the next week replaces it on the league", async () => {
+        const store = manualLeagueStore(testDb.db);
+        const league = await store.create({ ...input, matchup: pasted(6, '2026-10-18T20:00:00.000Z') });
+        await store.update(league.id, { ...input, matchup: pasted(7, '2026-10-25T20:00:00.000Z') });
+        await store.update(league.id, { ...input, rosterText: 'QB Drake Maye', matchup: null }); // a roster edit with no paste
+
+        expect((await store.list()).find((l) => l.id === league.id)?.matchup).toBeNull();
+        expect((await store.matchupWeeks(league.id, '2026')).map((m) => [m.week, m.capturedAt])).toEqual([
+          [6, '2026-10-18T20:00:00.000Z'],
+          [7, '2026-10-25T20:00:00.000Z'],
+        ]);
+        expect(await store.matchupWeeks(league.id, '2025')).toEqual([]);
+      });
+
+      it('replaces a week with a newer paste of it, never an older one', async () => {
+        const store = manualLeagueStore(testDb.db);
+        const league = await store.create({ ...input, matchup: pasted(7, '2026-10-25T20:00:00.000Z', 10) });
+        await store.update(league.id, { ...input, matchup: pasted(7, '2026-10-27T02:00:00.000Z', 25) });
+        await store.update(league.id, { ...input, matchup: pasted(7, '2026-10-25T17:00:00.000Z', 3) });
+        expect(await store.matchupWeeks(league.id, '2026')).toEqual([pasted(7, '2026-10-27T02:00:00.000Z', 25)]);
+      });
+
+      it("goes with its league when it's deleted", async () => {
+        const store = manualLeagueStore(testDb.db);
+        const league = await store.create({ ...input, matchup: pasted(6, '2026-10-18T20:00:00.000Z') });
+        await store.remove(league.id);
+        expect(await store.matchupWeeks(league.id, '2026')).toEqual([]);
+      });
+
+      it('files a January paste under the season that started the year before', () => {
+        expect(matchupSeason(pasted(17, '2027-01-03T18:00:00.000Z'))).toBe('2026');
+        expect(matchupSeason(pasted(1, '2026-09-13T18:00:00.000Z'))).toBe('2026');
+      });
+
+      it("the migration copies each league's current paste, using the same season rule", async () => {
+        const store = manualLeagueStore(testDb.db);
+        const league = await store.create({ ...input, matchup: pasted(17, '2027-01-03T18:00:00.000Z') });
+        const migration = await fs.readFile(new URL('../../drizzle/0007_ffpc_matchup_weeks.sql', import.meta.url), 'utf8');
+        const copy = migration.split('--> statement-breakpoint').at(-1)!;
+
+        await testDb.db.execute(sql`DELETE FROM manual_matchup_weeks`); // as it was before the migration
+        await testDb.db.execute(sql.raw(copy));
+        expect(await store.matchupWeeks(league.id, '2026')).toEqual([pasted(17, '2027-01-03T18:00:00.000Z')]);
+      });
     });
 
     it('imports the old JSON file once, keeping ids, then sets it aside', async () => {
@@ -328,6 +382,19 @@ describe.skipIf(!enabled)('Postgres', () => {
       const captures = await store.capturesFor('sleeper', 'L1', '2026');
       expect(captures.map((c) => c.week).sort()).toEqual([1, 2, 3]);
       expect(captures.every((c) => c.capturedAt instanceof Date)).toBe(true);
+    });
+
+    it("marks a re-scored FFPC week as an estimate and takes its all-play rank, which other re-fetches don't have", async () => {
+      const store = snapshotStore(testDb.db);
+      const ffpc = (extra: Partial<NewSnapshot>) => snapshot(6, 0, { platform: 'ffpc', leagueId: 'F9', ...extra });
+      await store.save([ffpc({ points: 60, allPlayRank: 9, allPlayTeams: 12, allPlayWinSlots: 6 })]);
+      await store.saveFinal([ffpc({ points: 141.2, allPlayRank: 4, allPlayTeams: 12, allPlayWinSlots: 6, estimated: true })]);
+      const row = async () => (await store.listForSeason('2026')).find((r) => r.leagueId === 'F9')!;
+      expect(await row()).toMatchObject({ points: 141.2, allPlayRank: 4, estimated: true });
+
+      // A refetch that has no all-play rank keeps the one already there, and is exact.
+      await store.saveFinal([ffpc({ points: 142 })]);
+      expect(await row()).toMatchObject({ points: 142, allPlayRank: 4, allPlayTeams: 12, estimated: false });
     });
 
     it('keeps leagues and seasons separate', async () => {

@@ -2,10 +2,12 @@
 // recording, and ones last captured before they ended. The dashboard only records
 // while it's open (and the server sleeps when nobody is using it), so a week's
 // row can be from before kickoff or Sunday night; whichever load comes next
-// replaces it with the final score.
+// replaces it with the final score. Sleeper, ESPN and Yahoo weeks come from their
+// APIs; FFPC weeks are re-scored from that week's pasted lineups.
 
 import type { LeagueSummary } from '@ffd/shared';
 import { espnPastWeeks } from './adapters/espn/history.js';
+import { ffpcPastWeeks } from './adapters/manual/history.js';
 import { sleeperPastWeeks } from './adapters/sleeper/history.js';
 import { yahooPastWeeks } from './adapters/yahoo/history.js';
 import { config } from './config.js';
@@ -28,13 +30,14 @@ export const weeksToFetch = (season: string, current: number, captures: { week: 
 
 export async function backfillHistory(leagues: LeagueSummary[], store = snapshotRepo, now = Date.now()): Promise<void> {
   for (const league of leagues) {
-    if (league.platform === 'ffpc') continue;
     const key = `${league.platform}:${league.leagueId}:${league.season}`;
     if (now - (lastChecked.get(key) ?? 0) < CHECK_EVERY_MS) continue;
     lastChecked.set(key, now);
 
-    const weeks = weeksToFetch(league.season, league.week, await store.capturesFor(league.platform, league.leagueId, league.season));
-    if (weeks.length === 0) continue;
+    const captures = await store.capturesFor(league.platform, league.leagueId, league.season);
+    const weeks = weeksToFetch(league.season, league.week, captures);
+    // An FFPC week can also be re-pasted after its row was written, so it goes on.
+    if (weeks.length === 0 && league.platform !== 'ffpc') continue;
 
     let rows: NewSnapshot[];
     try {
@@ -43,7 +46,9 @@ export async function backfillHistory(leagues: LeagueSummary[], store = snapshot
           ? await sleeperPastWeeks(league, weeks)
           : league.platform === 'espn'
             ? await espnPastWeeks(league, weeks, config.espnAuth)
-            : await yahooPastWeeks(league, weeks);
+            : league.platform === 'yahoo'
+              ? await yahooPastWeeks(league, weeks)
+              : await ffpcPastWeeks(league, weeks, captures);
     } catch (e) {
       lastChecked.delete(key); // try again on a later load
       throw e;
