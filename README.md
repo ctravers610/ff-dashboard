@@ -8,7 +8,7 @@ One place to follow all of my fantasy football teams across platforms, instead o
 - **Live scoring** (a column beside the matchups): while games are on, every scoring change for your players and this week's opponents, checked every 30 seconds and scored by each league's own rules (green helps you, red hurts you, gray has no effect; scoring plays stand out and small gains shrink to one line)
 - **Matchups:** every league in one scoreboard table (my score, the opponent's, the margin), opening into projections, standings and side-by-side lineups
 - **Lineup alerts:** empty slots and injured starters whose games haven't kicked off yet, each with the best healthy bench player who could still fill in
-- **Waivers:** per league (Sleeper and ESPN), your FAAB and claim priority, the best available players ranked by next week, rest of season or Sleeper's trending adds, and suggested add/drop moves for byes, injuries and upgrades. A player is only suggested as a drop when someone as good at his position is still available
+- **Waivers:** per league (Sleeper, ESPN, Yahoo and FFPC), your FAAB and claim priority, the best available players ranked by next week, rest of season or Sleeper's trending adds, and suggested add/drop moves for byes, injuries and upgrades. A player is only suggested as a drop when someone as good at his position is still available. In FAAB leagues, each available player has a **likely bid**, and each suggested move says what to bid (see below)
 - **Lineup check:** a push 90 minutes before a lineup problem locks: a starter who's out or doubtful (before his game), questionable with a healthy swap available, on bye, or an empty slot (before the week's first game)
 - **Waiver reminders:** browser push notifications at 9 PM ET before overnight runs and 2 hours before the rest, skipped once your claims are in (ESPN shows you your own pending claims; elsewhere you mark them set, from the tab or the notification)
 - **Players:** where each player sits across all my leagues, who I'm facing this week, and "start and face" conflicts
@@ -158,6 +158,35 @@ mkcert -cert-file certs/localhost.pem -key-file certs/localhost-key.pem localhos
 ```
 
 `mkcert -install` adds a root certificate that only exists on your machine to its trust store. Without `certs/`, the dev server falls back to a self-signed certificate: everything else works, but Chrome won't register the service worker push needs.
+
+### Likely FAAB bids, and what to bid
+
+In FAAB leagues, Waivers estimates the bid you'd have to beat for each available player, from what each bidder on similar players had to beat: every claim in your FAAB leagues, as a share of that league's budget. Claims count more for the same position, a similarly ranked player (by Sleeper's projections over the next four weeks), a similar point in the season, the same league (double) and recent seasons (each season back counts 0.8 as much). It shows the range that bid fell in half the time when someone else wanted him, or nothing when fewer than about four similar claims back it up. The model is `apps/api/src/waivers/pricing.ts`.
+
+Every player you'd have to bid on then gets a bid, on suggested moves and in Best available, in three steps:
+
+1. **The odds of each bid.** On similar claims, how often no one else bid at all, and otherwise how often this bid beats what the bidders had to beat. No team can bid more than it has left, so a bid that tops every other team's balance is certain, and any other bid leaves room for a bidding war. A tie goes by your place in the claim order.
+2. **What he's worth to you.** His points are what he adds to his best slot in your lineup: the gain this week or, if he's better than the starter and your best bench player there for good, that gain over the rest of the season. Someone who wouldn't start for you is worth $0. A point costs what you have left over the points it could still buy: the smallest upgrade worth a claim (3 points a week), made each week from now on and lasting to the end. So money gets freer as the weeks run out. This step is a judgment call rather than something the data can test.
+3. **The bid.** The one with the best payoff: its chance of winning times what you'd keep of his worth after paying it. Suggested moves are sized out of what the ones before them leave, since bids in one run can all win. Other players are sized on their own, so those bids can add up to more than you have.
+
+Free agents get no bid, since you can just add them.
+
+This season's claims come from every platform. Yahoo also keeps earlier seasons, so a Yahoo league's past seasons (followed back through each league it was renewed from) are loaded in the background; until they're in, prices use this season alone. Yahoo doesn't report the starting budget, so it's worked out from each team's balance plus its winning bids.
+
+What each team had to beat comes from the losing bids: Yahoo's site (with a `YAHOO_COOKIE`, this season and past ones) and Sleeper's failed claims. Where they aren't known (ESPN), a claim only says what a rival paid. Waivers also says how much you've overpaid on contested wins and how close your contested losses were.
+
+Backtested on 1,298 real bids from 2020 to 2026 in two leagues, each priced only from claims made before it, against the same model using winning bids alone:
+
+| Bids meant to win | With losing bids | Winning bids alone |
+| --- | --- | --- |
+| 50% | won 52% | won 58% |
+| 75% | won 77% | won 78% |
+| 90% | won 91% | won 91% |
+| Average price of a win, per $100 of budget | $2.70 | $4.90 |
+
+That average is from a simulation that assumes each player was worth half again what the team really bid. Odds come out about right every season taken together, but single seasons swing both ways (bids meant to win 50% won 44% in 2023 and 61% in 2026). Counting recent seasons more didn't help: making seasons count less with age, or counting this season extra, made the odds worse overall, so a season's level doesn't seem predictable from the seasons before it. Bidding wars on breaking news are mostly beyond the model.
+
+`npm run backtest:faab` reruns that backtest on your own leagues and prints the numbers.
 
 ### ESPN cookies
 

@@ -8,15 +8,16 @@ import { sleeperClient } from '../adapters/sleeper/client.js';
 import { toPlayer } from '../adapters/sleeper/mapper.js';
 import { yahooGet } from '../adapters/yahoo/client.js';
 import { errorMessage, myYahooTeams, yahooReady } from '../adapters/yahoo/index.js';
-import { parseAdds, parseAvailable, parseLeagueSettings, parseRoster, parseWaiverStanding, startersOf, type YahooLeagueInfo, type YahooRosterSpot } from '../adapters/yahoo/parse.js';
+import { parseAdds, parseAvailable, parseLeagueSettings, parseRoster, parseWaiverStanding, startersOf, type YahooAdd, type YahooLeagueInfo, type YahooRosterSpot } from '../adapters/yahoo/parse.js';
 import { yahooScoring } from '../adapters/yahoo/scoring.js';
 import { yahooContestedClaims, YahooCookiesError } from '../adapters/yahoo/web.js';
 import { HOUR } from '../cache.js';
 import { config } from '../config.js';
 import { playerKey } from '../exposure.js';
 import { scoreWithSettings, weeklyProjections } from '../scoring/projection.js';
-import { waiverPlayer, type WaiverContext } from './context.js';
+import { waiverPlayer, type WaiverContext, type WaiverLeagueWithBids } from './context.js';
 import { pickAvailable, startablePositions, suggestMoves } from './moves.js';
+import { withLosingBids } from './pricing.js';
 import { yahooSchedule } from './schedule.js';
 
 type Projections = Map<string, Record<string, number>>;
@@ -29,14 +30,30 @@ export interface YahooWaiverInput {
   teams: number;
   roster: YahooRosterSpot[]; // yours
   available: ReturnType<typeof parseAvailable>;
+  faabBudget: number | null; // see inferFaabBudget
 }
 
-export function yahooRules(input: Pick<YahooWaiverInput, 'settings' | 'standing' | 'teams'>): WaiverRules {
+/**
+ * The league's FAAB budget, which Yahoo doesn't report: each team's balance
+ * plus what it has spent on winning bids, the most common answer across teams
+ * (a team given extra budget, or a claim missing from the log, won't skew it).
+ */
+export function inferFaabBudget(balances: Map<string, { faabBalance: number | null }>, adds: YahooAdd[]): number | null {
+  const spent = new Map<string, number>();
+  for (const a of adds) if (a.fromWaivers && a.bid) spent.set(a.teamKey, (spent.get(a.teamKey) ?? 0) + a.bid);
+  const totals = [...balances].flatMap(([team, s]) => (s.faabBalance == null ? [] : [s.faabBalance + (spent.get(team) ?? 0)]));
+  if (totals.length === 0) return null;
+  const counts = new Map<number, number>();
+  for (const t of totals) counts.set(t, (counts.get(t) ?? 0) + 1);
+  return [...counts].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0]![0];
+}
+
+export function yahooRules(input: Pick<YahooWaiverInput, 'settings' | 'standing' | 'teams' | 'faabBudget'>): WaiverRules {
   const faab = input.settings.usesFaab;
   return {
     // Yahoo's default otherwise is a continual rolling list.
     type: faab ? 'faab' : 'rolling',
-    faabTotal: null, // Yahoo reports what's left, not the starting budget
+    faabTotal: faab ? input.faabBudget : null,
     faabLeft: faab ? (input.standing?.faabBalance ?? null) : null,
     priority: input.standing?.priority ?? null,
     teams: input.teams,
@@ -44,7 +61,7 @@ export function yahooRules(input: Pick<YahooWaiverInput, 'settings' | 'standing'
 }
 
 /** One Yahoo league's waiver view. `sleeperIdOf` finds a player in Sleeper's projections. */
-export function yahooWaiverLeague(input: YahooWaiverInput, weeks: Projections[], sleeperIdOf: (p: Player) => string | null, ctx: WaiverContext): WaiverLeague {
+export function yahooWaiverLeague(input: YahooWaiverInput, weeks: Projections[], sleeperIdOf: (p: Player) => string | null, ctx: WaiverContext): WaiverLeagueWithBids {
   const toWaiver = (player: Player, availability: WaiverPlayer['availability'] = null) => {
     const id = sleeperIdOf(player);
     const perWeek = id ? weeks.map((w) => scoreWithSettings(w.get(id) ?? {}, input.scoring)) : null;
@@ -69,6 +86,7 @@ export function yahooWaiverLeague(input: YahooWaiverInput, weeks: Projections[],
     rules: yahooRules(input),
     moves: suggestMoves({ starters, bench, available, openRosterSpots, byeTeams: ctx.byeTeams }),
     available,
+    lineup: { starters, bench },
     openRosterSpots,
     runs: [],
     runsSource: null,
@@ -76,8 +94,8 @@ export function yahooWaiverLeague(input: YahooWaiverInput, weeks: Projections[],
   };
 }
 
-export async function fetchYahooWaivers(ctx: WaiverContext): Promise<{ leagues: WaiverLeague[]; errors: SourceError[] }> {
-  const result = { leagues: [] as WaiverLeague[], errors: [] as SourceError[] };
+export async function fetchYahooWaivers(ctx: WaiverContext): Promise<{ leagues: WaiverLeagueWithBids[]; errors: SourceError[] }> {
+  const result = { leagues: [] as WaiverLeagueWithBids[], errors: [] as SourceError[] };
   if (!(await yahooReady())) return result;
 
   const weekNumbers = Array.from({ length: Math.max(0, ctx.lastWeek - ctx.week + 1) }, (_, i) => ctx.week + i);
@@ -111,6 +129,7 @@ export async function fetchYahooWaivers(ctx: WaiverContext): Promise<{ leagues: 
         ]);
         const standings = parseWaiverStanding(teams);
         const settings = parseLeagueSettings(setup);
+        const added = parseAdds(adds);
         const input: YahooWaiverInput = {
           league,
           settings,
@@ -119,8 +138,9 @@ export async function fetchYahooWaivers(ctx: WaiverContext): Promise<{ leagues: 
           teams: standings.size,
           roster: parseRoster(roster),
           available: available.flatMap(parseAvailable),
+          faabBudget: settings.usesFaab ? inferFaabBudget(standings, added) : null,
         };
-        const schedule = yahooSchedule(parseAdds(adds), settings.usesFaab, league.currentWeek);
+        const schedule = yahooSchedule(added, settings.usesFaab, league.currentWeek);
         // Losing bids come from Yahoo's site; trouble there shouldn't cost you the rest of the league.
         const contestedClaims =
           settings.usesFaab && config.yahooCookie
@@ -130,7 +150,14 @@ export async function fetchYahooWaivers(ctx: WaiverContext): Promise<{ leagues: 
                 return null;
               })
             : null;
-        result.leagues.push({ ...yahooWaiverLeague(input, weeks, sleeperIdOf, ctx), ...schedule, contestedClaims });
+        const rivalBalances = [...standings].flatMap(([key, s]) => (key !== team.teamKey && s.faabBalance != null ? [s.faabBalance] : []));
+        result.leagues.push({
+          ...yahooWaiverLeague(input, weeks, sleeperIdOf, ctx),
+          ...schedule,
+          contestedClaims,
+          winningBids: withLosingBids(schedule.winningBids ?? [], contestedClaims),
+          rivalBalances,
+        });
       } catch (e) {
         result.errors.push({ source: `yahoo:${league.leagueKey}`, message: errorMessage(e) });
       }

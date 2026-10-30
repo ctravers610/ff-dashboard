@@ -121,7 +121,7 @@ export function ffpcWaiverPage(leagueNumber = '#12345'): string {
 // Wednesday, so the app learns "Wed 3:00 AM". ESPN has no history in the
 // fixtures, so its schedule is unknown and it sorts last.
 const SLEEPER_RUNS = ['2026-09-16T07:05:00Z', '2026-09-23T07:05:00Z', '2026-09-30T07:05:00Z', '2026-10-07T07:05:00Z', '2026-10-14T07:05:00Z'];
-// Each week's winning claim and what it cost: median $5, most $18 (Puka Nacua, week 2).
+// Each week's winning claim and what it cost.
 export const SLEEPER_WINNING_BIDS: [FxPlayer, number][] = [
   [P.doubs, 3],
   [P.puka, 18],
@@ -129,17 +129,29 @@ export const SLEEPER_WINNING_BIDS: [FxPlayer, number][] = [
   [P.geno, 0],
   [P.olave, 9],
 ];
+// The top receivers, claimed and dropped again, which is enough like them to
+// price them now. With the above: median $10, most $24 (Rashee Rice, week 5).
+const SLEEPER_MORE_WINNING_BIDS: Record<number, [FxPlayer, number][]> = {
+  3: [[P.rice, 11]],
+  4: [[P.rice, 15], [P.reed, 6]],
+  5: [[P.rice, 24], [P.reed, 13]],
+};
 export function sleeperTransactions(week: number) {
   const at = SLEEPER_RUNS[week - 1];
   if (!at) return [];
   const [player, bid] = SLEEPER_WINNING_BIDS[week - 1]!;
   const trades = week === SLEEPER_TRADE.week ? [sleeperTrade(at)] : [];
-  return [...trades, ...[0, 1].map((i) => ({
+  const more = (SLEEPER_MORE_WINNING_BIDS[week] ?? []).flatMap(([p, amount]) => [
+    { type: 'waiver', status: 'complete', status_updated: Date.parse(at), leg: week, settings: { waiver_bid: amount }, adds: { [p.id]: 3 } },
+    { type: 'waiver', status: 'failed', status_updated: Date.parse(at), leg: week, settings: { waiver_bid: Math.floor(amount / 2) }, adds: { [p.id]: 4 }, metadata: { notes: 'This player was claimed by another owner.' } },
+  ]);
+  return [...trades, ...more, ...[0, 1].map((i) => ({
     type: 'waiver',
     status: i === 0 ? 'complete' : 'failed',
     status_updated: Date.parse(at) + i * 1000,
     leg: week,
     settings: { waiver_bid: i === 0 ? bid : 1 },
+    metadata: i === 0 ? null : { notes: 'This player was claimed by another owner.' },
     adds: { [player.id]: i === 0 ? 3 : 4 },
   }))];
 }

@@ -13,10 +13,11 @@ import { config } from '../config.js';
 import { activeSources } from '../sources/store.js';
 import { playerKey } from '../exposure.js';
 import { byes, byeWeeks, nflGames } from '../scoring/games.js';
-import type { WaiverContext } from './context.js';
+import type { WaiverContext, WaiverLeagueWithBids } from './context.js';
 import { fetchEspnWaivers } from './espn.js';
 import { fetchFfpcWaivers } from './ffpc.js';
 import { claimWeek, LAST_REGULAR_WEEK } from './moves.js';
+import { forBrowser, withPrices } from './prices.js';
 import { fetchSleeperWaivers } from './sleeper.js';
 import { fetchYahooWaivers } from './yahoo.js';
 
@@ -57,7 +58,13 @@ export async function getWaivers(): Promise<WaiversResponse> {
   ]);
   const [, espn] = results;
   const now = new Date();
-  const leagues = (await withClaims(results.flatMap((r) => r.leagues), espn.pendingClaims)).map((l) =>
+  // Prices are a bonus: without them the rest of the page still works.
+  const all: WaiverLeagueWithBids[] = results.flatMap((r) => r.leagues);
+  const priced = await withPrices(all, ctx).catch((e) => {
+    console.error('Could not price waiver players:', e);
+    return all.map(forBrowser);
+  });
+  const leagues = (await withClaims(priced, espn.pendingClaims)).map((l) =>
     l.platform === 'ffpc' ? { ...l, pasteStale: addDropStale(l, now) } : l,
   );
   return {

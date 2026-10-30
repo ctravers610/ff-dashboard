@@ -66,6 +66,7 @@ export interface YahooLeagueInfo {
   season: string;
   currentWeek: number;
   slots: string[]; // lineup slots in order, one per starter: QB, WR, WR, ... (empty if settings weren't returned)
+  previousKey: string | null; // the same league last season, when it was renewed from one
 }
 
 /** The league's starting slots, from its settings' roster_positions (a list, or a collection). */
@@ -91,9 +92,32 @@ export function parseLeagues(json: Json): YahooLeagueInfo[] {
         season: str(p.season),
         currentWeek: num(p.current_week),
         slots: lineupSlots(p.settings),
+        // Yahoo writes the league it was renewed from as "461_906193".
+        previousKey: str(p.renew).replace('_', '.l.') || null,
       };
     }),
   );
+}
+
+export interface YahooGameWeek {
+  week: number;
+  start: string; // YYYY-MM-DD, the Tuesday (or opening Thursday) it starts
+  end: string; // YYYY-MM-DD, the Monday it ends
+}
+
+/** A season's fantasy weeks and their dates (game/{game_key}/game_weeks). */
+export function parseGameWeeks(json: Json): YahooGameWeek[] {
+  const content = isObject(json) ? json.fantasy_content : null;
+  return items(flat(isObject(content) ? content.game : null).game_weeks, 'game_week').map((w) => {
+    const p = flat(w);
+    return { week: num(p.week), start: str(p.start), end: str(p.end) };
+  });
+}
+
+/** The fantasy week a moment falls in, by its Eastern date; null outside the season's weeks. */
+export function weekOn(weeks: YahooGameWeek[], at: Date): number | null {
+  const day = at.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); // YYYY-MM-DD
+  return weeks.find((w) => w.start <= day && day <= w.end)?.week ?? null;
 }
 
 /** The team resource inside a single-team response (team/{key}/...). */
@@ -225,6 +249,7 @@ export interface YahooAdd {
   fromWaivers: boolean; // a claim, rather than a free-agent pickup
   bid: number | null; // FAAB leagues' winning bid
   player: Player | null;
+  teamKey: string; // the team that added him
 }
 
 /** Every player added, with when and how (league/{key}/transactions;types=add). Drops and trades are left out. */
@@ -235,7 +260,13 @@ export function parseAdds(json: Json): YahooAdd[] {
     return items(p.players, 'player').flatMap((raw) => {
       const data = flat(flat(raw).transaction_data); // an object, or an array of one
       if (str(data.type) !== 'add') return [];
-      return [{ at: new Date(num(p.timestamp) * 1000), fromWaivers: str(data.source_type) === 'waivers', bid: p.faab_bid == null ? null : num(p.faab_bid), player: playerSpot(raw).player }];
+      return [{
+        at: new Date(num(p.timestamp) * 1000),
+        fromWaivers: str(data.source_type) === 'waivers',
+        bid: p.faab_bid == null ? null : num(p.faab_bid),
+        player: playerSpot(raw).player,
+        teamKey: str(data.destination_team_key),
+      }];
     });
   });
 }

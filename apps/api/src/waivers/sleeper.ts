@@ -8,7 +8,7 @@ import { NON_STARTER_SLOTS, toPlayer } from '../adapters/sleeper/mapper.js';
 import type { SleeperLeague, SleeperPlayerMap, SleeperRoster } from '../adapters/sleeper/types.js';
 import { HOUR } from '../cache.js';
 import { scoreWithSettings, weeklyProjections } from '../scoring/projection.js';
-import { waiverPlayer, type WaiverContext } from './context.js';
+import { waiverPlayer, type WaiverContext, type WaiverLeagueWithBids } from './context.js';
 import { sleeperSchedule } from './schedule.js';
 import { pickAvailable, startablePositions, suggestMoves } from './moves.js';
 
@@ -37,7 +37,7 @@ export function sleeperWaiverLeague(
   players: SleeperPlayerMap,
   weeks: Projections[], // claim week first, then each later week of the regular season
   ctx: WaiverContext,
-): WaiverLeague {
+): WaiverLeagueWithBids {
   const scoring = league.scoring_settings ?? {};
   const value = (id: string): Pick<WaiverPlayer, 'week' | 'restOfSeason'> => {
     const perWeek = weeks.map((w) => scoreWithSettings(w.get(id) ?? {}, scoring));
@@ -81,6 +81,7 @@ export function sleeperWaiverLeague(
     rules: sleeperRules(league, mine, rosters.length),
     moves: suggestMoves({ starters, bench, available, openRosterSpots, byeTeams: ctx.byeTeams }),
     available,
+    lineup: { starters, bench },
     openRosterSpots,
     runs: [],
     runsSource: null,
@@ -90,8 +91,8 @@ export function sleeperWaiverLeague(
 
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-export async function fetchSleeperWaivers(usernames: string[], ctx: WaiverContext): Promise<{ leagues: WaiverLeague[]; errors: SourceError[] }> {
-  const result = { leagues: [] as WaiverLeague[], errors: [] as SourceError[] };
+export async function fetchSleeperWaivers(usernames: string[], ctx: WaiverContext): Promise<{ leagues: WaiverLeagueWithBids[]; errors: SourceError[] }> {
+  const result = { leagues: [] as WaiverLeagueWithBids[], errors: [] as SourceError[] };
   if (usernames.length === 0) return result;
 
   const weekNumbers = Array.from({ length: Math.max(0, ctx.lastWeek - ctx.week + 1) }, (_, i) => ctx.week + i);
@@ -113,7 +114,9 @@ export async function fetchSleeperWaivers(usernames: string[], ctx: WaiverContex
           const mine = rosters.find((r) => r.owner_id === user.user_id || r.co_owners?.includes(user.user_id));
           if (!mine) continue;
           const schedule = await sleeperSchedule(league, ctx.week);
-          result.leagues.push({ ...sleeperWaiverLeague(league, rosters, mine, players, weeks, ctx), ...schedule });
+          const budget = league.settings?.waiver_budget ?? 0;
+          const rivalBalances = rosters.filter((r) => r !== mine).map((r) => budget - (r.settings.waiver_budget_used ?? 0));
+          result.leagues.push({ ...sleeperWaiverLeague(league, rosters, mine, players, weeks, ctx), ...schedule, rivalBalances });
         }
       } catch (e) {
         result.errors.push({ source: `sleeper:${username}`, message: errorMessage(e) });

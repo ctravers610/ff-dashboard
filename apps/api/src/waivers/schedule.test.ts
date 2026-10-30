@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeBids, yahooSchedule } from './schedule.js';
+import type { SleeperPlayerMap, SleeperTransaction } from '../adapters/sleeper/types.js';
+import { sleeperClaims, summarizeBids, yahooSchedule } from './schedule.js';
 
 const p = (name: string) => ({ playerId: name, name, position: 'RB', nflTeam: 'KC', injuryStatus: null });
 
@@ -24,13 +25,13 @@ describe('summarizeBids', () => {
 describe('yahooSchedule', () => {
   // Thursday of week 8, 2026. Claims processed at 4:10 AM Eastern (8:10 UTC) the last two Wednesdays.
   const now = new Date('2026-10-29T20:00:00Z');
-  const claim = (iso: string, bid: number, name: string) => ({ at: new Date(iso), fromWaivers: true, bid, player: p(name) });
+  const claim = (iso: string, bid: number, name: string) => ({ at: new Date(iso), fromWaivers: true, bid, player: p(name), teamKey: 't.1' });
   const adds = [
     claim('2026-10-28T08:10:00Z', 13, 'This Week'),
     claim('2026-10-28T08:10:30Z', 1, 'Cheap'),
     claim('2026-10-21T08:11:00Z', 25, 'Last Week'),
     claim('2026-10-21T08:10:00Z', 0, 'Free Claim'),
-    { at: new Date('2026-10-28T16:24:00Z'), fromWaivers: false, bid: null, player: p('Free Agent') }, // added any time: not a run
+    { at: new Date('2026-10-28T16:24:00Z'), fromWaivers: false, bid: null, player: p('Free Agent'), teamKey: 't.2' }, // added any time: not a run
   ];
 
   it('finds the run from when claims processed, ignoring free-agent pickups', () => {
@@ -43,6 +44,34 @@ describe('yahooSchedule', () => {
 
   it('has no bids outside FAAB leagues, and no runs without claims', () => {
     expect(yahooSchedule(adds, false, 8, now).bids).toBeNull();
-    expect(yahooSchedule([], true, 8, now)).toEqual({ runs: [], runsSource: null, bids: null });
+    expect(yahooSchedule([], true, 8, now)).toEqual({ runs: [], runsSource: null, bids: null, winningBids: [] });
+  });
+});
+
+describe('sleeperClaims', () => {
+  const players = {} as SleeperPlayerMap; // names don't matter here
+  const claim = (status: string, player: string, bid: number, leg: number, notes?: string): SleeperTransaction => ({
+    type: 'waiver',
+    status,
+    status_updated: 1,
+    leg,
+    settings: { waiver_bid: bid },
+    adds: { [player]: 1 },
+    metadata: notes ? { notes } : null,
+  });
+  const outbid = 'This player was claimed by another owner.';
+
+  it('finds the bids that lost to each win, the same week on the same player', () => {
+    const claims = sleeperClaims(
+      [claim('complete', 'a', 10, 3), claim('failed', 'a', 4, 3, outbid), claim('failed', 'a', 7, 3, outbid), claim('failed', 'a', 9, 4, outbid), claim('failed', 'b', 9, 3, outbid)],
+      players,
+    );
+    expect(claims).toHaveLength(1);
+    expect(claims[0]).toMatchObject({ bid: 10, week: 3, losers: [4, 7] });
+  });
+
+  it('leaves out failed claims that were never in the running', () => {
+    const claims = sleeperClaims([claim('complete', 'a', 10, 3), claim('failed', 'a', 40, 3, 'Unfortunately, your roster will have too many players after this transaction.')], players);
+    expect(claims[0]!.losers).toEqual([]);
   });
 });

@@ -67,8 +67,8 @@ export function parseContestedClaims(html: string, myTeamId: string): ContestedC
     .map((row) => parseClaim(row, myTeamId));
 }
 
-async function fetchPage(leagueId: string, offset: number, cookie: string, opts: RetryOptions): Promise<string> {
-  const url = `${config.upstream.yahooWeb}/f1/${encodeURIComponent(leagueId)}/transactions?transactionsfilter=faab${offset ? `&count=${offset}` : ''}`;
+async function fetchPage(leagueId: string, offset: number, cookie: string, opts: RetryOptions, season: string | null): Promise<string> {
+  const url = `${config.upstream.yahooWeb}${season ? `/${season}` : ''}/f1/${encodeURIComponent(leagueId)}/transactions?transactionsfilter=faab${offset ? `&count=${offset}` : ''}`;
   let res: Response;
   try {
     res = await fetchWithRetry(url, { headers: { Cookie: cookie }, redirect: 'manual' }, opts);
@@ -83,12 +83,15 @@ async function fetchPage(leagueId: string, offset: number, cookie: string, opts:
   return res.text();
 }
 
-/** Every contested claim in a league this season, newest first. Pages one at a time, gently. */
-export function yahooContestedClaims(leagueId: string, myTeamId: string, cookie: string, opts: RetryOptions = {}): Promise<ContestedClaim[]> {
-  return cached(`yahoo-web:${leagueId}`, TTL, async () => {
+/**
+ * Every contested claim in a league, newest first, this season or (with `season`)
+ * an earlier one, which the site keeps at its own address. Pages one at a time, gently.
+ */
+export function yahooContestedClaims(leagueId: string, myTeamId: string, cookie: string, opts: RetryOptions = {}, season: string | null = null): Promise<ContestedClaim[]> {
+  return cached(`yahoo-web:${season ?? 'now'}:${leagueId}`, TTL, async () => {
     const claims: ContestedClaim[] = [];
     for (let page = 0; page < MAX_PAGES; page++) {
-      const html = await fetchPage(leagueId, claims.length, cookie, opts);
+      const html = await fetchPage(leagueId, claims.length, cookie, opts, season);
       const found = parseContestedClaims(html, myTeamId);
       claims.push(...found);
       if (found.length === 0 || !/>Next \d+<\/a>/.test(html)) break;

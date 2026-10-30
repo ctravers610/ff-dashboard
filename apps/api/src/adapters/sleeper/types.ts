@@ -81,6 +81,7 @@ export interface SleeperTransaction {
   status_updated: number;
   leg?: number; // the week
   settings?: { waiver_bid?: number } | null;
+  metadata?: { notes?: string } | null; // why a claim failed
   adds?: Record<string, number> | null; // player id -> roster id
   drops?: Record<string, number> | null;
   roster_ids?: number[];
