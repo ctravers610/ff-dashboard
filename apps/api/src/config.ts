@@ -54,6 +54,7 @@ function applyDemo(cfg: ReturnType<typeof baseConfig>, env: Env) {
     upstream: { ...cfg.upstream, ...demo.upstream },
     push: null,
     yahoo: null,
+    yahooCookie: null,
     tokenKey: null,
   };
 }
@@ -103,6 +104,8 @@ function baseConfig(env: Env) {
             redirectUri: env.YAHOO_REDIRECT_URI ?? `${publicUrl}/api/auth/yahoo/callback`,
           }
         : null,
+    // A signed-in Yahoo session, for the losing bids only Yahoo's site shows (see adapters/yahoo/web.ts).
+    yahooCookie: env.YAHOO_COOKIE?.trim() || null,
     // Matches docker-compose.yml, so `docker compose up -d` works with no setup.
     databaseUrl: env.DATABASE_URL ?? 'postgres://ffd:ffd_dev_password@127.0.0.1:5432/ffd',
     // The analytics warehouse (analytics/), read for History's past seasons.
@@ -117,6 +120,7 @@ function baseConfig(env: Env) {
       espnFantasy: env.ESPN_FANTASY_URL ?? 'https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons',
       espnScoreboard: env.ESPN_SCOREBOARD_URL ?? 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard',
       yahooFantasy: env.YAHOO_FANTASY_URL ?? 'https://fantasysports.yahooapis.com/fantasy/v2',
+      yahooWeb: env.YAHOO_WEB_URL ?? 'https://football.fantasysports.yahoo.com',
       githubOAuth: env.GITHUB_OAUTH_URL ?? 'https://github.com',
       githubApi: env.GITHUB_API_URL ?? 'https://api.github.com',
     },

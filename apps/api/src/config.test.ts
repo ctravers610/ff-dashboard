@@ -63,7 +63,8 @@ describe('demo mode', () => {
   const env = { DEMO_MODE: '1', NODE_ENV: 'production', DEMO_UPSTREAM_PORT: '3099', DATABASE_URL: 'postgres://db/ffd_demo' };
 
   it('follows the made-up leagues on the built-in fake upstream, never your own accounts', () => {
-    const cfg = loadConfig({ ...env, SLEEPER_USERNAMES: 'me', ESPN_S2: 'real-cookie', ESPN_SWID: '{REAL}', VAPID_PUBLIC_KEY: 'k', VAPID_PRIVATE_KEY: 'k' });
+    const cfg = loadConfig({ ...env, SLEEPER_USERNAMES: 'me', ESPN_S2: 'real-cookie', ESPN_SWID: '{REAL}', YAHOO_COOKIE: 'real-cookie', VAPID_PUBLIC_KEY: 'k', VAPID_PRIVATE_KEY: 'k' });
+    expect(cfg.yahooCookie).toBeNull();
     expect(cfg.demo).toEqual({ upstreamPort: 3099 });
     expect(cfg.auth.mode).toBe('demo');
     expect(cfg.sleeperUsernames).not.toContain('me');

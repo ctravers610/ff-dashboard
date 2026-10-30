@@ -173,6 +173,14 @@ The SWID (with its curly braces) is also how the dashboard knows which team is y
 
 Create an app at [developer.yahoo.com/apps](https://developer.yahoo.com/apps/create/) (Confidential Client, Fantasy Sports Read, redirect URI `https://localhost:5173/api/auth/yahoo/callback`), put the Client ID and Secret in `.env`, then click **Connect Yahoo** in the dashboard. Yahoo's tokens are stored in the database encrypted with `TOKEN_ENCRYPTION_KEY`, so set one first (see `.env.example`). Yahoo only serves Fantasy data to approved apps; apply at [sports.yahoo.com/developer](https://sports.yahoo.com/developer). Approval covers apps that already had Fantasy Sports checked. If the dashboard still says Yahoo hasn't turned on access, create a new app (editing the old one doesn't work) and submit its Client ID at [sports.yahoo.com/developer/application-confirmation](https://sports.yahoo.com/developer/application-confirmation/). After putting the new app's Client ID and Secret in `.env`, click **Reconnect Yahoo** under **Add league** so the old app's saved sign-in is replaced.
 
+**Losing bids (optional).** Yahoo's API only reports winning bids; it blanks the rest. Its website lists them all, so with `YAHOO_COOKIE` set, Waivers shows every bid on each contested claim in FAAB leagues. To get the cookie:
+
+1. Sign in at [football.fantasysports.yahoo.com](https://football.fantasysports.yahoo.com/) in a desktop browser, and open your league's Transactions page.
+2. Open DevTools (F12) → **Network**, reload, and click the first request (`transactions`).
+3. Under **Request Headers**, copy the whole value of `Cookie`, and put it in `.env` in single quotes: `YAHOO_COOKIE='...'`. On Render, paste it without the quotes.
+
+This cookie is a login to your whole Yahoo account, far more than the read-only Fantasy access **Connect Yahoo** grants, and reading the site this way is unofficial, so it could stop working if Yahoo changes the page. Keep it in `.env` and your host's secret settings only. The app sends it only to `football.fantasysports.yahoo.com`, only to read that page, at most once every 30 minutes per league. It expires when Yahoo ends the session, and signing out of Yahoo ends it too; Waivers says so when that happens, and the rest of Yahoo keeps working.
+
 Yahoo has no projections, so Waivers uses Sleeper's, matched to Yahoo's players by position and name and scored with each Yahoo league's own scoring (yardage bonuses aren't counted). Trades and the trade finder are Sleeper-only (the finder also covers ESPN), and History's **All seasons** panel is Sleeper-only.
 
 ## Analytics

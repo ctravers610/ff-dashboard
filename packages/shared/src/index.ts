@@ -217,8 +217,9 @@ export interface SourceError {
   source: string;
   message: string;
   // A problem with a known fix: 'espn-cookies' means ESPN refused the saved
-  // cookies (expired, or signed out), so ESPN_S2 and ESPN_SWID need updating.
-  code?: 'espn-cookies';
+  // cookies (expired, or signed out), so ESPN_S2 and ESPN_SWID need updating;
+  // 'yahoo-cookies' is the same for YAHOO_COOKIE.
+  code?: 'espn-cookies' | 'yahoo-cookies';
 }
 
 export interface DashboardResponse {
@@ -287,6 +288,9 @@ export interface WaiverLeague {
   // where the platform doesn't show them.
   pendingClaims?: PendingClaim[] | null;
   bids?: WaiverBids | null; // FAAB leagues with processed claims (Sleeper, ESPN)
+  // Yahoo FAAB leagues with YAHOO_COOKIE set: every bid on each contested claim,
+  // newest first. Null where we can't see losing bids.
+  contestedClaims?: ContestedClaim[] | null;
   // Your claims for the next run (null when there's no known next run). ESPN
   // shows you your own pending claims; elsewhere you mark them set yourself.
   claims: WaiverClaims | null;
@@ -298,6 +302,24 @@ export interface WaiverBids {
   median: number;
   high: number;
   top: { name: string; position: string; bid: number; week: number }[]; // the biggest, most expensive first
+}
+
+// One team's bid on a contested claim.
+export interface ClaimBid {
+  team: string;
+  mine: boolean;
+  amount: number;
+  reason: string | null; // why it lost, in Yahoo's words; null for the winner
+}
+
+// A player more than one bid went in on, and how it came out.
+export interface ContestedClaim {
+  player: string;
+  position: string;
+  nflTeam: string;
+  when: string; // when it processed, as Yahoo shows it: "Oct 14, 3:59 am"
+  winner: ClaimBid;
+  losers: ClaimBid[];
 }
 
 export interface PendingClaim {

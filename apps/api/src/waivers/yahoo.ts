@@ -10,7 +10,9 @@ import { yahooGet } from '../adapters/yahoo/client.js';
 import { errorMessage, myYahooTeams, yahooReady } from '../adapters/yahoo/index.js';
 import { parseAdds, parseAvailable, parseLeagueSettings, parseRoster, parseWaiverStanding, startersOf, type YahooLeagueInfo, type YahooRosterSpot } from '../adapters/yahoo/parse.js';
 import { yahooScoring } from '../adapters/yahoo/scoring.js';
+import { yahooContestedClaims, YahooCookiesError } from '../adapters/yahoo/web.js';
 import { HOUR } from '../cache.js';
+import { config } from '../config.js';
 import { playerKey } from '../exposure.js';
 import { scoreWithSettings, weeklyProjections } from '../scoring/projection.js';
 import { waiverPlayer, type WaiverContext } from './context.js';
@@ -119,7 +121,16 @@ export async function fetchYahooWaivers(ctx: WaiverContext): Promise<{ leagues: 
           available: available.flatMap(parseAvailable),
         };
         const schedule = yahooSchedule(parseAdds(adds), settings.usesFaab, league.currentWeek);
-        result.leagues.push({ ...yahooWaiverLeague(input, weeks, sleeperIdOf, ctx), ...schedule });
+        // Losing bids come from Yahoo's site; trouble there shouldn't cost you the rest of the league.
+        const contestedClaims =
+          settings.usesFaab && config.yahooCookie
+            ? await yahooContestedClaims(league.leagueId, team.teamKey.split('.t.')[1] ?? '', config.yahooCookie).catch((e) => {
+                const source = `yahoo-site:${league.leagueKey}`;
+                result.errors.push(e instanceof YahooCookiesError ? { source, message: e.message, code: e.code } : { source, message: errorMessage(e) });
+                return null;
+              })
+            : null;
+        result.leagues.push({ ...yahooWaiverLeague(input, weeks, sleeperIdOf, ctx), ...schedule, contestedClaims });
       } catch (e) {
         result.errors.push({ source: `yahoo:${league.leagueKey}`, message: errorMessage(e) });
       }
