@@ -188,6 +188,8 @@ That average is from a simulation that assumes each player was worth half again 
 
 `npm run backtest:faab` reruns that backtest on your own leagues and prints the numbers.
 
+The model mostly misses bidding wars: bids meant to win 90% won only 57% of claims that went for 20% or more of the budget. Breaking news doesn't show in projected rank, but it might show in Sleeper's trending adds. Sleeper only reports the current count, so the app saves it to `trending_add_snapshots` once a day: season, week, player, position and adds in the last 24 hours, for Sleeper's top 100. A player outside the top 100 has no row, which doesn't mean no one added him. A day starts at 9 PM Eastern, hours before overnight waivers run, and the first check after that saves it. If the app is asleep then on the free plan, the next wake-up saves it instead, and `captured_at` says when that was. Nothing uses these rows yet. Once a few weeks are saved they can be matched against claims, to test the signal before it goes into the odds.
+
 ### ESPN cookies
 
 Private ESPN leagues need two cookies from a browser where you're logged in to ESPN:

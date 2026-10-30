@@ -57,6 +57,13 @@
       "when": 1793319247361,
       "tag": "0007_ffpc_matchup_weeks",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793376885523,
+      "tag": "0008_trending_add_snapshots",
+      "breakpoints": true
     }
   ]
 }
