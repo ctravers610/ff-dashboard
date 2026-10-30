@@ -2,13 +2,14 @@
 // recording, and ones last captured before they ended. The dashboard only records
 // while it's open (and the server sleeps when nobody is using it), so a week's
 // row can be from before kickoff or Sunday night; whichever load comes next
-// replaces it with the final score. Sleeper and ESPN weeks come from their
-// history APIs; FFPC weeks are re-scored from that week's pasted lineups.
+// replaces it with the final score. Sleeper, ESPN and Yahoo weeks come from their
+// APIs; FFPC weeks are re-scored from that week's pasted lineups.
 
 import type { LeagueSummary } from '@ffd/shared';
 import { espnPastWeeks } from './adapters/espn/history.js';
 import { ffpcPastWeeks } from './adapters/manual/history.js';
 import { sleeperPastWeeks } from './adapters/sleeper/history.js';
+import { yahooPastWeeks } from './adapters/yahoo/history.js';
 import { config } from './config.js';
 import type { NewSnapshot } from './db/schema.js';
 import { weekEndsAt } from './history.js';
@@ -29,7 +30,6 @@ export const weeksToFetch = (season: string, current: number, captures: { week: 
 
 export async function backfillHistory(leagues: LeagueSummary[], store = snapshotRepo, now = Date.now()): Promise<void> {
   for (const league of leagues) {
-    if (league.platform !== 'sleeper' && league.platform !== 'espn' && league.platform !== 'ffpc') continue;
     const key = `${league.platform}:${league.leagueId}:${league.season}`;
     if (now - (lastChecked.get(key) ?? 0) < CHECK_EVERY_MS) continue;
     lastChecked.set(key, now);
@@ -46,7 +46,9 @@ export async function backfillHistory(leagues: LeagueSummary[], store = snapshot
           ? await sleeperPastWeeks(league, weeks)
           : league.platform === 'espn'
             ? await espnPastWeeks(league, weeks, config.espnAuth)
-            : await ffpcPastWeeks(league, weeks, captures);
+            : league.platform === 'yahoo'
+              ? await yahooPastWeeks(league, weeks)
+              : await ffpcPastWeeks(league, weeks, captures);
     } catch (e) {
       lastChecked.delete(key); // try again on a later load
       throw e;

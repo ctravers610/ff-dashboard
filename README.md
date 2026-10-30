@@ -45,7 +45,7 @@ Each platform has an **adapter** in `apps/api/src/adapters/<platform>/` that fet
 | Sleeper | ✅ Public API, multiple accounts |
 | ESPN | ✅ Unofficial API, cookie auth for private leagues |
 | FFPC | ✅ No usable API, so rosters come from pasting FFPC's Live Scoring page; scores then update live (see below) |
-| Yahoo | OAuth 2.0 sign-in works; Fantasy API data is pending Yahoo's app approval |
+| Yahoo | ✅ Official Fantasy API (OAuth 2.0): lineups, standings, History, the live feed, recaps, playoff odds and waivers |
 
 ### FFPC (manual import with live scoring)
 
@@ -171,7 +171,9 @@ The SWID (with its curly braces) is also how the dashboard knows which team is y
 
 ### Yahoo
 
-Create an app at [developer.yahoo.com/apps](https://developer.yahoo.com/apps/create/) (Confidential Client, Fantasy Sports Read, redirect URI `https://localhost:5173/api/auth/yahoo/callback`), put the Client ID and Secret in `.env`, then click **Connect Yahoo** in the dashboard. Yahoo's tokens are stored in the database encrypted with `TOKEN_ENCRYPTION_KEY`, so set one first (see `.env.example`). Yahoo only serves Fantasy data to approved apps; apply at [sports.yahoo.com/developer](https://sports.yahoo.com/developer).
+Create an app at [developer.yahoo.com/apps](https://developer.yahoo.com/apps/create/) (Confidential Client, Fantasy Sports Read, redirect URI `https://localhost:5173/api/auth/yahoo/callback`), put the Client ID and Secret in `.env`, then click **Connect Yahoo** in the dashboard. Yahoo's tokens are stored in the database encrypted with `TOKEN_ENCRYPTION_KEY`, so set one first (see `.env.example`). Yahoo only serves Fantasy data to approved apps; apply at [sports.yahoo.com/developer](https://sports.yahoo.com/developer). Approval covers apps that already had Fantasy Sports checked. If the dashboard still says Yahoo hasn't turned on access, create a new app (editing the old one doesn't work) and submit its Client ID at [sports.yahoo.com/developer/application-confirmation](https://sports.yahoo.com/developer/application-confirmation/). After putting the new app's Client ID and Secret in `.env`, click **Reconnect Yahoo** under **Add league** so the old app's saved sign-in is replaced.
+
+Yahoo has no projections, so Waivers uses Sleeper's, matched to Yahoo's players by position and name and scored with each Yahoo league's own scoring (yardage bonuses aren't counted). Trades and the trade finder are Sleeper-only (the finder also covers ESPN), and History's **All seasons** panel is Sleeper-only.
 
 ## Analytics
 
@@ -206,7 +208,7 @@ What it loads, into the `raw` schema:
 - **Sleeper:** your users, every league since 2017 (`--first-season` to change), their users, rosters, drafts and picks, each week's matchups and transactions, and the player list (at most once a day, as Sleeper asks). Usernames come from `SLEEPER_USERNAMES` plus accounts added in the app, or `--username`.
 - **The app's database:** `league_snapshots` (History, including FFPC) and `live_events`, which exist nowhere else.
 
-ESPN, Yahoo and FFPC aren't fetched: ESPN's API is unofficial and needs your cookies, Yahoo's agreement limits keeping its data, and FFPC is never contacted.
+ESPN, Yahoo and FFPC aren't fetched: ESPN's API is unofficial and needs your cookies, Yahoo needs your sign-in, and FFPC is never contacted. Their weeks still reach the warehouse through `league_snapshots`.
 
 Each table holds the payload exactly as the source sent it, plus the columns that identify the item (`league_id`, `week`, …). A row is only added when the payload differs from that item's latest one, so loading again is safe and changes such as stat corrections are kept as versions. Finished leagues and weeks are fetched once; leagues in season refetch their rosters and the last two weeks. Every run is recorded in `raw.load_runs` (status, rows added, Sleeper calls, error), and an advisory lock stops two loads overlapping.
 

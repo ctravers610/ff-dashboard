@@ -1,9 +1,6 @@
-// The Yahoo Fantasy API, under its API Access and Use Agreement (personal use):
-//   - Nothing it returns is stored, cached or indexed: every call goes to Yahoo,
-//     and the results are used for the response being built, then dropped.
-//   - Rate limits are respected: a throttled or failing call is retried a few
-//     times with exponential backoff, honoring Yahoo's Retry-After.
-// See adapters/yahoo/index.ts for what is fetched (your own team only).
+// The Yahoo Fantasy API. Rate limits are respected: a throttled or failing call
+// is retried a few times with exponential backoff, honoring Yahoo's Retry-After.
+// See adapters/yahoo/index.ts for what the dashboard fetches.
 
 import { config } from '../../config.js';
 import { getAccessToken } from './auth.js';
@@ -42,7 +39,7 @@ export async function fetchWithRetry(url: string, init: RequestInit, opts: Retry
   }
 }
 
-// GET a Yahoo Fantasy resource as JSON, e.g. "users;use_login=1/games;game_codes=nfl/teams".
+// GET a Yahoo Fantasy resource as JSON, e.g. "users;use_login=1/games;game_keys=nfl/teams".
 export async function yahooGet<T = unknown>(resource: string, opts: RetryOptions = {}): Promise<T> {
   const token = await getAccessToken();
   if (!token) throw new Error('Yahoo is not connected');
@@ -50,9 +47,12 @@ export async function yahooGet<T = unknown>(resource: string, opts: RetryOptions
   const separator = resource.includes('?') ? '&' : '?';
   const res = await fetchWithRetry(`${config.upstream.yahooFantasy}/${resource}${separator}format=json`, { headers: { Authorization: `Bearer ${token}` } }, opts);
   if (res.status === 401) throw new Error('Yahoo rejected the access token; try reconnecting Yahoo');
-  // Yahoo only serves Fantasy data to apps it has approved; until then, 403 everywhere.
+  // Yahoo only serves Fantasy data to apps it has approved; any other app gets 403 everywhere.
+  // An app created before the account's access was approved stays unapproved, and editing it doesn't help.
   if (res.status === 403) {
-    throw new Error("Yahoo hasn't turned on Fantasy API access for this app yet (it follows the confirmation form)");
+    throw new Error(
+      "Yahoo hasn't turned on Fantasy API access for this app. If the app was created before access was approved, create a new one with Fantasy Sports checked and submit its Client ID at sports.yahoo.com/developer/application-confirmation",
+    );
   }
   if (RETRYABLE.has(res.status)) throw new Error(`Yahoo is rate-limiting or unavailable (HTTP ${res.status}); it will be tried again on the next refresh`);
   if (!res.ok) throw new Error(`Yahoo ${resource} returned HTTP ${res.status}`);

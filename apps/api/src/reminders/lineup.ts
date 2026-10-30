@@ -19,8 +19,8 @@ export interface LineupIssue {
   deadline: Date; // after this, the lineup spot is locked
 }
 
-// "Already sent" keys are stored, so a Yahoo one is kept only as a hash: no Yahoo
-// ids in the database (its API agreement doesn't allow storing its data).
+// "Already sent" keys are stored; a Yahoo one as a hash, from before Yahoo data
+// was saved. Switching to plain keys would re-send reminders already sent.
 const sentKey = (key: string, platform: string) =>
   platform === 'yahoo' ? `lineup:yahoo:${crypto.createHash('sha256').update(key).digest('hex')}` : key;
 
