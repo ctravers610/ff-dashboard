@@ -11,6 +11,7 @@ import { sendDueReminders, sendEspnCookieAlert, sendFfpcPasteReminders, sendLine
 import { getDashboard } from './dashboard.js';
 import { reminderRepo } from './reminders/store.js';
 import { getWaivers } from './waivers/index.js';
+import { recordTrendingAdds } from './waivers/trending.js';
 import { sleeperNflState } from './adapters/sleeper/index.js';
 import { gamesLive, pollLive } from './live/service.js';
 import { startDemo } from './demo.js';
@@ -84,6 +85,16 @@ if (sender) {
 } else {
   app.log.info('Waiver reminders are off: set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY to turn them on.');
 }
+
+// Sleeper's trending adds: every 5 minutes, save the day's snapshot if it isn't
+// saved yet, on its own timer because it doesn't need push set up. Same catch-up
+// as reminders: a restart or a host waking from sleep saves a day it had missed.
+const saveTrendingAdds = () =>
+  recordTrendingAdds()
+    .then((n) => n > 0 && app.log.info(`Saved trending adds for ${n} player(s)`))
+    .catch((e) => app.log.warn(e, 'Could not save trending adds'));
+setTimeout(saveTrendingAdds, 30_000).unref();
+setInterval(saveTrendingAdds, 5 * 60 * 1000).unref();
 
 // The live feed: every 30 seconds while games are on, record scoring changes.
 let polling = false;

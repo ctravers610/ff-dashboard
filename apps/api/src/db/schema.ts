@@ -2,6 +2,7 @@ import type { ManualMatchup } from '@ffd/shared';
 import {
   bigint,
   boolean,
+  date,
   doublePrecision,
   index,
   integer,
@@ -178,3 +179,21 @@ export const notificationsSent = pgTable('notifications_sent', {
   key: text('key').primaryKey(),
   sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Sleeper's trending adds, one row per player per day (see waivers/trending.ts).
+// Sleeper only reports the current count, so what isn't saved here is gone.
+export const trendingAddSnapshots = pgTable(
+  'trending_add_snapshots',
+  {
+    day: date('day').notNull(), // the Eastern date the 24 hours began, at 9 PM
+    season: text('season').notNull(),
+    week: integer('week').notNull(), // the week a claim made then would play in
+    playerKey: text('player_key').notNull(),
+    position: text('position').notNull(),
+    adds: integer('adds').notNull(), // Sleeper users who added him in the 24 hours before capturedAt
+    capturedAt: timestamp('captured_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.day, t.playerKey] })],
+);
+
+export type NewTrendingAddSnapshot = typeof trendingAddSnapshots.$inferInsert;

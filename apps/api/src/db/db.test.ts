@@ -18,7 +18,8 @@ import { sessionStore } from '../auth/sessions.js';
 import { oauthTokenStore } from '../auth/tokens.js';
 import { manualLeagueRoutes } from '../routes/manualLeagues.js';
 import { snapshotStore, toSnapshot } from '../snapshots.js';
-import type { NewSnapshot } from './schema.js';
+import { trendingStore } from '../waivers/trending.js';
+import { trendingAddSnapshots, type NewSnapshot } from './schema.js';
 import { createTestDb, dbAvailable } from './testing.js';
 
 const enabled = Boolean(process.env.CI) || (await dbAvailable());
@@ -428,6 +429,36 @@ describe.skipIf(!enabled)('Postgres', () => {
 
       const row = (await store.listForSeason('2026')).find((r) => r.leagueId === 'F1')!;
       expect(row).toMatchObject({ platform: 'ffpc', week: 6, allPlayRank: 2, allPlayTeams: 12, allPlayWinSlots: 6, wins: null });
+    });
+  });
+
+  describe('trending adds', () => {
+    const row = (adds: number, playerKey = 'RB:sam sample', day = '2026-10-27') => ({ day, season: '2026', week: 9, playerKey, position: 'RB', adds });
+    const saved = () => testDb.db.select().from(trendingAddSnapshots).orderBy(trendingAddSnapshots.day, trendingAddSnapshots.playerKey);
+
+    it('keeps the first capture when a day is saved again', async () => {
+      const store = trendingStore(testDb.db);
+      expect(await store.hasDay('2026-10-27')).toBe(false);
+
+      await store.save([row(100)]);
+      const [first] = await saved();
+      expect(await store.hasDay('2026-10-27')).toBe(true);
+
+      await store.save([row(999)]);
+      expect(await saved()).toEqual([first]);
+      expect(first).toMatchObject({ day: '2026-10-27', season: '2026', week: 9, playerKey: 'RB:sam sample', position: 'RB', adds: 100 });
+      expect(first!.capturedAt).toBeInstanceOf(Date);
+    });
+
+    it('gives the same player a row for each day', async () => {
+      const store = trendingStore(testDb.db);
+      await store.save([row(300, 'RB:sam sample', '2026-10-28'), row(50, 'RB:tom test', '2026-10-28')]);
+      expect(await store.hasDay('2026-10-28')).toBe(true);
+      expect((await saved()).map((r) => [r.day, r.playerKey, r.adds])).toEqual([
+        ['2026-10-27', 'RB:sam sample', 100],
+        ['2026-10-28', 'RB:sam sample', 300],
+        ['2026-10-28', 'RB:tom test', 50],
+      ]);
     });
   });
 });
