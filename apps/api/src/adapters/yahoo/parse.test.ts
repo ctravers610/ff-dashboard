@@ -1,6 +1,6 @@
 import * as fx from '@ffd/demo/fixtures/yahoo';
 import { describe, expect, it } from 'vitest';
-import { flat, items, parseAdds, parseLeagues, parseMatchup, parseMyTeams, parseRoster, parseStandings, startersOf, toYahooSummary } from './parse.js';
+import { flat, items, parseAdds, parseGameWeeks, parseLeagues, weekOn, parseMatchup, parseMyTeams, parseRoster, parseStandings, startersOf, toYahooSummary } from './parse.js';
 
 // Made-up responses only (packages/demo/src/fixtures/yahoo.ts).
 describe('Yahoo JSON helpers', () => {
@@ -80,8 +80,8 @@ describe('Yahoo transactions', () => {
         { league_key: fx.YAHOO_LEAGUE_KEY },
         {
           transactions: {
-            '0': { transaction: tx('1793261400', [player('Claimed Receiver', { type: 'add', source_type: 'waivers' }), player('Dropped Guy', { type: 'drop', source_type: 'team' })], { faab_bid: '13' }) },
-            '1': { transaction: tx('1793290000', [player('Picked Up', { type: 'add', source_type: 'freeagents' })]) },
+            '0': { transaction: tx('1793261400', [player('Claimed Receiver', { type: 'add', source_type: 'waivers', destination_team_key: '461.l.777001.t.4' }), player('Dropped Guy', { type: 'drop', source_type: 'team' })], { faab_bid: '13' }) },
+            '1': { transaction: tx('1793290000', [player('Picked Up', { type: 'add', source_type: 'freeagents', destination_team_key: '461.l.777001.t.9' })]) },
             '2': { transaction: [{ type: 'add', status: 'failed', timestamp: '1793261400' }, { players: {} }] },
             count: 3,
           },
@@ -92,8 +92,30 @@ describe('Yahoo transactions', () => {
 
   it('lists adds with when, how and the bid, leaving out drops and failed claims', () => {
     expect(parseAdds(json)).toEqual([
-      { at: new Date(1793261400 * 1000), fromWaivers: true, bid: 13, player: expect.objectContaining({ name: 'Claimed Receiver', nflTeam: 'BUF' }) },
-      { at: new Date(1793290000 * 1000), fromWaivers: false, bid: null, player: expect.objectContaining({ name: 'Picked Up' }) },
+      { at: new Date(1793261400 * 1000), fromWaivers: true, bid: 13, player: expect.objectContaining({ name: 'Claimed Receiver', nflTeam: 'BUF' }), teamKey: '461.l.777001.t.4' },
+      { at: new Date(1793290000 * 1000), fromWaivers: false, bid: null, player: expect.objectContaining({ name: 'Picked Up' }), teamKey: '461.l.777001.t.9' },
     ]);
+  });
+});
+
+describe("Yahoo's week calendar", () => {
+  const json = {
+    fantasy_content: {
+      game: [
+        { game_key: '390', season: '2019' },
+        { game_weeks: { '0': { game_week: { week: '1', start: '2019-09-05', end: '2019-09-09' } }, '1': { game_week: { week: '2', start: '2019-09-10', end: '2019-09-16' } }, count: 2 } },
+      ],
+    },
+  };
+  const weeks = parseGameWeeks(json);
+
+  it('reads each week’s dates', () => {
+    expect(weeks).toEqual([{ week: 1, start: '2019-09-05', end: '2019-09-09' }, { week: 2, start: '2019-09-10', end: '2019-09-16' }]);
+  });
+
+  it('places a moment in its week by the Eastern date', () => {
+    expect(weekOn(weeks, new Date('2019-09-11T08:10:00Z'))).toBe(2); // a Wednesday 4:10 AM ET run
+    expect(weekOn(weeks, new Date('2019-09-10T03:30:00Z'))).toBe(1); // still Monday night in New York
+    expect(weekOn(weeks, new Date('2019-12-30T12:00:00Z'))).toBeNull();
   });
 });

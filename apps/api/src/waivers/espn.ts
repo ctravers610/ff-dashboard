@@ -5,7 +5,7 @@ import type { PendingClaim, SourceError, WaiverLeague, WaiverPlayer, WaiverRules
 import { espnClient, espnSourceError, type EspnAuth } from '../adapters/espn/client.js';
 import { BENCH_SLOT, findMyTeamId, IR_SLOT, SLOT_NAMES, SLOT_ORDER, toEspnPlayer } from '../adapters/espn/mapper.js';
 import type { EspnFreeAgents, EspnLeague, EspnPlayer, EspnTransaction } from '../adapters/espn/types.js';
-import { waiverPlayer, type WaiverContext } from './context.js';
+import { waiverPlayer, type WaiverContext, type WaiverLeagueWithBids } from './context.js';
 import { espnSchedule } from './schedule.js';
 import { pickAvailable, startablePositions, suggestMoves } from './moves.js';
 
@@ -33,7 +33,7 @@ export function espnRules(league: EspnLeague, myTeamId: number): WaiverRules {
   };
 }
 
-export function espnWaiverLeague(league: EspnLeague, freeAgents: EspnFreeAgents, myTeamId: number, name: string, ctx: WaiverContext): WaiverLeague {
+export function espnWaiverLeague(league: EspnLeague, freeAgents: EspnFreeAgents, myTeamId: number, name: string, ctx: WaiverContext): WaiverLeagueWithBids {
   const season = Number(ctx.season);
   const toWaiver = (p: EspnPlayer, availability: WaiverPlayer['availability'] = null) => {
     const v = projection(p, season, ctx.week);
@@ -71,6 +71,7 @@ export function espnWaiverLeague(league: EspnLeague, freeAgents: EspnFreeAgents,
     rules: espnRules(league, myTeamId),
     moves: suggestMoves({ starters, bench, available, openRosterSpots, byeTeams: ctx.byeTeams }),
     available,
+    lineup: { starters, bench },
     openRosterSpots,
     runs: [],
     runsSource: null,
@@ -132,8 +133,8 @@ export async function fetchEspnWaivers(
   leagueIds: string[],
   auth: EspnAuth | null,
   ctx: WaiverContext,
-): Promise<{ leagues: WaiverLeague[]; errors: SourceError[]; pendingClaims: Map<string, number> }> {
-  const result = { leagues: [] as WaiverLeague[], errors: [] as SourceError[], pendingClaims: new Map<string, number>() };
+): Promise<{ leagues: WaiverLeagueWithBids[]; errors: SourceError[]; pendingClaims: Map<string, number> }> {
+  const result = { leagues: [] as WaiverLeagueWithBids[], errors: [] as SourceError[], pendingClaims: new Map<string, number>() };
   await Promise.all(
     leagueIds.map(async (leagueId) => {
       try {
@@ -157,7 +158,9 @@ export async function fetchEspnWaivers(
           const fetchPlayers = (ids: number[]) => espnClient.players(leagueId, ctx.season, ctx.week, ids, auth).then((r) => r.players.map((p) => p.player));
           pendingClaims = await espnPendingClaims(mine, league, freeAgents, base.rules?.type === 'faab', ctx, fetchPlayers);
         }
-        result.leagues.push({ ...base, ...schedule, pendingClaims });
+        const budget = league.settings?.acquisitionSettings?.acquisitionBudget ?? 0;
+        const rivalBalances = (league.teams ?? []).filter((t) => t.id !== myTeamId).map((t) => budget - (t.transactionCounter?.acquisitionBudgetSpent ?? 0));
+        result.leagues.push({ ...base, ...schedule, pendingClaims, rivalBalances });
       } catch (e) {
         result.errors.push(espnSourceError(leagueId, e));
       }

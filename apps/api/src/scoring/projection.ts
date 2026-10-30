@@ -18,7 +18,7 @@ interface StatRow {
   stats: Record<string, number>;
 }
 
-async function fetchProjections(season: string, week: number): Promise<Map<string, Record<string, number>>> {
+export async function fetchProjections(season: string, week: number): Promise<Map<string, Record<string, number>>> {
   const res = await fetch(`${config.upstream.sleeperStats}/projections/nfl/${season}/${week}?season_type=regular`);
   if (!res.ok) throw new Error(`Sleeper projections returned HTTP ${res.status}`);
   const rows = (await res.json()) as StatRow[];

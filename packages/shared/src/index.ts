@@ -2,6 +2,7 @@
 // converts its own API responses into these shapes, so the web app never
 // needs to know which platform a league came from.
 
+export * from './contestedClaims';
 export * from './ffpc';
 export * from './ffpcLive';
 export * from './ffpcWaivers';
@@ -244,6 +245,28 @@ export interface WaiverPlayer {
   // null when the platform doesn't say.
   availability: 'waivers' | 'free_agent' | null;
   trendingAdds: number | null; // Sleeper users who added him in the last 24 hours
+  // FAAB leagues, available players: what he's likely to go for, from similar
+  // players' winning bids. Absent elsewhere; null when there's too little to go on.
+  price?: FaabPrice | null;
+  bid?: FaabBid | null; // and what to bid on him, unless he's a free agent you can just add
+}
+
+// A likely winning FAAB bid, in the league's dollars: half of similar players'
+// winning bids fell between low and high.
+export interface FaabPrice {
+  low: number;
+  typical: number;
+  high: number;
+  basedOn: number; // how many similar claims' worth of evidence
+}
+
+// What to bid on a player: the bid that pays off best, given how likely
+// each bid is to win and how much the player is worth to you.
+export interface FaabBid {
+  bid: number;
+  chance: number; // of winning at that bid, 0 to 1
+  worth: number; // the most he's worth to you, in the league's dollars
+  odds: { bid: number; chance: number }[]; // other bids and their chances, cheapest first
 }
 
 export type WaiverMoveReason = 'empty' | 'bye' | 'injury' | 'upgrade';
@@ -256,6 +279,7 @@ export interface WaiverMove {
   add: WaiverPlayer;
   drop: WaiverPlayer | null; // null when you have an open roster spot
   gain: number; // projected points gained this week
+  bid?: FaabBid | null; // FAAB leagues, players you have to bid on; null with too little to go on
 }
 
 export interface WaiverRules {

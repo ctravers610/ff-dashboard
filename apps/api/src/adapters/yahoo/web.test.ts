@@ -113,3 +113,15 @@ describe('yahooContestedClaims', () => {
     expect((failure as Error).message).not.toContain('secret');
   });
 });
+
+describe('an earlier season of a league', () => {
+  it('is read from that season\u2019s address, and cached apart from this season', async () => {
+    const earlier = scripted([ok(page([back]))]);
+    const now = scripted([ok(page([defense]))]);
+    expect((await yahooContestedClaims('777555', '', 'c=1', earlier, '2025')).map((c) => c.player)).toEqual(["Fake O'Runner Jr."]);
+    expect((await yahooContestedClaims('777555', '', 'c=1', now)).map((c) => c.player)).toEqual(['Made Up Defense']);
+    expect(earlier.seen[0]!.url).toContain('/2025/f1/777555/transactions');
+    expect(now.seen[0]!.url).not.toContain('/2025/');
+  });
+});
+

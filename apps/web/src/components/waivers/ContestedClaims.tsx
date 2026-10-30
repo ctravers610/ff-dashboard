@@ -1,4 +1,4 @@
-import type { ClaimBid, ContestedClaim } from '@ffd/shared';
+import { yourBidding, type ClaimBid, type ContestedClaim } from '@ffd/shared';
 import { useState } from 'react';
 
 function Bid({ bid }: { bid: ClaimBid }) {
@@ -20,8 +20,10 @@ export function ContestedClaims({ claims }: { claims: ContestedClaim[] }) {
   const [all, setAll] = useState(false);
   const latest = dayOf(claims[0]!);
   const shown = all ? claims : claims.filter((c) => dayOf(c) === latest);
+  const summary = yourBidding(claims);
   return (
     <div className="flex flex-col gap-2">
+      {summary && <p className="text-sm text-slate-300">{summary}</p>}
       <ol className="divide-y divide-slate-800">
         {shown.map((c) => (
           <li key={`${c.when}:${c.player}`} className="grid gap-x-4 gap-y-1 py-3 text-sm sm:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] sm:items-start">

@@ -59,8 +59,39 @@ test.describe('Waivers', () => {
     // $85 left, weeks 7-18.
     await expect(pacing).toContainText('$85 left for 12 weeks: about $7 a week.');
     await expect(pacing).toContainText('Spent 15% of your budget with 33% of the regular season gone: room to bid bigger.');
-    await expect(pacing).toContainText('median $5, most $18 (5 claims)');
-    await expect(pacing).toContainText('Biggest: Puka Nacua WR $18 (wk 2), Chris Olave WR $9 (wk 5), Jonathon Brooks RB $5 (wk 3)');
+    await expect(pacing).toContainText('median $10, most $24 (10 claims)');
+    await expect(pacing).toContainText('Biggest: Rashee Rice WR $24 (wk 5), Puka Nacua WR $18 (wk 2), Rashee Rice WR $15 (wk 4)');
+  });
+
+  test('a suggested claim says what to bid, how likely it is to win and what he is worth', async ({ page }) => {
+    const move = moves(page, SLEEPER_MY_TEAM).first();
+    await expect(move).toContainText(/Bid \$\d+: about \d+% to win\. Worth up to \$\d+ to you\./);
+    await expect(move).toContainText(/\$\d+: \d+%/); // the odds at other bids
+
+    // A free agent can just be added.
+    await pickLeague(page, ESPN_MY_TEAM);
+    const list = moves(page, ESPN_MY_TEAM);
+    await expect(list.nth(0)).toContainText(/Bid \$\d+: about \d+% to win/); // Rice, on waivers
+    await expect(list.nth(1)).toContainText('Free agent: no bid needed'); // Olave
+  });
+
+  test('best available says what to bid on each player, and that free agents need no bid', async ({ page }) => {
+    const section = leagueSection(page, SLEEPER_MY_TEAM);
+    await section.getByRole('group', { name: 'Position' }).getByRole('button', { name: 'WR', exact: true }).click();
+    const table = section.getByRole('table');
+    await expect(table.getByRole('columnheader', { name: 'Bid and odds' })).toBeVisible();
+    // Rice is the suggested move: his row gives the same bid.
+    const suggested = await moves(page, SLEEPER_MY_TEAM).first().getByText(/^Bid \$\d+$/).textContent();
+    const bid = suggested!.replace('Bid ', '');
+    await expect(table.getByRole('row').nth(1)).toContainText(`${bid} · `);
+    await expect(table.getByRole('row').nth(1)).toContainText(/worth \$\d+usually \$\d+–\d+/);
+    // Reed, who isn't suggested, is sized on his own.
+    await expect(table.getByRole('row').filter({ hasText: 'Jayden Reed' })).toContainText(/\$\d+ · \d+%worth \$\d+/);
+
+    await pickLeague(page, ESPN_MY_TEAM);
+    const espn = leagueSection(page, ESPN_MY_TEAM);
+    await espn.getByRole('group', { name: 'Position' }).getByRole('button', { name: 'WR', exact: true }).click();
+    await expect(espn.getByRole('table').getByRole('row').filter({ hasText: 'Chris Olave' })).toContainText('Free agent');
   });
 
   test('lists the bye weeks ahead and whether the rest of the roster covers them', async ({ page }) => {

@@ -1,7 +1,7 @@
 import { ByePlanner } from './ByePlanner';
 import { ContestedClaims } from './ContestedClaims';
 import { FaabPacing } from './FaabPacing';
-import { friendlyRun, friendlyRunWithTime, nextRun, type LeagueSummary, type WaiverLeague, type WaiverMove, type WaiverPlayer, type WaiverRules } from '@ffd/shared';
+import { friendlyRun, friendlyRunWithTime, nextRun, type FaabPrice, type LeagueSummary, type WaiverLeague, type WaiverMove, type WaiverPlayer, type WaiverRules } from '@ffd/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState, type ReactNode } from 'react';
 import { api, useDemo, useWaivers } from '../../api';
@@ -220,6 +220,52 @@ function PlayerLine({ p, note }: { p: WaiverPlayer; note?: string }) {
 
 const availabilityNote = (p: WaiverPlayer) => (p.availability === 'waivers' ? 'on waivers' : p.availability === 'free_agent' ? 'free agent' : undefined);
 
+const priceTitle = (p: FaabPrice) =>
+  `When someone else wanted players like him, half the time the bid to beat was $${p.low}–${p.high}, from about ${p.basedOn} similar claims. Bidding wars on breaking news can go higher.`;
+const percent = (chance: number) => `${Math.round(chance * 100)}%`;
+
+// What to bid on a move, with the odds at other bids so you can pay for more certainty or less.
+function BidAdvice({ move }: { move: WaiverMove }) {
+  const { add, bid } = move;
+  if (add.availability === 'free_agent') return <span className="block text-xs text-slate-400">Free agent: no bid needed</span>;
+  if (!bid) return null;
+  const others = bid.odds.filter((o) => o.bid !== bid.bid);
+  return (
+    <span className="mt-1 block text-xs text-slate-300" title="The bid with the best payoff: its chance of winning times what you'd keep of his worth after paying it. Worth is what his points are worth out of your remaining FAAB. Chances come from similar past claims: how often no one else bid, and otherwise what the bidders had to beat.">
+      {bid.chance >= 0.1 ? (
+        <>
+          <span className="font-semibold text-emerald-300">Bid ${bid.bid}</span>: about {percent(bid.chance)} to win. Worth up to ${bid.worth} to you.
+        </>
+      ) : (
+        <>Worth up to ${bid.worth} to you, but players like him usually cost more. {bid.bid > 0 ? `Bid $${bid.bid} only as a long shot.` : 'A free bid is a long shot.'}</>
+      )}
+      {others.length > 0 && <span className="block text-slate-400">{others.map((o) => `$${o.bid}: ${percent(o.chance)}`).join(' · ')}</span>}
+    </span>
+  );
+}
+
+// One player's row in Best available: what to bid, its odds, what he's worth and what players like him take.
+function BidCell({ p }: { p: WaiverPlayer }) {
+  const { bid, price } = p;
+  const title = [bid && `Worth up to $${bid.worth} to you.`, price ? priceTitle(price) : 'Too few similar winning bids to estimate.'].filter(Boolean).join(' ');
+  if (p.availability === 'free_agent') return <td className="py-2 pl-3 text-right text-xs text-slate-400">Free agent</td>;
+  return (
+    <td className="py-2 pl-3 text-right tabular-nums text-slate-300" title={title}>
+      {bid ? (
+        <>
+          <span className="whitespace-nowrap">
+            <span className="font-semibold text-emerald-300">${bid.bid}</span> · {percent(bid.chance)}
+          </span>
+          <span className="block whitespace-nowrap text-xs text-slate-400">worth ${bid.worth}</span>
+        </>
+      ) : (
+        <span className="text-slate-500">—</span>
+      )}
+      {price && <span className="block whitespace-nowrap text-xs text-slate-400">usually ${price.low === price.high ? price.typical : `${price.low}–${price.high}`}</span>}
+    </td>
+  );
+}
+
 // Each move on one aligned row: why, who to add, who to drop, what it's worth.
 function Moves({ league, week }: { league: WaiverLeague; week: number }) {
   if (league.moves.length === 0) {
@@ -241,6 +287,7 @@ function Moves({ league, week }: { league: WaiverLeague; week: number }) {
                   : `for ${m.replaces.player.name} (${REASON_LABEL[m.reason].toLowerCase()})`}
               </span>
             )}
+            <BidAdvice move={m} />
           </span>
           <span className="min-w-0">
             {m.drop ? (
@@ -309,6 +356,8 @@ function Available({ league }: { league: WaiverLeague }) {
     const positions = position === 'All' ? POSITIONS.slice(1) : [position];
     return positions.map((pos) => ({ pos, rows: ranked(pos, position === 'All' ? 5 : 25) })).filter((g) => g.rows.length > 0);
   }, [league.available, sort, position]);
+  // FAAB leagues price their available players; other leagues have no bids to estimate.
+  const priced = league.available.some((p) => p.price !== undefined);
 
   return (
     <div className="flex flex-col gap-3">
@@ -345,13 +394,14 @@ function Available({ league }: { league: WaiverLeague }) {
               <th scope="col" className="hidden py-1 text-right font-normal sm:table-cell">Adds (24h)</th>
               <th scope="col" className="py-1 pl-3 text-right font-normal">Week</th>
               <th scope="col" className="py-1 pl-3 text-right font-normal">Rest of season</th>
+              {priced && <th scope="col" className="py-1 pl-3 text-right font-normal">Bid and odds</th>}
             </tr>
           </thead>
           {groups.map(({ pos, rows }) => (
             <tbody key={pos} className="divide-y divide-slate-800">
               {position === 'All' && (
                 <tr>
-                  <th scope="rowgroup" colSpan={4} className="pb-1 pt-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <th scope="rowgroup" colSpan={priced ? 5 : 4} className="pb-1 pt-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                     {pos}
                   </th>
                 </tr>
@@ -365,11 +415,17 @@ function Available({ league }: { league: WaiverLeague }) {
                   <td className="hidden py-2 text-right tabular-nums text-slate-400 sm:table-cell">{p.trendingAdds != null ? adds(p.trendingAdds) : ''}</td>
                   <td className={`py-2 pl-3 text-right tabular-nums ${sort === 'week' ? 'font-semibold' : 'text-slate-300'}`}>{fmt(p.week)}</td>
                   <td className={`py-2 pl-3 text-right tabular-nums ${sort === 'restOfSeason' ? 'font-semibold' : 'text-slate-300'}`}>{fmt(p.restOfSeason)}</td>
+                  {priced && <BidCell p={p} />}
                 </tr>
               ))}
             </tbody>
           ))}
         </table>
+      )}
+      {priced && (
+        <p className="text-xs text-slate-400">
+          Bid and odds: the bid with the best payoff for you and its chance of winning, then what he's worth to you and what it usually takes if someone else wants him (the range it fell in half the time). Odds count the chance no one else bids, and a bidding war on breaking news can go well past them. Each bid assumes you have a spare bench spot for him and is sized on its own, so together they can add up to more than you have.
+        </p>
       )}
     </div>
   );

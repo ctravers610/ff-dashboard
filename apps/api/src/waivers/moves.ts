@@ -48,11 +48,13 @@ export interface MoveInput {
   byeTeams: Set<string> | null; // NFL teams without a game in the claim week; null if unknown
 }
 
+export type Lineup = Pick<MoveInput, 'starters' | 'bench'>;
+
 // An upgrade has to be worth at least this many projected points to be worth a claim.
 export const UPGRADE_THRESHOLD = 3;
 const MAX_MOVES = 3;
 
-function problem(player: Player | null, byeTeams: Set<string> | null): WaiverMoveReason | null {
+export function problem(player: Player | null, byeTeams: Set<string> | null): WaiverMoveReason | null {
   if (!player) return 'empty';
   if (player.nflTeam && byeTeams?.has(player.nflTeam)) return 'bye';
   if (player.injuryStatus && BAD_STATUS.has(player.injuryStatus)) return 'injury';
