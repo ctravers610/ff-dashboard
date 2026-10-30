@@ -1,12 +1,26 @@
-// The Yahoo Fantasy API. Rate limits are respected: a throttled or failing call
-// is retried a few times with exponential backoff, honoring Yahoo's Retry-After.
+// The Yahoo Fantasy API. Rate limits are respected:
+//   - each answer is kept for a while (yahooTtl), so the live feed, the browser's
+//     refreshes and every tab asking at once share one call;
+//   - a throttled or failing call is retried a few times with exponential
+//     backoff, honoring Yahoo's Retry-After;
+//   - once Yahoo throttles anyway, nothing more is asked of it for a few minutes.
 // See adapters/yahoo/index.ts for what the dashboard fetches.
 
+import { cached, HOUR, MINUTE } from '../../cache.js';
 import { config } from '../../config.js';
 import { getAccessToken } from './auth.js';
 
 // Yahoo answers 999 when it throttles; 429 and 5xx are worth another try too.
 const RETRYABLE = new Set([429, 500, 502, 503, 504, 999]);
+const THROTTLED = new Set([429, 999]);
+const COOL_DOWN = 5 * MINUTE;
+
+/** How long Yahoo's answer for a resource is kept: live scores briefly, what rarely changes for longer. */
+export function yahooTtl(resource: string): number {
+  if (resource.startsWith('users;use_login=1/') || resource.endsWith(';out=settings')) return HOUR; // your teams and leagues, and their settings
+  if (/\/roster;week=\d+\/players\/stats|\/matchups;weeks=/.test(resource)) return MINUTE; // this week's points
+  return 5 * MINUTE; // standings, rosters, FAAB balances, transactions, available players
+}
 
 export interface RetryOptions {
   retries?: number; // after the first try
@@ -39,8 +53,17 @@ export async function fetchWithRetry(url: string, init: RequestInit, opts: Retry
   }
 }
 
+let throttledUntil = 0;
+
 // GET a Yahoo Fantasy resource as JSON, e.g. "users;use_login=1/games;game_keys=nfl/teams".
-export async function yahooGet<T = unknown>(resource: string, opts: RetryOptions = {}): Promise<T> {
+export function yahooGet<T = unknown>(resource: string, opts: RetryOptions = {}): Promise<T> {
+  return cached(`yahoo:${resource}`, yahooTtl(resource), () => fetchYahoo<T>(resource, opts));
+}
+
+async function fetchYahoo<T>(resource: string, opts: RetryOptions): Promise<T> {
+  const wait = throttledUntil - Date.now();
+  if (wait > 0) throw new Error(`Yahoo is rate-limiting this app; trying again in ${Math.ceil(wait / MINUTE)} min`);
+
   const token = await getAccessToken();
   if (!token) throw new Error('Yahoo is not connected');
 
@@ -54,6 +77,7 @@ export async function yahooGet<T = unknown>(resource: string, opts: RetryOptions
       "Yahoo hasn't turned on Fantasy API access for this app. If the app was created before access was approved, create a new one with Fantasy Sports checked and submit its Client ID at sports.yahoo.com/developer/application-confirmation",
     );
   }
+  if (THROTTLED.has(res.status)) throttledUntil = Date.now() + COOL_DOWN; // still throttled after the retries: back off
   if (RETRYABLE.has(res.status)) throw new Error(`Yahoo is rate-limiting or unavailable (HTTP ${res.status}); it will be tried again on the next refresh`);
   if (!res.ok) throw new Error(`Yahoo ${resource} returned HTTP ${res.status}`);
   return (await res.json()) as T;
