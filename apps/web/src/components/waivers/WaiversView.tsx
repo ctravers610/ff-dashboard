@@ -1,4 +1,5 @@
 import { ByePlanner } from './ByePlanner';
+import { ContestedClaims } from './ContestedClaims';
 import { FaabPacing } from './FaabPacing';
 import { friendlyRun, friendlyRunWithTime, nextRun, type LeagueSummary, type WaiverLeague, type WaiverMove, type WaiverPlayer, type WaiverRules } from '@ffd/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -435,6 +436,11 @@ export function WaiversView({ leagues }: { leagues?: LeagueSummary[] }) {
               </>
             )}
             <FaabPacing league={league} week={data.week} lastWeek={data.lastRegularWeek} />
+            {league.contestedClaims && league.contestedClaims.length > 0 && (
+              <Card title="Contested bids">
+                <ContestedClaims key={keyOf(league)} claims={league.contestedClaims} />
+              </Card>
+            )}
             <ByePlanner platform={league.platform} leagueId={league.leagueId} />
           </section>
         )}
