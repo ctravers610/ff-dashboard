@@ -66,16 +66,30 @@ export function snapshotStore(db: Db) {
         });
     },
 
-    // Backfill never overwrites: a live snapshot already in the table is more
-    // complete than anything reconstructed after the fact.
-    async saveIfMissing(rows: NewSnapshot[]): Promise<void> {
+    // A finished week rebuilt from the platform's history: fills a missing week,
+    // or replaces the score of one captured before it ended. Projections, record
+    // and standing stay as captured; the platform's history doesn't have them.
+    async saveFinal(rows: NewSnapshot[]): Promise<void> {
       if (rows.length === 0) return;
-      await db.insert(leagueSnapshots).values(rows).onConflictDoNothing();
+      await db
+        .insert(leagueSnapshots)
+        .values(rows)
+        .onConflictDoUpdate({
+          target: [leagueSnapshots.platform, leagueSnapshots.leagueId, leagueSnapshots.season, leagueSnapshots.week],
+          set: {
+            leagueName: sql`excluded.league_name`,
+            points: sql`excluded.points`,
+            opponentName: sql`coalesce(excluded.opponent_name, ${leagueSnapshots.opponentName})`,
+            opponentPoints: sql`excluded.opponent_points`,
+            capturedAt: sql`now()`,
+          },
+        });
     },
 
-    async weeksFor(platform: string, leagueId: string, season: string): Promise<number[]> {
-      const rows = await db
-        .select({ week: leagueSnapshots.week })
+    // When each week of a league's season was last captured.
+    async capturesFor(platform: string, leagueId: string, season: string): Promise<{ week: number; capturedAt: Date }[]> {
+      return db
+        .select({ week: leagueSnapshots.week, capturedAt: leagueSnapshots.capturedAt })
         .from(leagueSnapshots)
         .where(
           and(
@@ -84,7 +98,6 @@ export function snapshotStore(db: Db) {
             eq(leagueSnapshots.season, season),
           ),
         );
-      return rows.map((r) => r.week);
     },
 
     listForSeason(season: string): Promise<SnapshotRow[]> {

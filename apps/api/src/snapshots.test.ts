@@ -1,6 +1,5 @@
 import type { LeagueSummary } from '@ffd/shared';
 import { describe, expect, it, vi } from 'vitest';
-import { missingWeeks } from './backfill.js';
 import { recordSnapshots, snapshotRepo, toSnapshot } from './snapshots.js';
 
 const league = (id: string, week = 6, overrides: Partial<LeagueSummary> = {}): LeagueSummary =>
@@ -75,13 +74,5 @@ describe('recordSnapshots', () => {
     await expect(recordSnapshots([league('T2')], store, start)).rejects.toThrow('db down');
     await recordSnapshots([league('T2')], store, start + 1000); // not throttled after a failure
     expect(save).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe('missingWeeks', () => {
-  it('lists earlier weeks that have no snapshot yet', () => {
-    expect(missingWeeks(6, [6])).toEqual([1, 2, 3, 4, 5]);
-    expect(missingWeeks(6, [2, 3, 6])).toEqual([1, 4, 5]);
-    expect(missingWeeks(1, [])).toEqual([]);
   });
 });
