@@ -1,5 +1,6 @@
 import type { LeagueSummary } from '@ffd/shared';
 import { describe, expect, it, vi } from 'vitest';
+import { ffpcPastWeeks } from './adapters/manual/history.js';
 import { sleeperPastWeeks } from './adapters/sleeper/history.js';
 import { backfillHistory, weeksToFetch } from './backfill.js';
 import type { NewSnapshot } from './db/schema.js';
@@ -9,6 +10,12 @@ vi.mock('./adapters/sleeper/history.js', () => ({
   sleeperPastWeeks: vi.fn(async (league: LeagueSummary, weeks: number[]) =>
     weeks.map((week): NewSnapshot => ({ platform: 'sleeper', leagueId: league.leagueId, leagueName: league.name, season: league.season, week, points: 134.4, opponentPoints: 120.5 })),
   ),
+}));
+
+vi.mock('./adapters/manual/history.js', () => ({
+  ffpcPastWeeks: vi.fn(async (league: LeagueSummary): Promise<NewSnapshot[]> => [
+    { platform: 'ffpc', leagueId: league.leagueId, leagueName: league.name, season: league.season, week: 7, points: 120, estimated: true },
+  ]),
 }));
 
 const at = (iso: string) => new Date(iso);
@@ -54,5 +61,21 @@ describe('backfillHistory', () => {
     await backfillHistory([other], store, now + 10 * 60_000);
     await backfillHistory([other], store, now + 61 * 60_000);
     expect(store.capturesFor).toHaveBeenCalledTimes(2);
+  });
+
+  it("re-scores an FFPC league's finished weeks from its pastes", async () => {
+    const ffpc = { ...league, platform: 'ffpc', leagueId: 'F1' } as LeagueSummary;
+    const captures = [...final, { week: 7, capturedAt: at('2026-10-25T20:00:00Z') }];
+    const store = fakeStore(captures);
+    await backfillHistory([ffpc], store, now);
+    expect(store.capturesFor).toHaveBeenCalledWith('ffpc', 'F1', '2026');
+    expect(ffpcPastWeeks).toHaveBeenLastCalledWith(ffpc, [7], captures);
+    expect((store.saveFinal as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toMatchObject([{ week: 7, estimated: true }]);
+  });
+
+  it('still looks at FFPC pastes when every week has a final score: one may have been pasted since', async () => {
+    const ffpc = { ...league, platform: 'ffpc', leagueId: 'F2' } as LeagueSummary;
+    await backfillHistory([ffpc], fakeStore([...final, { week: 7, capturedAt: at('2026-10-28T12:00:00Z') }]), now);
+    expect(ffpcPastWeeks).toHaveBeenLastCalledWith(ffpc, [], expect.any(Array));
   });
 });

@@ -134,7 +134,7 @@ npm run db:generate -w @ffd/api
 
 CI fails if the schema and migrations disagree. Tests that need Postgres create a throwaway database and drop it afterwards, so they never touch your data; they are skipped locally if no database is running, and required in CI.
 
-The dashboard saves a snapshot of every league each time it loads (at most every 5 minutes per league), plus past weeks reconstructed from Sleeper and ESPN history, which feeds the History tab. Snapshots are only recorded while the API is running.
+The dashboard saves a snapshot of every league each time it loads (at most every 5 minutes per league), plus past weeks reconstructed from Sleeper and ESPN history, which feeds the History tab. Snapshots are only recorded while the API is running. FFPC has no history to read, so the app keeps every week's pasted matchup and re-scores a finished week from its starters and the week's final stats. If the paste came before every starter's game kicked off, a late swap could have changed the lineup, so History marks that week as an estimate.
 
 ### Sign-in
 

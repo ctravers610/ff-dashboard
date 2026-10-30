@@ -3,6 +3,7 @@ import type { Page } from '@playwright/test';
 import { ESPN_MY_TEAM, ESPN_PAST } from '@ffd/demo/fixtures/espn';
 import { FFPC_LEAGUE, FFPC_TEAM } from '@ffd/demo/fixtures/ffpc';
 import { SLEEPER_LEAGUE_NAME, SLEEPER_MY_TEAM, SLEEPER_PAST } from '@ffd/demo/fixtures/sleeper';
+import { withDb } from '../support/database.js';
 import { leagueCard, openDashboard, openTab, pts, showLeague, sideListEntry } from './helpers.js';
 import { seedFfpcLeague, waitForHistory } from './seed.js';
 
@@ -61,6 +62,28 @@ test.describe('History tab', () => {
     await expect(card).toContainText('Record'); // no finished weeks yet, so the record is blank
     await expect(card.getByText('Week in progress')).toBeVisible(); // legend entry for the lighter column
     await expect(card.getByText('Opponent', { exact: true })).toHaveCount(0); // all-play weeks have no single opponent
+  });
+
+  test('an FFPC week re-scored from a lineup pasted before it locked is marked as an estimate', async ({ page, request }) => {
+    // The row the backfill writes for a re-scored week (its re-scoring is covered by the API's tests).
+    const { id } = await findSeededLeague(request);
+    const { season } = (await (await request.get('/api/history')).json()) as { season: string };
+    await withDb((db) =>
+      db.query(
+        `INSERT INTO league_snapshots (platform, league_id, league_name, season, week, points, opponent_name, opponent_points, estimated)
+         VALUES ('ffpc', $1, $2, $3, 5, 131.4, 'Rival', 120.2, true)`,
+        [id, FFPC_TEAM, season],
+      ),
+    );
+
+    await openHistory(page);
+    const card = await showLeague(page, FFPC_TEAM);
+    expect(await chipTitles(card)).toEqual(['Week 5: win (estimate)', 'Week 6: in progress']);
+    await expect(card.getByText('Dashed results are estimates')).toBeVisible();
+    await expect(card).toContainText('1-0'); // still counted
+
+    await card.getByRole('button', { name: 'table', exact: true }).click();
+    await expect(card.getByRole('row').nth(1)).toContainText('estimate');
   });
 
   test('draws the chart with an accessible description and a hover tooltip', async ({ page }) => {

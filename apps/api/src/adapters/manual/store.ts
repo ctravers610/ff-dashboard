@@ -1,12 +1,12 @@
 // Hand-entered leagues (FFPC), stored in Postgres.
 
-import type { ManualLeague, ManualLeagueInput } from '@ffd/shared';
+import type { ManualLeague, ManualLeagueInput, ManualMatchup } from '@ffd/shared';
 import { and, eq, sql } from 'drizzle-orm';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../../config.js';
 import { db as appDb, type Db } from '../../db/client.js';
-import { leagueSnapshots, manualLeagues, type ManualLeagueRow } from '../../db/schema.js';
+import { leagueSnapshots, manualLeagues, manualMatchupWeeks, type ManualLeagueRow } from '../../db/schema.js';
 
 const toLeague = (row: ManualLeagueRow): ManualLeague => ({
   id: row.id,
@@ -19,6 +19,28 @@ const toLeague = (row: ManualLeagueRow): ManualLeague => ({
   waiversCapturedAt: row.waiversCapturedAt?.toISOString() ?? null,
 });
 
+// The NFL season a matchup was pasted in: the year, except that January's last
+// weeks (and anything before August) belong to the season that started the year
+// before. The migration that created manual_matchup_weeks uses the same rule.
+export function matchupSeason(matchup: ManualMatchup): string {
+  const at = new Date(matchup.capturedAt);
+  return String(at.getUTCFullYear() - (at.getUTCMonth() < 7 ? 1 : 0));
+}
+
+// Keeps a copy of each week's paste. A newer paste of the week replaces an older
+// one; re-saving the league with the same paste (a roster edit) changes nothing.
+async function archiveMatchup(db: Pick<Db, 'insert'>, leagueId: string, matchup: ManualMatchup | null | undefined): Promise<void> {
+  if (!matchup) return;
+  await db
+    .insert(manualMatchupWeeks)
+    .values({ leagueId, season: matchupSeason(matchup), week: matchup.week, matchup, capturedAt: new Date(matchup.capturedAt) })
+    .onConflictDoUpdate({
+      target: [manualMatchupWeeks.leagueId, manualMatchupWeeks.season, manualMatchupWeeks.week],
+      set: { matchup: sql`excluded.matchup`, capturedAt: sql`excluded.captured_at` },
+      setWhere: sql`excluded.captured_at > ${manualMatchupWeeks.capturedAt}`,
+    });
+}
+
 // A store bound to a database, so tests can point it at a throwaway one.
 export function manualLeagueStore(db: Db) {
   return {
@@ -28,29 +50,46 @@ export function manualLeagueStore(db: Db) {
     },
 
     async create(input: ManualLeagueInput): Promise<ManualLeague> {
-      const [row] = await db
-        .insert(manualLeagues)
-        .values({ name: input.name, teamName: input.teamName, rosterText: input.rosterText, matchup: input.matchup ?? null })
-        .returning();
-      return toLeague(row!);
+      return db.transaction(async (tx) => {
+        const [row] = await tx
+          .insert(manualLeagues)
+          .values({ name: input.name, teamName: input.teamName, rosterText: input.rosterText, matchup: input.matchup ?? null })
+          .returning();
+        await archiveMatchup(tx, row!.id, input.matchup);
+        return toLeague(row!);
+      });
     },
 
     async update(id: string, input: ManualLeagueInput): Promise<ManualLeague | null> {
-      const [row] = await db
-        .update(manualLeagues)
-        .set({
-          name: input.name,
-          teamName: input.teamName,
-          rosterText: input.rosterText,
-          matchup: input.matchup ?? null,
-          // The database's clock, like the defaultNow() that set it on create. The
-          // app's clock can differ from it by a few ms or more (another machine, or a
-          // Docker VM's drifting clock), which could make updatedAt go backwards.
-          updatedAt: sql`now()`,
-        })
-        .where(eq(manualLeagues.id, id))
-        .returning();
-      return row ? toLeague(row) : null;
+      return db.transaction(async (tx) => {
+        const [row] = await tx
+          .update(manualLeagues)
+          .set({
+            name: input.name,
+            teamName: input.teamName,
+            rosterText: input.rosterText,
+            matchup: input.matchup ?? null,
+            // The database's clock, like the defaultNow() that set it on create. The
+            // app's clock can differ from it by a few ms or more (another machine, or a
+            // Docker VM's drifting clock), which could make updatedAt go backwards.
+            updatedAt: sql`now()`,
+          })
+          .where(eq(manualLeagues.id, id))
+          .returning();
+        if (!row) return null;
+        await archiveMatchup(tx, id, input.matchup);
+        return toLeague(row);
+      });
+    },
+
+    // Each week's latest paste for a league's season, oldest week first.
+    async matchupWeeks(leagueId: string, season: string): Promise<ManualMatchup[]> {
+      const rows = await db
+        .select({ matchup: manualMatchupWeeks.matchup })
+        .from(manualMatchupWeeks)
+        .where(and(eq(manualMatchupWeeks.leagueId, leagueId), eq(manualMatchupWeeks.season, season)))
+        .orderBy(manualMatchupWeeks.week);
+      return rows.map((r) => r.matchup);
     },
 
     // The add/drop page for the Waivers tab. Kept apart from update(), so editing

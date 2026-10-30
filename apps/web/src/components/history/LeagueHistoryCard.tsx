@@ -100,9 +100,12 @@ export function LeagueHistoryCard({
         )}
         <div className="flex flex-wrap gap-1" aria-label="Weekly results">
           {weeks.map((w) => (
-            <ResultChip key={w.week} result={w.result} week={w.week} />
+            <ResultChip key={w.week} result={w.result} week={w.week} estimated={w.estimated} />
           ))}
         </div>
+        {weeks.some((w) => w.estimated) && (
+          <p className="text-xs text-slate-400">Dashed results are estimates: re-scored from a lineup you pasted before it locked.</p>
+        )}
       </div>
 
       {mode === 'chart' ? (

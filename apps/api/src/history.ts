@@ -15,8 +15,8 @@ export function weekEndsAt(season: string, week: number): Date {
 
 // Whether a finished week's row can be graded. A row captured before the week
 // ended holds whatever the score was then (0-0 before kickoff, Sunday night's
-// partial total); Sleeper and ESPN weeks get refetched (backfill.ts), FFPC's
-// can't be. And 0-0 means nothing was played, not a tie.
+// partial total); backfill.ts refetches Sleeper and ESPN weeks and re-scores
+// FFPC ones from their pastes. And 0-0 means nothing was played, not a tie.
 export function isFinal(row: SnapshotRow): boolean {
   if (row.capturedAt < weekEndsAt(row.season, row.week)) return false;
   return !(row.points === 0 && !row.opponentPoints);
@@ -56,6 +56,7 @@ export function buildHistory(rows: SnapshotRow[], currentWeek: number): LeagueHi
         r.allPlayRank != null && r.allPlayTeams != null && r.allPlayWinSlots != null
           ? { rank: r.allPlayRank, teams: r.allPlayTeams, winSlots: r.allPlayWinSlots }
           : null,
+      estimated: r.estimated,
       capturedAt: r.capturedAt.toISOString(),
     }));
 

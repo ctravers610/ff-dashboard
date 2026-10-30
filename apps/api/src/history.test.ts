@@ -22,6 +22,7 @@ const row = (week: number, points: number, opponentPoints: number | null, extra:
   ties: null,
   standingRank: null,
   standingTeams: null,
+  estimated: false,
   capturedAt: new Date('2026-10-21T12:00:00Z'), // Wednesday after week 6
   ...extra,
 });

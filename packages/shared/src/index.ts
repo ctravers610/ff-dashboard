@@ -190,6 +190,9 @@ export interface HistoryWeek {
   opponentPoints: number | null;
   result: WeekResult;
   allPlay: { rank: number; teams: number; winSlots: number } | null;
+  // The app re-scored the week from a pasted lineup (FFPC) that could still
+  // have changed afterwards, so the result is its best guess.
+  estimated: boolean;
   capturedAt: string;
 }
 
