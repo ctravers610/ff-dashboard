@@ -28,8 +28,9 @@ test.describe('Live feed', () => {
     await seedFfpcLeague(request);
     await openDashboard(page);
   });
-  test.afterEach(async () => {
+  test.afterEach(async ({ request }) => {
     await upstream('/_live/reset'); // other tests score the real fixture stats
+    await request.post('/api/live/poll'); // or the next test's first look reports this test's plays being taken away
   });
 
   test('is quiet when nothing is on', async ({ page }) => {
@@ -44,6 +45,7 @@ test.describe('Live feed', () => {
     const event = feed(page).getByRole('listitem').filter({ hasText: 'Drake Maye' }).first();
     await expect(event).toContainText('QB · NE');
     await expect(event).toContainText('1 pass TD, 25 pass yds');
+    await event.getByRole('button').click(); // the leagues are one click away
     const lines = event.getByRole('list', { name: 'Points by league' });
     await expect(lines).toContainText(`${SLEEPER_LEAGUE_NAME} · bench +5.0`); // 4 + 25 × 0.04
     await expect(lines).toContainText(`${FFPC_TEAM} · bench +5.3`); // FFPC: 4 + 25 × 0.05
@@ -51,6 +53,19 @@ test.describe('Live feed', () => {
 
     // Checking again with nothing new adds nothing.
     await feed(page).getByRole('button', { name: 'Check now' }).click();
+    await expect(feed(page).getByRole('listitem').filter({ hasText: 'Drake Maye' })).toHaveCount(1);
+  });
+
+  test('adds a player’s small plays up into one row', async ({ page, request }) => {
+    await request.post('/api/live/poll'); // the starting point
+    await upstream(`/_live/play?player=${P.maye.id}&pass_yd=6`);
+    await feed(page).getByRole('button', { name: 'Check now' }).click();
+    await expect(feed(page)).toContainText('6 pass yds');
+
+    await upstream(`/_live/play?player=${P.maye.id}&pass_yd=7`);
+    await feed(page).getByRole('button', { name: 'Check now' }).click();
+
+    await expect(feed(page)).toContainText('13 pass yds');
     await expect(feed(page).getByRole('listitem').filter({ hasText: 'Drake Maye' })).toHaveCount(1);
   });
 
@@ -92,6 +107,7 @@ test.describe('Live feed', () => {
     const show = feed(page).getByLabel('Show');
     await show.selectOption({ label: 'My starters' });
     await expect(feed(page)).toContainText('Drake Maye'); // he starts in ESPN
+    await feed(page).getByRole('button', { name: /Drake Maye/ }).click();
     const lines = feed(page).getByRole('list', { name: 'Points by league' }).first();
     await expect(lines).not.toContainText(SLEEPER_LEAGUE_NAME); // he's on that bench
     await show.selectOption({ label: FFPC_TEAM });

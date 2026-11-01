@@ -2,7 +2,7 @@
 // and turn every player whose fantasy-relevant numbers changed into an event,
 // worth whatever that change is in each league by that league's own rules.
 
-import type { LiveEventLeague, Player } from '@ffd/shared';
+import { describeStats, LIVE_STATS, type LiveEventLeague, type Player } from '@ffd/shared';
 import type { GameScore } from '../scoring/games.js';
 
 type Stats = Record<string, number>;
@@ -25,42 +25,11 @@ export interface TrackedPlayer {
   appearances: Appearance[];
 }
 
-// Stat changes worth describing, in the order they read best.
-const READABLE: [key: string, one: string, many: string][] = [
-  ['pass_td', 'pass TD', 'pass TDs'],
-  ['pass_yd', 'pass yd', 'pass yds'],
-  ['pass_int', 'INT thrown', 'INTs thrown'],
-  ['rush_td', 'rush TD', 'rush TDs'],
-  ['rush_yd', 'rush yd', 'rush yds'],
-  ['rec', 'catch', 'catches'],
-  ['rec_td', 'rec TD', 'rec TDs'],
-  ['rec_yd', 'rec yd', 'rec yds'],
-  ['fum_lost', 'fumble lost', 'fumbles lost'],
-  ['pass_2pt', '2-pt pass', '2-pt passes'],
-  ['rush_2pt', '2-pt run', '2-pt runs'],
-  ['rec_2pt', '2-pt catch', '2-pt catches'],
-  ['fgm', 'FG made', 'FGs made'],
-  ['fgmiss', 'FG missed', 'FGs missed'],
-  ['xpm', 'PAT', 'PATs'],
-  ['xpmiss', 'PAT missed', 'PATs missed'],
-  ['sack', 'sack', 'sacks'],
-  ['int', 'INT', 'INTs'],
-  ['fum_rec', 'fumble recovery', 'fumble recoveries'],
-  ['def_td', 'defensive TD', 'defensive TDs'],
-  ['def_st_td', 'return TD', 'return TDs'],
-  ['safe', 'safety', 'safeties'],
-];
-
 /** "1 catch, 14 rec yds" from the change in a stat line. */
 export function describeChange(before: Stats, after: Stats): string {
-  const parts: string[] = [];
-  for (const [key, one, many] of READABLE) {
-    const delta = Math.round(((after[key] ?? 0) - (before[key] ?? 0)) * 10) / 10;
-    if (delta === 0) continue;
-    const label = Math.abs(delta) === 1 ? one : many;
-    parts.push(`${delta > 0 ? '' : '−'}${Math.abs(delta)} ${label}`); // a negative is a stat correction
-  }
-  return parts.join(', ');
+  const changes: Stats = {};
+  for (const [key] of LIVE_STATS) changes[key] = Math.round(((after[key] ?? 0) - (before[key] ?? 0)) * 10) / 10;
+  return describeStats(changes);
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
