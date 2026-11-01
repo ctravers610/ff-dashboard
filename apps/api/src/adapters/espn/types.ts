@@ -116,3 +116,12 @@ export interface EspnTransaction {
   // its PENDING status for good.
   relatedTransactionId?: string;
 }
+
+// The kona_league_communication view, asked for trades: one topic per completed
+// trade, one message per player moved. `targetId` is the player.
+export interface EspnActivity {
+  topics?: {
+    date: number;
+    messages?: { messageTypeId: number; from?: number; to?: number; targetId?: number }[];
+  }[];
+}

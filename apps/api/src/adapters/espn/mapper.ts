@@ -62,6 +62,9 @@ export function toEspnPlayer(p: EspnPlayer): Player {
   };
 }
 
+export const weekPoints = (p: EspnPlayer, season: number, week: number) =>
+  p.stats?.find((s) => (s.seasonId ?? season) === season && s.scoringPeriodId === week && s.statSourceId === 0 && (s.statSplitTypeId ?? 1) === 1)?.appliedTotal ?? 0;
+
 // Points this player scored in the given week (actual stats, not projections).
 // statSourceId 0 = actual points, 1 = ESPN's projection.
 function weekStat(entry: EspnRosterEntry, scoringPeriod: number, source: 0 | 1): number | null {

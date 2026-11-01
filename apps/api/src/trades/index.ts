@@ -1,7 +1,6 @@
 // GET /api/trades?league=sleeper:123: every completed trade in a league this
-// season, scored (see analyze.ts). Sleeper and Yahoo (yahoo.ts): their
-// transactions say exactly who got what. ESPN's feed shows accepted trades
-// without the players in them, and FFPC has no feed at all.
+// season, scored (see analyze.ts). Sleeper, Yahoo (yahoo.ts) and ESPN (espn.ts):
+// each says exactly who got what. FFPC has no feed at all.
 
 import type { TradesResponse } from '@ffd/shared';
 import { sleeperClient } from '../adapters/sleeper/client.js';
@@ -11,6 +10,7 @@ import { HOUR } from '../cache.js';
 import { scoreWithSettings, weeklyProjections } from '../scoring/projection.js';
 import { activeSources } from '../sources/store.js';
 import { analyzeTrade, tradeSide, type LeagueWeeks } from './analyze.js';
+import { espnTrades } from './espn.js';
 import { lastFinishedWeek, pastStats } from './weeks.js';
 import { yahooTrades } from './yahoo.js';
 
@@ -27,6 +27,7 @@ export async function findSleeperLeague(leagueId: string, season: string): Promi
 export async function getTrades(leagueKey: string): Promise<TradesResponse> {
   const [platform, leagueId] = leagueKey.split(':');
   if (platform === 'yahoo' && leagueId) return yahooTrades(leagueId);
+  if (platform === 'espn' && leagueId) return espnTrades(leagueId);
   if (platform !== 'sleeper' || !leagueId) return { leagueKey, supported: false, trades: [] };
 
   const state = await sleeperClient.state();

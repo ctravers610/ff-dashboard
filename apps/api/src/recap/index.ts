@@ -4,8 +4,7 @@
 
 import type { LineupRecap, Player, RecapResponse, RecapSeasonLeague, RecapSeasonResponse, SourceError } from '@ffd/shared';
 import { espnClient, espnSourceError, type EspnAuth } from '../adapters/espn/client.js';
-import { BENCH_SLOT, findMyTeamId, IR_SLOT, SLOT_NAMES, SLOT_ORDER, toEspnPlayer } from '../adapters/espn/mapper.js';
-import type { EspnPlayer } from '../adapters/espn/types.js';
+import { BENCH_SLOT, findMyTeamId, IR_SLOT, SLOT_NAMES, SLOT_ORDER, toEspnPlayer, weekPoints } from '../adapters/espn/mapper.js';
 import { buildPlayerIndex, parseRosterText, resolvePlayer } from '../adapters/manual/parse.js';
 import { manualLeagueRepo } from '../adapters/manual/store.js';
 import { sleeperClient } from '../adapters/sleeper/client.js';
@@ -108,9 +107,6 @@ async function sleeperRecaps(season: string, week: number): Promise<LineupRecap[
   }
   return out;
 }
-
-const weekPoints = (p: EspnPlayer, season: number, week: number) =>
-  p.stats?.find((s) => (s.seasonId ?? season) === season && s.scoringPeriodId === week && s.statSourceId === 0 && (s.statSplitTypeId ?? 1) === 1)?.appliedTotal ?? 0;
 
 async function espnRecaps(season: string, week: number, auth: EspnAuth | null, errors: SourceError[]): Promise<LineupRecap[]> {
   const { espnLeagueIds } = await activeSources();

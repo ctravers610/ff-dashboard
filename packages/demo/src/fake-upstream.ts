@@ -83,12 +83,13 @@ function route(url: URL, headers: http.IncomingHttpHeaders): Reply | null {
   if (p === '/espn/scoreboard') {
     return { body: Number(url.searchParams.get('week')) === waivers.CLAIM_WEEK ? claimWeekBoard() : scoreboard() };
   }
-  const e = new RegExp(`^/espn/fantasy/${SEASON}/segments/0/leagues/(\\d+)$`).exec(p);
+  const e = new RegExp(`^/espn/fantasy/${SEASON}/segments/0/leagues/(\\d+)(/communication/)?$`).exec(p);
   if (e) {
     const cookie = headers.cookie ?? '';
     const authed = cookie.includes(`SWID=${espn.ESPN_SWID}`) && cookie.includes(`espn_s2=${espn.ESPN_S2}`);
     if (e[1] === espn.ESPN_FAILING_LEAGUE_ID || !authed) return { status: 401, body: { messages: ['You are not authorized to view this League.'] } };
     if (e[1] === espn.ESPN_LEAGUE_ID) {
+      if (e[2]) return { body: espn.tradeActivity() };
       const view = url.searchParams.getAll('view');
       if (view.includes('mTransactions2')) return { body: espn.transactions() };
       if (view.includes('kona_player_info')) {
