@@ -5,7 +5,7 @@
 
 import type { Player, SourceError, WaiverLeague, WaiverPlayer, WaiverRules } from '@ffd/shared';
 import { sleeperClient } from '../adapters/sleeper/client.js';
-import { toPlayer } from '../adapters/sleeper/mapper.js';
+import { sleeperIdsByKey } from '../adapters/sleeper/mapper.js';
 import { yahooGet } from '../adapters/yahoo/client.js';
 import { errorMessage, myYahooTeams, yahooReady } from '../adapters/yahoo/index.js';
 import { parseAdds, parseAvailable, parseLeagueSettings, parseRoster, parseWaiverStanding, startersOf, type YahooAdd, type YahooLeagueInfo, type YahooRosterSpot } from '../adapters/yahoo/parse.js';
@@ -107,11 +107,7 @@ export async function fetchYahooWaivers(ctx: WaiverContext): Promise<{ leagues: 
       return [];
     }),
   ]);
-  const sleeperIdByKey = new Map<string, string>();
-  for (const id of Object.keys(players)) {
-    const p = toPlayer(id, players);
-    if (p?.position) sleeperIdByKey.set(playerKey(p), id);
-  }
+  const sleeperIdByKey = sleeperIdsByKey(players);
   const sleeperIdOf = (p: Player) => sleeperIdByKey.get(playerKey(p)) ?? null;
 
   await Promise.all(

@@ -3,14 +3,21 @@
 // see history.ts), the live feed, recaps, playoff odds and waivers.
 //
 // Calls per load: your teams and your leagues (one each, for all leagues),
-// then per league your roster with this week's points, your matchup, and the
-// league's standings, then your opponent's roster. Throttled calls back off and retry (client.ts).
+// then per league your roster with this week's points, your matchup, the
+// league's standings and settings, then your opponent's roster. Projections
+// come from Sleeper, loaded once per refresh (live.ts). Throttled calls back off and retry (client.ts).
 
 import type { SourceError } from '@ffd/shared';
+import { nflGames } from '../../scoring/games.js';
+import { weeklyProjections } from '../../scoring/projection.js';
+import { sleeperClient } from '../sleeper/client.js';
+import { sleeperIdsByKey } from '../sleeper/mapper.js';
 import type { AdapterResult } from '../types.js';
 import { isConnected, yahooConfigured } from './auth.js';
 import { yahooGet } from './client.js';
+import { liveProjector } from './live.js';
 import { parseLeagues, parseMatchup, parseMyTeams, parseRoster, parseStandings, toYahooSummary, type YahooLeagueInfo, type YahooTeamRef } from './parse.js';
+import { yahooScoring } from './scoring.js';
 
 export const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -31,24 +38,33 @@ export async function myYahooTeams(): Promise<{ team: YahooTeamRef; league: Yaho
   });
 }
 
-export async function fetchYahooLeagues(nfl: { week: number }): Promise<AdapterResult> {
+export async function fetchYahooLeagues(nfl: { season: string; week: number }): Promise<AdapterResult> {
   if (!(await yahooReady())) return { leagues: [], errors: [] };
   try {
+    // Live projections are a bonus: without them each matchup keeps Yahoo's pre-game totals.
+    const [players, projections, games] = await Promise.all([
+      sleeperClient.players().catch(() => null),
+      weeklyProjections(nfl.season, nfl.week).catch(() => null),
+      nflGames(nfl.season, nfl.week).catch(() => null),
+    ]);
+    const sleeperIds = players ? sleeperIdsByKey(players) : null;
     const errors: SourceError[] = [];
     const summaries = await Promise.all(
       (await myYahooTeams()).map(async ({ team, league }) => {
         const week = league.currentWeek || nfl.week;
         try {
-          const [roster, matchup, standing] = await Promise.all([
+          const [roster, matchup, standing, setup] = await Promise.all([
             yahooGet(`team/${team.teamKey}/roster;week=${week}/players/stats;type=week;week=${week}`),
             yahooGet(`team/${team.teamKey}/matchups;weeks=${week}`),
             yahooGet(`league/${league.leagueKey}/standings`),
+            yahooGet(`league/${league.leagueKey};out=settings`).catch(() => null), // the scoring, to score projections with
           ]);
           const versus = parseMatchup(matchup, team.teamKey);
           const opponentRoster = versus?.opponent
             ? await yahooGet(`team/${versus.opponent.teamKey}/roster;week=${week}/players/stats;type=week;week=${week}`)
             : null;
-          return toYahooSummary(league, team, parseRoster(roster), versus, parseStandings(standing), week, parseRoster(opponentRoster));
+          const project = setup && sleeperIds && projections && games ? liveProjector(sleeperIds, projections, games, yahooScoring(setup)) : undefined;
+          return toYahooSummary(league, team, parseRoster(roster), versus, parseStandings(standing), week, parseRoster(opponentRoster), project);
         } catch (e) {
           errors.push({ source: `yahoo:${league.leagueKey}`, message: errorMessage(e) });
           return null;

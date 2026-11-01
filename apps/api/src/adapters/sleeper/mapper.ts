@@ -10,6 +10,7 @@ import type {
   StarterSlot,
   TeamStanding,
 } from '@ffd/shared';
+import { playerKey } from '../../exposure.js';
 import { buildAlerts, rankStandings, totalSide } from '../common.js';
 import type {
   SleeperLeague,
@@ -57,6 +58,16 @@ export function toPlayer(playerId: string, players: SleeperPlayerMap): Player | 
     nflTeam: p?.team ?? null,
     injuryStatus: (p?.injury_status && INJURY_MAP[p.injury_status]) || null,
   };
+}
+
+/** Sleeper's player ids by playerKey, so a player from another platform can find his projection. */
+export function sleeperIdsByKey(players: SleeperPlayerMap): Map<string, string> {
+  const ids = new Map<string, string>();
+  for (const id of Object.keys(players)) {
+    const p = toPlayer(id, players);
+    if (p?.position) ids.set(playerKey(p), id);
+  }
+  return ids;
 }
 
 export function buildStandings(rosters: SleeperRoster[], users: SleeperUser[]): TeamStanding[] {
