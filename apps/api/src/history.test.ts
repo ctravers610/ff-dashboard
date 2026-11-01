@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SnapshotRow } from './db/schema.js';
-import { buildHistory, weekEndsAt, weekResult } from './history.js';
+import { buildHistory, weekEndsAt, weekOnDate, weekResult } from './history.js';
 
 const row = (week: number, points: number, opponentPoints: number | null, extra: Partial<SnapshotRow> = {}): SnapshotRow => ({
   id: week,
@@ -25,6 +25,22 @@ const row = (week: number, points: number, opponentPoints: number | null, extra:
   estimated: false,
   capturedAt: new Date('2026-10-21T12:00:00Z'), // Wednesday after week 6
   ...extra,
+});
+
+describe('weekOnDate', () => {
+  it('finds the NFL week of a bid run', () => {
+    expect(weekOnDate('2026', '2026-09-09')).toBe(1); // the Wednesday before the opener
+    expect(weekOnDate('2026', '2026-09-13')).toBe(1);
+    expect(weekOnDate('2026', '2026-09-16')).toBe(2);
+    expect(weekOnDate('2026', '2026-10-28')).toBe(8);
+    expect(weekOnDate('2026', '2026-11-01')).toBe(8);
+    expect(weekOnDate('2026', '2027-01-03')).toBe(17);
+  });
+
+  it('keeps anything outside the season in its first or last week', () => {
+    expect(weekOnDate('2026', '2026-08-20')).toBe(1);
+    expect(weekOnDate('2026', '2027-02-01')).toBe(18);
+  });
 });
 
 describe('weekEndsAt', () => {

@@ -4,6 +4,7 @@
 
 export * from './contestedClaims';
 export * from './ffpc';
+export * from './ffpcFaab';
 export * from './ffpcLive';
 export * from './ffpcWaivers';
 export * from './slots';
@@ -154,6 +155,32 @@ export interface ManualLeague extends ManualLeagueInput {
   platform: Platform;
   updatedAt: string;
   waiversCapturedAt: string | null; // when FFPC's add/drop page was last pasted
+}
+
+// A finished FFPC week pasted for History. Points are null until the week is scored.
+export interface FfpcWeekPasted {
+  week: number;
+  teamName: string;
+  opponentName: string;
+  points: number | null;
+  opponentPoints: number | null;
+}
+
+// Which of this season's weeks have a pasted page.
+export interface FfpcWeeksPasted {
+  weeks: number[];
+}
+
+// A FAAB Report pasted for Waivers: how many claims it holds, how many were new, and their weeks.
+export interface FfpcFaabPasted {
+  claims: number;
+  added: number;
+  weeks: number[];
+}
+
+// Which of this season's weeks have FAAB claims, and how many.
+export interface FfpcFaabWeeks {
+  weeks: { week: number; claims: number }[];
 }
 
 export interface LeagueRef {

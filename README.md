@@ -51,6 +51,8 @@ Each platform has an **adapter** in `apps/api/src/adapters/<platform>/` that fet
 
 FFPC's terms prohibit unapproved scripts, so the dashboard never contacts FFPC. Once a week, copy FFPC's **Live Scoring** page (Ctrl+A, Ctrl+C) and paste it into the league's dialog. That fills in the roster and both lineups. Scores and projections then update every minute by running Sleeper's real-time stats through FFPC's published scoring rules (checked against FFPC's own totals: 20 of 20 starters matched exactly).
 
+To fill in the past, paste a finished week's **Live Scoring** page in the **History** tab, under the league. It goes straight into History, scored from that week's real stats. FFPC's **FAAB Reports** go in the **Waivers** tab, under the league, and their claims feed bid recommendations. Neither changes your roster or this week's matchup, and pasting a report twice only adds what's new. A report's bids are dated from the bids themselves, because FFPC can show "Week 1" over another week's rows.
+
 ## Running locally
 
 Requires Node 20.12+ and Docker.
@@ -173,7 +175,9 @@ Free agents get no bid, since you can just add them.
 
 This season's claims come from every platform. Yahoo also keeps earlier seasons, so a Yahoo league's past seasons (followed back through each league it was renewed from) are loaded in the background; until they're in, prices use this season alone. Yahoo doesn't report the starting budget, so it's worked out from each team's balance plus its winning bids.
 
-What each team had to beat comes from the losing bids: Yahoo's site (with a `YAHOO_COOKIE`, this season and past ones) and Sleeper's failed claims. Where they aren't known (ESPN), a claim only says what a rival paid. Waivers also says how much you've overpaid on contested wins and how close your contested losses were.
+FFPC's claims come from its pasted FAAB Reports. Every league there starts with $1,000, and the lowest bid is $1. FFPC only prices FFPC, and the other platforms only price each other: a $1,000 budget buys very different things than a $100 one, and FFPC bids priced from other platforms' shares won far too often (bids meant to win 50% won 88%, on 33 claims). So an FFPC player has no likely bid until enough similar FFPC claims have been pasted.
+
+What each team had to beat comes from the losing bids: Yahoo's site (with a `YAHOO_COOKIE`, this season and past ones), Sleeper's failed claims, and FFPC's FAAB Report, which shows the next highest bid and your own but not every bid. Where they aren't known (ESPN), a claim only says what a rival paid. Waivers also says how much you've overpaid on contested wins and how close your contested losses were.
 
 Backtested on 1,298 real bids from 2020 to 2026 in two leagues, each priced only from claims made before it, against the same model using winning bids alone:
 

@@ -38,7 +38,8 @@ type Scoreboard = NonNullable<ManualMatchup['scoreboard']>;
 
 function parseLivePage(text: string): { week: number; teams: LiveTeam[]; scoreboard: Scoreboard } | null {
   const lines = text.split(/\r?\n/).map((l) => l.trim());
-  const week = Number(/Week\s+(\d+)\s*\(Current\)/.exec(text)?.[1] ?? 0);
+  // This week's page says "Week 8 (Current)"; a finished week's, just "Week 1".
+  const week = Number((/Week\s+(\d+)\s*\(Current\)/.exec(text) ?? /^\s*Week\s+(\d+)\s*$/m.exec(text))?.[1] ?? 0);
 
   // League-wide scoreboard: "SR21" / "141" / "PMR: 60  Proj: 166" triples.
   const scoreboard: Scoreboard = [];

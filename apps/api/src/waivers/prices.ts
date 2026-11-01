@@ -8,7 +8,7 @@
 // the background now and then and kept as claims only; until they're ready, prices
 // come from this season alone.
 
-import type { Player, WaiverLeague, WaiverPlayer } from '@ffd/shared';
+import { FFPC_FAAB_BUDGET, FFPC_MIN_BID, type Player, type WaiverLeague, type WaiverPlayer } from '@ffd/shared';
 import { sleeperClient } from '../adapters/sleeper/client.js';
 import { toPlayer } from '../adapters/sleeper/mapper.js';
 import type { SleeperPlayerMap } from '../adapters/sleeper/types.js';
@@ -52,7 +52,8 @@ export async function ranksFor(weeks: number[], load: (week: number) => Promise<
 }
 
 const leagueKey = (l: Pick<WaiverLeague, 'platform' | 'leagueId'>) => `${l.platform}:${l.leagueId}`;
-const budgetOf = (l: WaiverLeague) => (l.rules?.type === 'faab' && l.rules.faabTotal ? l.rules.faabTotal : null);
+// An FFPC league's budget is known even before its add/drop page is pasted, so its claims still count.
+const budgetOf = (l: WaiverLeague) => (l.platform === 'ffpc' ? FFPC_FAAB_BUDGET : l.rules?.type === 'faab' && l.rules.faabTotal ? l.rules.faabTotal : null);
 
 const toPastClaim = (b: WinningBid, league: string, player: Player, rank: number, season: number, budget: number): PastClaim => ({
   league,
@@ -177,10 +178,11 @@ export async function withPrices(leagues: WaiverLeagueWithBids[], ctx: WaiverCon
 
     const weeksLeft = ctx.lastWeek - ctx.week + 1;
     const ties = tieChance(l.rules?.priority ?? null, l.rules?.teams ?? 0);
+    const minBid = l.platform === 'ffpc' ? FFPC_MIN_BID : 0;
     const bidFor = (use: Use, money: number) => {
       const target = targetFor(use.add);
       const rivals = target && rivalBids(claims, target, budget, topRival);
-      return rivals && money > 0 ? chooseBid(rivals, moveWorth(use, money, weeksLeft), money, ties) : null;
+      return rivals && money > 0 && money >= minBid ? chooseBid(rivals, moveWorth(use, money, weeksLeft), money, ties, minBid) : null;
     };
 
     // Biggest gain first, each bid out of what the ones before it leave: bids in one run can all win.

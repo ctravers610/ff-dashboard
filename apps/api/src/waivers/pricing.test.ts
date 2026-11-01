@@ -11,6 +11,12 @@ describe('how much a past claim says about a player', () => {
     expect(weightOf(claim({ position: 'D/ST' }), { ...target, position: 'DEF' })).toBeGreaterThan(0);
   });
 
+  it('keeps FFPC and the other platforms apart, whose budgets buy very different things', () => {
+    expect(weightOf(claim({ league: 'ffpc:1' }), target)).toBe(0);
+    expect(weightOf(claim(), { ...target, league: 'ffpc:1' })).toBe(0);
+    expect(weightOf(claim({ league: 'ffpc:1' }), { ...target, league: 'ffpc:2' })).toBe(1);
+  });
+
   it('counts most for a similar player, at a similar time, in the same league, recently', () => {
     const same = weightOf(claim(), target);
     expect(same).toBe(2); // the league's own claim counts double
@@ -235,6 +241,7 @@ describe('the bid to make', () => {
 
   it('stays at $0 when he’s worth nothing', () => {
     expect(chooseBid(rivals, 0, 100, 0).bid).toBe(0);
+    expect(chooseBid(rivals, 0, 100, 0, 1).bid).toBe(1); // where a league's lowest bid is $1
   });
 });
 

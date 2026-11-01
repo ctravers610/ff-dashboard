@@ -8,6 +8,7 @@ import { api, useDemo, useWaivers } from '../../api';
 import { labelFor, leagueSubtitle, PLATFORM_LABEL, type LeagueLabel } from '../../format';
 import { SideList, WithSideList } from '../SideList';
 import { SourceErrors } from '../SourceErrors';
+import { FfpcFaabPaste } from './FfpcFaabPaste';
 import { FfpcWaiverPaste } from './FfpcWaiverPaste';
 import { Reminders } from './Reminders';
 
@@ -201,6 +202,7 @@ function Header({ league, name, next }: { league: WaiverLeague; name: LeagueLabe
       </dl>
 
       {league.platform === 'ffpc' && <FfpcWaiverPaste key={league.leagueId} league={league} />}
+      {league.platform === 'ffpc' && <FfpcFaabPaste key={`faab:${league.leagueId}`} leagueId={league.leagueId} />}
     </div>
   );
 }

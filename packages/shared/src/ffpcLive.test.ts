@@ -82,6 +82,11 @@ describe('FFPC Live Scoring import', () => {
     expect([m.opponent.teamName, m.opponent.points, m.opponent.projected]).toEqual(['Rival Team', 140.7, 165.9]);
   });
 
+  it("reads the week of a finished week's page, which isn't marked Current", () => {
+    const past = PAGE.replace('Scoreboard - All Play Week \nWeek 6 (Current)', 'Scoreboard \n\nWeek 1');
+    expect(convertFfpcLiveScoring(past)?.week).toBe(1);
+  });
+
   it('reads the league-wide scoreboard', () => {
     const page = PAGE.replace('Sample Squad\n140\nPMR: 60\tProj: 151', 'Sample Squad\n140\nPMR: 60\tProj: 151\nThird Team\n98\nPMR: 0\tProj: 98');
     expect(convertFfpcLiveScoring(page)!.scoreboard).toEqual([

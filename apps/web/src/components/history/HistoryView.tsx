@@ -11,6 +11,7 @@ import { TradesPanel } from './TradesPanel';
 import { Awards, LuckTable } from '../outlook/SeasonCards';
 import { ResultChip } from './ResultChip';
 import { AllSeasonsPanel } from './AllSeasonsPanel';
+import { FfpcWeekPaste } from './FfpcWeekPaste';
 
 // League by league: pick a league on the left; on the right, its weekly
 // results (chart or table) and the lineup recap for a finished week. Leagues
@@ -28,8 +29,16 @@ export function HistoryView({ leagues }: { leagues?: LeagueSummary[] }) {
 
   if (isPending) return <p className="text-slate-400">Loading history…</p>;
   if (error) return <p role="alert" className="text-rose-300">Couldn't load history: {error.message}</p>;
+  // An FFPC league with no recorded weeks isn't on the list below, but old weeks can still be pasted for it.
+  const unrecorded = (leagues ?? []).filter((l) => l.platform === 'ffpc' && !data.leagues.some((h) => h.platform === 'ffpc' && h.leagueId === l.leagueId));
+  const unrecordedPastes = unrecorded.map((l) => <FfpcWeekPaste key={l.leagueId} leagueId={l.leagueId} leagueName={l.name} />);
   if (data.leagues.length === 0) {
-    return <p className="text-slate-400">No history yet. Weeks are recorded each time the dashboard loads, so check back after a few games.</p>;
+    return (
+      <div className="flex flex-col gap-4">
+        <p className="text-slate-400">No history yet. Weeks are recorded each time the dashboard loads, so check back after a few games.</p>
+        {unrecordedPastes}
+      </div>
+    );
   }
 
   const keyOf = (h: { platform: string; leagueId: string }) => `${h.platform}:${h.leagueId}`;
@@ -43,6 +52,7 @@ export function HistoryView({ leagues }: { leagues?: LeagueSummary[] }) {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-slate-400">{data.season} season · results are head-to-head against your opponent each week</p>
+      {unrecordedPastes}
       <WithSideList
         list={
           <SideList
@@ -87,6 +97,7 @@ export function HistoryView({ leagues }: { leagues?: LeagueSummary[] }) {
             recap={recap ? { week: recap.week, weeks: recap.weeks } : null}
             onPickWeek={setWeek}
           />
+          {league.platform === 'ffpc' && <FfpcWeekPaste key={league.leagueId} leagueId={league.leagueId} />}
           <RecapPanel leagueKey={keyOf(league)} week={week} onWeek={setWeek} />
           {oddsFor(league) && <Awards outlook={oddsFor(league)!} />}
           {oddsFor(league) && <LuckTable outlook={oddsFor(league)!} />}

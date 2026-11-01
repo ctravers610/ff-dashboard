@@ -209,6 +209,29 @@ test.describe('FFPC waivers (pasted add/drop page)', () => {
 
   const pasteBox = (page: Page) => leagueSection(page, FFPC_TEAM).getByPlaceholder("Paste FFPC's add/drop page here");
 
+  test('a FAAB Report pasted here adds its claims, and only new ones when pasted again', async ({ page }) => {
+    const section = leagueSection(page, FFPC_TEAM);
+    await section.getByRole('button', { name: 'Add a FAAB Report' }).click();
+    const box = section.getByPlaceholder("Paste FFPC's FAAB Report here");
+    const report = [
+      'Gorilla Tourney (Aug 5 9:00 PM) #12345 - Sample (4-3)',
+      'Free Agent Auction Bidding (FAAB)',
+      'Bid Date',
+      '(Processed)\tTeam\tAdded Player\tDropped Player\tBid\tResult',
+      '09/08 08:58 PM (WED)\tTeam D\tChris Bell, WR (MIA)\tEli Stowers TE PHI\t$185.00\tPlayer Added',
+      '09/08 08:30 PM (WED)\tNext Highest Bid\tChris Bell, WR (MIA)\t\t$75.00\t',
+    ].join('\n');
+
+    await paste(box, report);
+    await expect(section.getByText(/^Added 1 new claim/)).toBeVisible();
+    await paste(box, report);
+    await expect(section.getByText(/^Nothing new/)).toBeVisible();
+    await expect(section.getByText(/^FAAB Reports so far: week \d+ \(1 claim\)/)).toBeVisible();
+
+    await paste(box, 'Player Min Remaining: 0\nPos\tBench\tStatus');
+    await expect(section.getByRole('alert')).toContainText('paste it in the History tab');
+  });
+
   test('asks for the page until it has been pasted, already knowing when FFPC bids run', async ({ page }) => {
     const runs = leagueSection(page, FFPC_TEAM).getByRole('definition').first();
     await expect(runs).toContainText('Wed 11:00 PM and Sun 10:00 AM ETnext in');
@@ -221,7 +244,7 @@ test.describe('FFPC waivers (pasted add/drop page)', () => {
   test('one paste gives FAAB, the bid schedule, a move and the best available', async ({ page }) => {
     await paste(pasteBox(page), ffpcWaiverPage());
     const section = leagueSection(page, FFPC_TEAM);
-    await expect(section).toContainText(`$${FFPC_FAAB_LEFT} FAAB`);
+    await expect(section).toContainText(`$${FFPC_FAAB_LEFT} of $1000 FAAB`);
     await expect(section).toContainText('Wed 11:00 PM and Sun 10:00 AM ETnext in'); // FFPC_BID_SCHEDULE, read from the page
     await expect(section).toContainText("From FFPC's add/drop page as pasted");
 

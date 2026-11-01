@@ -73,9 +73,13 @@ export function projectedRanks(weeks: Map<string, number>[], positionOf: (sleepe
   return ranks;
 }
 
-/** How much one past claim says about a target: 0 at another position. */
+// FFPC's $1,000 budgets go much further than a $100 one: priced from other platforms'
+// shares, its bids meant to win 50% of the time won 88%. So each only prices itself.
+const isFfpc = (league: string) => league.startsWith('ffpc:');
+
+/** How much one past claim says about a target: 0 at another position, or across FFPC and the other platforms. */
 export function weightOf(c: PastClaim, t: Target): number {
-  if (pricePosition(c.position) !== pricePosition(t.position)) return 0;
+  if (pricePosition(c.position) !== pricePosition(t.position) || isFfpc(c.league) !== isFfpc(t.league)) return 0;
   const rank = (Math.log(c.rank) - Math.log(t.rank)) / RANK_SPREAD;
   const week = (c.week - t.week) / WEEK_SPREAD;
   const seasons = Math.max(0, t.season - c.season);
@@ -239,12 +243,12 @@ const ODDS = [0.5, 0.75, 0.9]; // the chances worth showing a bid for
  * you'd keep of his worth after paying it. Bidding more wins more often but
  * leaves less, so the best bid sits below his worth, and lower still when the
  * odds barely improve for paying more. It never tops the highest bid anyone can
- * make by more than a dollar, or what you have left.
+ * make by more than a dollar, or what you have left, or go under the league's lowest bid.
  */
-export function chooseBid(rivals: RivalBids, worth: number, faabLeft: number, ties: number): FaabBid {
+export function chooseBid(rivals: RivalBids, worth: number, faabLeft: number, ties: number, minBid = 0): FaabBid {
   const most = Math.max(0, ...rivals.map((r) => r.amount)) + 1; // nothing beats more than topping every bid
   const can = Math.min(most, faabLeft);
-  const bids = Array.from({ length: Math.floor(can) + 1 }, (_, bid) => ({ bid, chance: chanceAt(rivals, bid, ties) }));
+  const bids = Array.from({ length: Math.floor(can) - minBid + 1 }, (_, i) => ({ bid: minBid + i, chance: chanceAt(rivals, minBid + i, ties) }));
   const best = bids.reduce((a, b) => (b.chance * (worth - b.bid) > a.chance * (worth - a.bid) ? b : a), bids[0]!);
   const levels = ODDS.flatMap((level) => bids.find((b) => b.chance >= level) ?? []);
   const odds = [...new Map([...levels, best].sort((a, b) => a.bid - b.bid).map((b) => [b.bid, b])).values()];

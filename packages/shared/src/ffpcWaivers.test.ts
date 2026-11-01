@@ -58,6 +58,7 @@ describe('parseFfpcWaivers', () => {
       faabLeft: 1136,
       bidSchedule: 'Wednesdays at 11 pm ET and Sundays at 10 am ET',
       teams: 3,
+      rivalFaab: [900, 450],
     });
   });
 
