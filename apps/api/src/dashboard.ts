@@ -9,6 +9,7 @@ import { activeSources } from './sources/store.js';
 import { buildExposure } from './exposure.js';
 import { adviseLeagues, loadWeekContext } from './lineupAdvice.js';
 import { withMinutesLeft } from './minutesLeft.js';
+import { reminderRepo } from './reminders/store.js';
 import { nflGames } from './scoring/games.js';
 import { recordSnapshots } from './snapshots.js';
 
@@ -37,7 +38,11 @@ export async function getDashboard(): Promise<DashboardResponse> {
     });
   // Drop alerts that can't be acted on any more and suggest bench swaps for the rest.
   const week = await loadWeekContext(nfl);
-  const advised = adviseLeagues(unique, week);
+  const cleared = await reminderRepo.clearedWarnings(nfl.season, nfl.week).catch((e) => {
+    console.error('Could not load cleared warnings:', e);
+    return new Set<string>();
+  });
+  const advised = adviseLeagues(unique, week && { ...week, cleared });
   const leagues = withMinutesLeft(advised, nfl.week, await nflGames(nfl.season, nfl.week).catch(() => null));
 
   // Record history in the background: a database problem must never break the dashboard.

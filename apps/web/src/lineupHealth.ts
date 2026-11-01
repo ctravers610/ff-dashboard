@@ -40,9 +40,9 @@ function issue(alert: LineupAlert, waivers: WaiverLeague | undefined): LineupIss
   return { alert, level: 'red', label, fix: 'Nobody on your bench or the waiver wire can fill it' };
 }
 
-/** A league's lineup problems, worst first, and its overall color. */
+/** A league's lineup problems, worst first, and its overall color. A warning you cleared doesn't count. */
 export function lineupHealth(league: LeagueSummary, waivers: WaiverLeague | undefined): { health: Health; issues: LineupIssue[] } {
-  const issues = league.alerts.map((a) => issue(a, waivers)).sort((a, b) => (a.level === b.level ? 0 : a.level === 'red' ? -1 : 1));
+  const issues = league.alerts.filter((a) => !a.cleared).map((a) => issue(a, waivers)).sort((a, b) => (a.level === b.level ? 0 : a.level === 'red' ? -1 : 1));
   const health: Health = issues.some((i) => i.level === 'red') ? 'red' : issues.length ? 'yellow' : 'green';
   return { health, issues };
 }

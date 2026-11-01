@@ -60,6 +60,34 @@ describe('canPlay', () => {
   });
 });
 
+describe('clearing a Questionable warning', () => {
+  const thomas = player('Brian Thomas', 'WR', 'JAX');
+  const hopkins = player('DeAndre Hopkins', 'WR', 'DAL', 'Out');
+  const clearedEvans = { ...ctx(), cleared: new Set(['WR:mikeevans']) };
+
+  it('offers it for a Questionable starter only, keyed by the player across platforms', () => {
+    const l = league([[evans, 'starter'], [hopkins, 'starter'], [thomas, 'bench']], [injured(evans, 'WR'), injured(hopkins, 'WR')]);
+    const [q, out] = adviseLeague(l, ctx());
+    expect(q).toMatchObject({ clearKey: 'WR:mikeevans' });
+    expect(q?.cleared).toBeUndefined();
+    expect(out?.clearKey).toBeUndefined();
+  });
+
+  it('marks him cleared, and he doesn’t use up the bench swap another starter needs', () => {
+    const l = league([[evans, 'starter'], [hopkins, 'starter'], [thomas, 'bench']], [injured(evans, 'WR'), injured(hopkins, 'WR')]);
+    const [q, out] = adviseLeague(l, clearedEvans);
+    expect(q).toMatchObject({ cleared: true, clearKey: 'WR:mikeevans', suggestion: null });
+    expect(out?.suggestion?.playerName).toBe('Brian Thomas');
+    expect(out?.cleared).toBeUndefined();
+  });
+
+  it('warns again when his status gets worse', () => {
+    const doubtful = { ...evans, injuryStatus: 'Doubtful' as const };
+    const [alert] = adviseLeague(league([[doubtful, 'starter']], [injured(doubtful, 'WR')]), clearedEvans);
+    expect(alert?.cleared).toBeUndefined();
+  });
+});
+
 describe('adviseLeague', () => {
   it('suggests the healthy bench player with the highest projection who can fill the slot', () => {
     const thomas = player('Brian Thomas', 'WR', 'JAX');

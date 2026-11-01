@@ -25,7 +25,7 @@ const sentKey = (key: string, platform: string) =>
   platform === 'yahoo' ? `lineup:yahoo:${crypto.createHash('sha256').update(key).digest('hex')}` : key;
 
 const needsAttention = (a: LineupAlert) =>
-  a.reason === 'empty' || a.reason === 'bye' || (a.detail != null && OUT.has(a.detail)) || (a.detail === 'Questionable' && a.suggestion != null);
+  !a.cleared && (a.reason === 'empty' || a.reason === 'bye' || (a.detail != null && OUT.has(a.detail)) || (a.detail === 'Questionable' && a.suggestion != null));
 
 /**
  * Every lineup problem worth a reminder this week. An injured starter is due

@@ -181,6 +181,23 @@ test.describe('Lineup status', () => {
     await expect(issues.getByRole('link', { name: /Fix it on ESPN/ })).toHaveAttribute('href', new RegExp(`leagueId=${ESPN_LEAGUE_ID}&teamId=1`));
   });
 
+  test('a questionable warning can be cleared, which turns the row green, and undone', async ({ page }) => {
+    const issues = (await openLeague(page, ESPN_MY_TEAM)).getByRole('region', { name: 'Lineup issues' });
+    await issues.getByRole('button', { name: 'Clear the warning for Jayden Reed' }).click();
+    await expect.poll(() => lineup(page, ESPN_MY_TEAM)).toBe('green');
+    await expect(issues).toContainText('Jayden Reed questionable · WR · cleared for this week');
+    await expect(issues).not.toContainText('Start Romeo Doubs');
+
+    // It's saved, not just on this page.
+    await page.reload();
+    await expect.poll(() => lineup(page, ESPN_MY_TEAM)).toBe('green');
+
+    const reopened = (await openLeague(page, ESPN_MY_TEAM)).getByRole('region', { name: 'Lineup issues' });
+    await reopened.getByRole('button', { name: 'Undo clearing the warning for Jayden Reed' }).click();
+    await expect.poll(() => lineup(page, ESPN_MY_TEAM)).toBe('yellow');
+    await expect(reopened).toContainText('Start Romeo Doubs (WR) from your bench instead');
+  });
+
   test('a lineup with nothing to fix is green; a game that has started no longer counts', async ({ page }) => {
     // Jaylen Waddle is questionable in Sleeper, but DEN's game is final: the lineup is locked.
     expect(await lineup(page, SLEEPER_MY_TEAM)).toBe('green');

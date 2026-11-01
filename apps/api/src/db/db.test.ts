@@ -440,6 +440,17 @@ describe.skipIf(!enabled)('Postgres', () => {
       await store.removeSubscriptions(['https://push.example/x']);
       expect(await store.subscriptions()).toEqual([]);
     });
+
+    it('keeps a cleared warning for its week only, and can undo it', async () => {
+      const store = reminderStore(testDb.db);
+      await store.setWarningCleared('2026', 9, 'WR:georgepickens', true);
+      await store.setWarningCleared('2026', 9, 'WR:georgepickens', true); // clearing twice is fine
+      expect([...(await store.clearedWarnings('2026', 9))]).toEqual(['WR:georgepickens']);
+      expect((await store.clearedWarnings('2026', 10)).size).toBe(0);
+
+      await store.setWarningCleared('2026', 9, 'WR:georgepickens', false);
+      expect((await store.clearedWarnings('2026', 9)).size).toBe(0);
+    });
   });
 
   describe('snapshot store', () => {

@@ -17,6 +17,8 @@ export interface AdviceContext {
   games: Map<string, GameScore> | null;
   /** A neutral projection for ranking bench players; null when unknown. */
   projectedFor: (player: Player) => number | null;
+  /** Players whose Questionable warning you cleared this week, by playerKey. */
+  cleared?: Set<string>;
 }
 
 type GameState = 'upcoming' | 'started' | 'bye' | 'unknown';
@@ -67,7 +69,12 @@ export function adviseLeague(league: LeagueSummary, ctx: AdviceContext, now = ne
     const starter = alert.playerId ? rosterById.get(alert.playerId) : undefined;
     if (starter && gameState(starter, ctx.games) === 'started') continue;
     if (tooEarlyToWorry(alert, starter, ctx.games, now)) continue;
-    advice.push({ ...alert, suggestion: bestFor(alert.slot) });
+    // You can clear a Questionable warning when you know he's playing. Keyed by
+    // player, so it holds in all your leagues; a worse status warns again. A
+    // cleared starter doesn't need a bench swap, so he doesn't use one up.
+    const clearKey = alert.reason === 'injury' && alert.detail === 'Questionable' && starter ? playerKey(starter) : undefined;
+    if (clearKey && ctx.cleared?.has(clearKey)) advice.push({ ...alert, clearKey, cleared: true, suggestion: null });
+    else advice.push({ ...alert, ...(clearKey && { clearKey }), suggestion: bestFor(alert.slot) });
   }
   return advice;
 }

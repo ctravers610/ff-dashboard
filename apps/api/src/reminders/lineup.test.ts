@@ -56,6 +56,11 @@ describe('lineupIssues', () => {
     expect(q(null)).toEqual([]);
     expect(q(swap)).toHaveLength(1);
   });
+
+  it('leaves out a warning you cleared', () => {
+    const cleared = alert({ playerId: 'Mike Evans', playerName: 'Mike Evans', detail: 'Questionable', suggestion: null, clearKey: 'WR:mikeevans', cleared: true });
+    expect(lineupIssues([league('L', [cleared], [evans])], games, '2026', 7)).toEqual([]);
+  });
 });
 
 describe('dueLineupIssues', () => {

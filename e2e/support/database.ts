@@ -42,4 +42,5 @@ export const resetFfpc = () =>
     await db.query('DELETE FROM push_subscriptions');
     await db.query('DELETE FROM league_sources');
     await db.query('DELETE FROM live_events');
+    await db.query('DELETE FROM cleared_warnings');
   });
