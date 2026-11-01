@@ -1,7 +1,7 @@
-import { latestPlay, type DashboardResponse, type LeagueSummary } from '@ffd/shared';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { arrangeWall, cardSpans, latestPlay, winProbability, type CardSize, type DashboardResponse, type LeagueSummary, type WallCard } from '@ffd/shared';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useDemo, useLive, useWaivers, useWinChance } from '../../api';
-import { leagueLabel } from '../../format';
+import { leagueLabel, matchupOver } from '../../format';
 import { lineupHealth } from '../../lineupHealth';
 import { useShortcut } from '../../shortcuts';
 import { DataStatus } from '../DataStatus';
@@ -32,9 +32,36 @@ function rememberFeed(open: boolean) {
 // What's in the panel beside the cards: the live feed, or one league's details.
 type Panel = 'feed' | { league: string } | null;
 
-// The home page: a wall of team cards to leave up during the games. Every league
-// keeps its spot, so you learn where each one is, and the feed and a league's
-// details open beside the wall (over it, on a phone) without moving anything else.
+// Spelled out so Tailwind sees them; a card's width in twelfths of the wall.
+const MID_SPAN: Record<number, string> = { 6: 'md:col-span-6', 12: 'md:col-span-12' };
+const WIDE_SPAN: Record<number, string> = { 3: 'xl:col-span-3', 4: 'xl:col-span-4', 6: 'xl:col-span-6', 8: 'xl:col-span-8', 12: 'xl:col-span-12' };
+
+// Each card's width and the grid's rows: the rows with live matchups share any spare
+// height, and the small cards' rows stay as short as they can.
+function wallLayout(cards: { key: string; size: CardSize }[], across: number) {
+  const spans = new Map<string, number>();
+  const rows: string[] = [];
+  const place = (group: { key: string }[], widths: number[], row: string) => {
+    group.forEach((c, i) => spans.set(c.key, widths[i]!));
+    const count = widths.reduce((sum, w) => sum + w, 0) / 12;
+    for (let i = 0; i < count; i++) rows.push(row);
+  };
+  const [focus, regular, small] = (['focus', 'regular', 'small'] as const).map((size) => cards.filter((c) => c.size === size)) as [typeof cards, typeof cards, typeof cards];
+  // One toss-up with a card or two beside it, rather than each stretched across its own row.
+  const shareRow = across === 3 && focus.length === 1 && (regular.length === 1 || regular.length === 2);
+  if (shareRow) place([...focus, ...regular], regular.length === 1 ? [8, 4] : [6, 3, 3], 'auto');
+  else {
+    place(focus, cardSpans(focus.length, across), 'auto');
+    place(regular, cardSpans(regular.length, across), 'auto');
+  }
+  place(small, cardSpans(small.length, across), 'min-content');
+  return { spans, rows: rows.join(' ') };
+}
+
+// The home page: a wall of team cards to leave up during the games. The closer a
+// matchup, the earlier and bigger its card, and that's worked out afresh with every
+// refresh, so a game that gets interesting comes forward and one that's settled gives
+// way. The feed and a league's details open beside the wall (over it, on a phone).
 export function Wall({ data, onEdit, onAdd }: { data: DashboardResponse; onEdit?: (leagueId: string) => void; onAdd: () => void }) {
   const demo = useDemo();
   const waivers = useWaivers().data;
@@ -69,9 +96,47 @@ export function Wall({ data, onEdit, onAdd }: { data: DashboardResponse; onEdit?
     return new Map(data.leagues.map((l) => [leagueKey(l), latestPlay(live?.events ?? [], leagueKey(l), now)]));
   }, [data.leagues, live?.events]);
 
-  // Three across when there's room for six leagues to fill a screen; two for a few, or beside the panel.
-  const columns = open || data.leagues.length <= 4 ? 'md:grid-cols-2' : 'md:grid-cols-2 xl:grid-cols-3';
-  const details = openLeague && lineupHealth(openLeague, waivers?.leagues.find((w) => w.platform === openLeague.platform && w.leagueId === openLeague.leagueId));
+  const lastCards = useRef<WallCard[]>([]);
+  const arranged = useMemo(() => {
+    const next = arrangeWall(
+      data.leagues.map((l) => ({ key: leagueKey(l), chance: winProbability(l.matchup), over: matchupOver(l.matchup) })),
+      lastCards.current,
+    );
+    lastCards.current = next;
+    return next;
+  }, [data.leagues]);
+  // With nothing left in doubt there's nothing to make room for, so no card needs to shrink.
+  const anyInDoubt = arranged.some((c) => c.size !== 'small');
+  const cards = useMemo(() => arranged.map((c) => ({ key: c.key, size: anyInDoubt ? c.size : ('regular' as const) })), [arranged, anyInDoubt]);
+  const leagueByKey = new Map(data.leagues.map((l) => [leagueKey(l), l]));
+
+  // Three across at most, or two beside the panel.
+  const mid = wallLayout(cards, 2);
+  const wide = wallLayout(cards, open ? 2 : 3);
+  const gridRows = { '--wall-rows-mid': mid.rows, '--wall-rows-wide': wide.rows } as CSSProperties;
+
+  // When the arrangement changes, each card slides from where it was, so you can
+  // follow it. This render's DOM is still the old one, so that's where it was.
+  const wallRef = useRef<HTMLElement>(null);
+  const was = new Map(Array.from(wallRef.current?.querySelectorAll<HTMLElement>('[data-card]') ?? [], (el) => [el.dataset.card!, el.getBoundingClientRect()]));
+  const focused = document.activeElement;
+  const arrangement = cards.map((c) => `${c.key}=${c.size}`).join();
+  useLayoutEffect(() => {
+    // Moving a card in the page can drop the keyboard's place on it.
+    if (focused instanceof HTMLElement && focused.isConnected && document.activeElement !== focused) focused.focus({ preventScroll: true });
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    wallRef.current?.querySelectorAll<HTMLElement>('[data-card]').forEach((el) => {
+      const from = was.get(el.dataset.card!);
+      if (!from) return;
+      const to = el.getBoundingClientRect();
+      const [x, y] = [from.left - to.left, from.top - to.top];
+      if (x || y) el.animate([{ transform: `translate(${x}px, ${y}px)` }, { transform: 'none' }], { duration: 500, easing: 'ease-in-out' });
+    });
+    // Only for a new arrangement: a refresh that changes nothing, or opening the panel, shouldn't slide anything.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arrangement]);
+
+  const details =openLeague && lineupHealth(openLeague, waivers?.leagues.find((w) => w.platform === openLeague.platform && w.leagueId === openLeague.leagueId));
   const feedOpen = panel === 'feed';
 
   return (
@@ -94,16 +159,25 @@ export function Wall({ data, onEdit, onAdd }: { data: DashboardResponse; onEdit?
       </div>
 
       <div className="flex flex-1 items-stretch gap-3">
-        <main className="flex min-w-0 flex-1 flex-col gap-3">
+        {/* Clipped so a card sliding to a wider spot can't widen the page; the padding leaves room for focus rings. */}
+        <main className="-mx-1 flex min-w-0 flex-1 flex-col gap-3 overflow-x-clip px-1">
           {data.leagues.length > 0 && (
-            <section aria-label="Your teams" className={`grid flex-1 grid-cols-1 gap-3 ${columns}`}>
-              {data.leagues.map((league) => {
-                const key = leagueKey(league);
-                const lineup = lineupHealth(league, waivers?.leagues.find((w) => w.platform === league.platform && w.leagueId === league.leagueId));
+            <section
+              ref={wallRef}
+              aria-label="Your teams"
+              style={gridRows}
+              className="grid flex-1 grid-cols-1 content-start gap-3 md:grid-cols-12 md:content-normal md:[grid-template-rows:var(--wall-rows-mid)] xl:[grid-template-rows:var(--wall-rows-wide)]"
+            >
+              {cards.map(({ key, size }) => {
+                const league = leagueByKey.get(key)!;
+                const lineup =lineupHealth(league, waivers?.leagues.find((w) => w.platform === league.platform && w.leagueId === league.leagueId));
                 const isOpen = shown === key;
                 return (
                   <TeamCard
                     key={key}
+                    cardKey={key}
+                    size={size}
+                    span={`${MID_SPAN[mid.spans.get(key)!]} ${WIDE_SPAN[wide.spans.get(key)!]}`}
                     league={league}
                     health={lineup.health}
                     issues={lineup.issues}

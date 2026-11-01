@@ -70,15 +70,15 @@ test.describe('Matchups', () => {
     await expect(espn).toContainText('Projected: no one has played yet');
   });
 
-  test('has a card for every league with scores, projections and chance to win, in a fixed order', async ({ page }) => {
+  test('has a card for every league with scores, projections and chance to win', async ({ page }) => {
     const cards = page.getByRole('region', { name: 'Your teams' }).getByRole('article');
     await expect(cards).toHaveCount(2);
     // Sleeper's games are all final (decided: 100%); ESPN still has projected
     // points to come, so its 15.5-point projected lead is 99%.
     const sleeper = leagueCard(page, SLEEPER_MY_TEAM);
     const espn = leagueCard(page, ESPN_MY_TEAM);
-    await expect(cards.nth(0)).toHaveAccessibleName(SLEEPER_MY_TEAM);
-    await expect(cards.nth(1)).toHaveAccessibleName(ESPN_MY_TEAM);
+    await expect(cards.nth(0)).toHaveAccessibleName(ESPN_MY_TEAM); // still being played, so ahead of the finished one
+    await expect(cards.nth(1)).toHaveAccessibleName(SLEEPER_MY_TEAM);
     await expect(sleeper).toContainText('100%');
     await expect(sleeper).toContainText('Won');
     await expect(espn).toContainText('99%');
@@ -92,18 +92,63 @@ test.describe('Matchups', () => {
     await expect(sleeper).toContainText(pts(SLEEPER_OPP_POINTS));
   });
 
-  test('keeps a card in its spot when the odds change', async ({ page }) => {
+  test('with nothing in doubt, every card stays regular size', async ({ page }) => {
+    await expect(leagueCard(page, ESPN_MY_TEAM)).toHaveAttribute('data-size', 'regular'); // 99%
+    await expect(leagueCard(page, SLEEPER_MY_TEAM)).toHaveAttribute('data-size', 'regular'); // final
+  });
+
+  test('moves and resizes cards as the odds change, without a reload', async ({ page }) => {
+    await page.clock.install();
+    // A matchup with this much still to score: even at first for one league, then for the other.
+    let close = 'espn';
     await page.route('**/api/dashboard', async (route) => {
       const res = await route.fetch();
       const body = await res.json();
-      // Sleeper's matchup becomes the closer one, which would once have moved it.
-      const m = body.leagues[0].matchup;
-      m.me.projected = 100;
-      m.opponent.projected = 100;
+      for (const l of body.leagues) {
+        const { me, opponent } = l.matchup;
+        for (const s of [...me.starters, ...opponent.starters]) if (s.game) s.game.state = 'live';
+        me.points = 50;
+        opponent.points = 50;
+        me.projected = 120;
+        opponent.projected = l.platform === close ? 120 : 20;
+      }
       await route.fulfill({ response: res, json: body });
     });
     await page.reload();
-    await expect(page.getByRole('region', { name: 'Your teams' }).getByRole('article').first()).toHaveAccessibleName(SLEEPER_MY_TEAM);
+    const cards = page.getByRole('region', { name: 'Your teams' }).getByRole('article');
+    const espn = leagueCard(page, ESPN_MY_TEAM);
+    const sleeper = leagueCard(page, SLEEPER_MY_TEAM);
+    await expect(cards.first()).toHaveAccessibleName(ESPN_MY_TEAM);
+    await expect(espn).toHaveAttribute('data-size', 'focus');
+    await expect(sleeper).toHaveAttribute('data-size', 'small');
+    await expect(sleeper).toContainText('Cruising');
+    expect((await espn.boundingBox())!.height).toBeGreaterThan((await sleeper.boundingBox())!.height);
+
+    close = 'sleeper';
+    await page.clock.fastForward(31_000); // the next refresh
+    await expect(cards.first()).toHaveAccessibleName(SLEEPER_MY_TEAM);
+    await expect(sleeper).toHaveAttribute('data-size', 'focus');
+    await expect(espn).toHaveAttribute('data-size', 'small');
+  });
+
+  test('a small card keeps the score and anything to fix', async ({ page }) => {
+    await page.route('**/api/dashboard', async (route) => {
+      const res = await route.fetch();
+      const body = await res.json();
+      // Sleeper's matchup comes back into doubt, so ESPN's 99% gives way to it.
+      const { me, opponent } = body.leagues[0].matchup;
+      for (const s of [...me.starters, ...opponent.starters]) if (s.game) s.game.state = 'live';
+      me.projected = opponent.projected = 200;
+      await route.fulfill({ response: res, json: body });
+    });
+    await page.reload();
+    const espn = leagueCard(page, ESPN_MY_TEAM);
+    await expect(espn).toHaveAttribute('data-size', 'small');
+    await expect(espn).toContainText(`You ${pts(ESPN_ME_POINTS)}`);
+    await expect(espn).toContainText(pts(ESPN_OPP_POINTS));
+    await expect(espn).toContainText('99%');
+    await expect(espn).toContainText('Jayden Reed questionable');
+    await expect(espn).not.toContainText('to come');
   });
 
   test('says who is left to play on each side', async ({ page }) => {
