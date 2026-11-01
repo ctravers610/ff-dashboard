@@ -12,21 +12,18 @@ function Side({ side, winner, final }: { side: TradeSide; winner: boolean; final
           {side.teamName}
           {side.isMe && <span className="text-xs text-slate-400"> (you)</span>}
         </span>
-        <span className={`shrink-0 text-sm font-semibold tabular-nums ${winner ? 'text-emerald-400' : 'text-slate-300'}`} title="Started points over replacement">
-          {signedPts(side.overReplacement)}
+        <span className={`shrink-0 text-sm font-semibold tabular-nums ${winner ? 'text-emerald-400' : 'text-slate-300'}`} title="Lineup points scored with the trade, minus without it">
+          {signedPts(side.gain)}
         </span>
       </p>
       <ul className="flex flex-col gap-1 text-sm">
         {side.received.map((p) => (
-          <li key={p.name} className="flex items-baseline justify-between gap-2">
-            <span className="min-w-0 truncate">
-              {p.name} <span className="text-slate-400">{p.position}</span>
-              <span className="block text-xs text-slate-400">
-                {one(p.points)} pts · started {p.startedWeeks} of {p.rosterWeeks} week{p.rosterWeeks === 1 ? '' : 's'}
-                {!final && p.restOfSeason != null && ` · ${p.restOfSeason.toFixed(0)} projected to come`}
-              </span>
+          <li key={p.name} className="min-w-0 truncate">
+            {p.name} <span className="text-slate-400">{p.position}</span>
+            <span className="block text-xs text-slate-400">
+              {one(p.points)} pts · started {p.startedWeeks} of {p.rosterWeeks} week{p.rosterWeeks === 1 ? '' : 's'}
+              {!final && p.restOfSeason != null && ` · ${p.restOfSeason.toFixed(0)} projected to come`}
             </span>
-            <span className="shrink-0 text-xs tabular-nums text-slate-400">{signedPts(p.overReplacement)}</span>
           </li>
         ))}
         {[...side.picks, ...(side.faab ? [`$${side.faab} FAAB`] : [])].map((x) => (
@@ -35,6 +32,12 @@ function Side({ side, winner, final }: { side: TradeSide; winner: boolean; final
           </li>
         ))}
       </ul>
+      {side.flips.map((f) => (
+        <p key={f.week} className={`text-xs font-medium ${f.won ? 'text-emerald-400' : 'text-rose-300'}`}>
+          Week {f.week}: {f.won ? `beat ${f.opponent} because of this trade` : `lost to ${f.opponent} because of this trade`}
+        </p>
+      ))}
+      {!final && <p className="text-xs text-slate-400">{signedPts(side.projectedGain)} lineup points projected rest of season</p>}
     </div>
   );
 }
@@ -57,7 +60,7 @@ function Trade({ t }: { t: TradeReport }) {
   );
 }
 
-// Every trade in the league this season, scored by what the players actually did for their new teams.
+// Every trade in the league this season, scored by what it did for each team's lineups.
 export function TradesPanel({ leagueKey }: { leagueKey: string }) {
   const { data, error, isPending } = useTrades(leagueKey);
   let body;
@@ -79,8 +82,8 @@ export function TradesPanel({ leagueKey }: { leagueKey: string }) {
       <h3 className="font-semibold">Trades</h3>
       {body}
       <p className="text-xs text-slate-400">
-        Scored by started points over replacement: what each player scored in his new team's lineup, minus what a waiver-level player at his position
-        scored that week. About 89 points is one win.
+        Scored by each team's lineups with the trade, against the ones it would have had without it: the same starters, with the players it gave up
+        starting wherever that week's projections favored them. A game is flipped when it would have gone the other way.
       </p>
     </section>
   );

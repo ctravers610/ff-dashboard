@@ -504,8 +504,14 @@ export interface TradedPlayer {
   started: number; // the part of that scored in their starting lineup
   startedWeeks: number;
   rosterWeeks: number;
-  overReplacement: number; // started points above a replacement-level player at his position
   restOfSeason: number | null; // projected points still to come, if he's still on the team
+}
+
+// A game the trade changed: it would have gone the other way without it.
+export interface TradeFlip {
+  week: number;
+  opponent: string;
+  won: boolean; // won with the trade, rather than lost because of it
 }
 
 export interface TradeSide {
@@ -514,17 +520,18 @@ export interface TradeSide {
   received: TradedPlayer[];
   picks: string[]; // e.g. "2027 round 2"
   faab: number; // FAAB dollars received
-  overReplacement: number; // the side's total
-  restOfSeason: number;
+  gain: number; // points its lineups have scored over what they would have without the trade
+  flips: TradeFlip[];
+  projectedGain: number; // the same on projections, for the rest of the season
 }
 
 export interface TradeReport {
   id: string;
   week: number;
   sides: TradeSide[]; // two teams; the winner first once there is one
-  // Started points over replacement, winner minus loser, so far (or final).
+  // Lineup points gained, winner minus loser, so far (or final).
   margin: number;
-  winsSwung: number; // margin in wins, at the matchup model's points per win
+  winsSwung: number; // games the trade changed: the winner's net wins minus the loser's
   final: boolean; // the regular season is over: this is the verdict
   verdict: string; // the plain summary
   roast: string | null; // for the lopsided ones
