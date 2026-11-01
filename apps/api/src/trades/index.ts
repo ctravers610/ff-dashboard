@@ -1,21 +1,18 @@
 // GET /api/trades?league=sleeper:123: every completed trade in a league this
-// season, scored (see analyze.ts). Sleeper only for now: its transactions say
-// exactly who got what. ESPN's feed shows accepted trades without the players
-// in them, and FFPC has no feed at all.
+// season, scored (see analyze.ts). Sleeper and Yahoo (yahoo.ts): their
+// transactions say exactly who got what. ESPN's feed shows accepted trades
+// without the players in them, and FFPC has no feed at all.
 
 import type { TradesResponse } from '@ffd/shared';
 import { sleeperClient } from '../adapters/sleeper/client.js';
 import { NON_STARTER_SLOTS, toPlayer } from '../adapters/sleeper/mapper.js';
 import type { SleeperLeague, SleeperTransaction } from '../adapters/sleeper/types.js';
-import { cached, HOUR } from '../cache.js';
-import { nflGames } from '../scoring/games.js';
-import { fetchStats } from '../scoring/live.js';
+import { HOUR } from '../cache.js';
 import { scoreWithSettings, weeklyProjections } from '../scoring/projection.js';
 import { activeSources } from '../sources/store.js';
-import { analyzeTrade, replacementLevel, type Acquired, type SideInput } from './analyze.js';
-
-// A finished week's stats don't change.
-const pastStats = (season: string, week: number) => cached(`trades:stats:${season}:${week}`, 6 * HOUR, () => fetchStats(season, week));
+import { analyzeTrade, tradeSide, type LeagueWeeks } from './analyze.js';
+import { lastFinishedWeek, pastStats } from './weeks.js';
+import { yahooTrades } from './yahoo.js';
 
 export async function findSleeperLeague(leagueId: string, season: string): Promise<{ league: SleeperLeague; myUserId: string } | null> {
   for (const username of (await activeSources()).sleeperUsernames) {
@@ -29,6 +26,7 @@ export async function findSleeperLeague(leagueId: string, season: string): Promi
 
 export async function getTrades(leagueKey: string): Promise<TradesResponse> {
   const [platform, leagueId] = leagueKey.split(':');
+  if (platform === 'yahoo' && leagueId) return yahooTrades(leagueId);
   if (platform !== 'sleeper' || !leagueId) return { leagueKey, supported: false, trades: [] };
 
   const state = await sleeperClient.state();
@@ -37,10 +35,7 @@ export async function getTrades(leagueKey: string): Promise<TradesResponse> {
   const { league, myUserId } = found;
 
   const lastWeek = (league.settings?.playoff_week_start ?? 15) - 1;
-  // The latest week whose games are all over.
-  const games = await nflGames(state.season, state.week).catch(() => null);
-  const currentDone = games != null && games.size > 0 && [...games.values()].every((g) => g.progress >= 1);
-  const lastDone = Math.min(lastWeek, currentDone ? state.week : state.week - 1);
+  const lastDone = await lastFinishedWeek(state.season, state.week, lastWeek);
   const final = state.week > lastWeek;
 
   const weeksSoFar = Array.from({ length: Math.min(state.week, lastWeek) }, (_, i) => i + 1);
@@ -58,10 +53,10 @@ export async function getTrades(leagueKey: string): Promise<TradesResponse> {
   const myRoster = rosters.find((r) => r.owner_id === myUserId || r.co_owners?.includes(myUserId))?.roster_id;
 
   // Every week from the first trade to the last finished one: who each team had and
-  // started, everyone's points in league scoring, and replacement level.
+  // started, and everyone's points in league scoring.
   const first = Math.min(...trades.map((t) => t.leg ?? 1));
   const weeks = Array.from({ length: Math.max(0, lastDone - first + 1) }, (_, i) => first + i);
-  const slots = league.roster_positions.filter((s) => !NON_STARTER_SLOTS.has(s));
+  const left = Array.from({ length: Math.max(0, lastWeek - lastDone) }, (_, i) => lastDone + 1 + i);
   const scoring = league.scoring_settings ?? {};
   const byWeek = new Map(
     await Promise.all(
@@ -70,52 +65,54 @@ export async function getTrades(leagueKey: string): Promise<TradesResponse> {
         const points = new Map<string, number>();
         for (const [id, s] of stats ?? []) points.set(id, scoreWithSettings(s, scoring));
         for (const m of matchups) for (const [id, p] of Object.entries(m.players_points ?? {})) points.set(id, p); // the league's own numbers win
-        const scores = [...points].flatMap(([id, p]) => {
-          const player = toPlayer(id, players);
-          return player ? [{ position: player.position, points: p }] : [];
-        });
-        return [w, { matchups, points, replacement: replacementLevel(scores, slots, league.total_rosters) }] as const;
+        return [w, { matchups, points }] as const;
       }),
     ),
   );
+  const projections = new Map(await Promise.all([...weeks, ...left].map(async (w) => [w, await weeklyProjections(state.season, w, HOUR).catch(() => null)] as const)));
+  const projected = (w: number, id: string) => {
+    const stats = projections.get(w);
+    return stats ? scoreWithSettings(stats.get(id) ?? {}, scoring) : null;
+  };
+  const positionOf = (id: string) => toPlayer(id, players)?.position ?? '';
 
-  // Rest of season: projections for the weeks left, for players still on the team that got them.
-  const left = Array.from({ length: Math.max(0, lastWeek - lastDone) }, (_, i) => lastDone + 1 + i);
-  const projections = await Promise.all(left.map((w) => weeklyProjections(state.season, w, HOUR).catch(() => null)));
-  const restOfSeason = (id: string, rosterId: number) => {
-    if (final || !rosters.find((r) => r.roster_id === rosterId)?.players?.includes(id)) return null;
-    return projections.reduce((n, p) => n + (p?.get(id) ? scoreWithSettings(p.get(id)!, scoring) : 0), 0);
+  const season: LeagueWeeks = {
+    slots: league.roster_positions.filter((s) => !NON_STARTER_SLOTS.has(s)),
+    finished: weeks,
+    left,
+    final,
+    teamWeek: (w, teamId) => {
+      const week = byWeek.get(w);
+      const mine = week?.matchups.find((m) => String(m.roster_id) === teamId);
+      if (!week || !mine) return null;
+      const them = mine.matchup_id == null ? undefined : week.matchups.find((m) => m.matchup_id === mine.matchup_id && m.roster_id !== mine.roster_id);
+      const starters = (mine.starters ?? []).filter((id) => id !== '0'); // '0' is an empty slot
+      return {
+        players: [...new Set([...starters, ...(mine.players ?? [])])].map((id) => ({ id, position: positionOf(id), points: week.points.get(id) ?? 0, projected: projected(w, id), started: starters.includes(id) })),
+        score: mine.points,
+        opponent: them ? { id: String(them.roster_id), name: teamName(them.roster_id), score: them.points } : null,
+      };
+    },
+    tradedPlayer: (w, id) => ({ points: byWeek.get(w)?.points.get(id) ?? 0, projected: projected(w, id) }),
+    rosterAhead: (w, teamId) => (rosters.find((r) => String(r.roster_id) === teamId)?.players ?? []).map((id) => ({ id, position: positionOf(id), projected: projected(w, id) })),
   };
 
-  const side = (t: SleeperTransaction, rosterId: number): SideInput => ({
-    teamName: teamName(rosterId),
-    isMe: rosterId === myRoster,
-    received: Object.entries(t.adds ?? {})
-      .filter(([, to]) => to === rosterId)
-      .flatMap(([id]): Acquired[] => {
-        const player = toPlayer(id, players);
-        if (!player) return [];
-        const lines = new Map(
-          weeks
-            .filter((w) => w >= (t.leg ?? 1))
-            .map((w) => {
-              const week = byWeek.get(w)!;
-              const mine = week.matchups.find((m) => m.roster_id === rosterId);
-              const started = mine?.starters?.includes(id) ?? false;
-              return [w, { points: week.points.get(id) ?? 0, onRoster: started || (mine?.players?.includes(id) ?? false), started }];
-            }),
-        );
-        return [{ name: player.name, position: player.position, weeks: lines, restOfSeason: restOfSeason(id, rosterId) }];
-      }),
-    picks: ((t.draft_picks ?? []) as { season: string; round: number; owner_id: number }[]).filter((p) => p.owner_id === rosterId).map((p) => `${p.season} round ${p.round}`),
-    faab: (t.waiver_budget ?? []).filter((b) => b.receiver === rosterId).reduce((n, b) => n + b.amount, 0),
-  });
+  const side = (t: SleeperTransaction, rosterId: number) => {
+    const moves = Object.entries(t.adds ?? {}).flatMap(([id, to]) => {
+      const player = toPlayer(id, players);
+      return player ? [{ id, name: player.name, position: player.position, toTeamId: String(to) }] : [];
+    });
+    return tradeSide({ id: String(rosterId), name: teamName(rosterId), isMe: rosterId === myRoster }, moves, t.leg ?? 1, season, {
+      picks: ((t.draft_picks ?? []) as { season: string; round: number; owner_id: number }[]).filter((p) => p.owner_id === rosterId).map((p) => `${p.season} round ${p.round}`),
+      faab: (t.waiver_budget ?? []).filter((b) => b.receiver === rosterId).reduce((n, b) => n + b.amount, 0),
+    });
+  };
 
   const reports = trades
     .sort((a, b) => b.status_updated - a.status_updated)
     .map((t, i) => {
       const [a, b] = t.roster_ids!;
-      return analyzeTrade(`${t.leg}:${i}`, t.leg ?? 0, [side(t, a!), side(t, b!)], (w, pos) => byWeek.get(w)?.replacement.get(pos) ?? 0, final);
+      return analyzeTrade(`${t.leg}:${i}`, t.leg ?? 0, [side(t, a!), side(t, b!)], final);
     });
   return { leagueKey, supported: true, trades: reports };
 }
