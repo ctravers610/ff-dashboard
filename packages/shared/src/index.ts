@@ -10,6 +10,7 @@ export * from './ffpcWaivers';
 export * from './liveBoard';
 export * from './slots';
 export * from './waiverSchedule';
+export * from './wallOrder';
 export * from './winProbability';
 
 export type Platform ='sleeper' | 'espn' | 'yahoo' | 'ffpc';
