@@ -7,6 +7,7 @@ export * from './ffpc';
 export * from './ffpcFaab';
 export * from './ffpcLive';
 export * from './ffpcWaivers';
+export * from './liveBoard';
 export * from './slots';
 export * from './waiverSchedule';
 export * from './winProbability';

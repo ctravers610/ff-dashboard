@@ -1,12 +1,15 @@
-import type { LiveEvent, LiveEventLeague } from '@ffd/shared';
+import { buildBoard, isBigStat, marginChange, RECENT_MINUTES, rowWhere, type BoardLine, type BoardRow, type LiveEventLeague } from '@ffd/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { api, useDemo, useLive } from '../../api';
 
-// The day heading and the column layout make AM/PM noise.
-const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M$/i, '');
+// A week's feed runs Thursday to Monday, so anything older than today says its day.
+const clock = (iso: string) => {
+  const at = new Date(iso);
+  const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M$/i, '');
+  return at.toDateString() === new Date().toDateString() ? time : `${at.toLocaleDateString([], { weekday: 'short' })} ${time}`;
+};
 const fullTime = (iso: string) => new Date(iso).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
-const day = (iso: string) => new Date(iso).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
 
 const ago = (iso: string | null) => {
   if (!iso) return null;
@@ -14,144 +17,104 @@ const ago = (iso: string | null) => {
   return seconds < 60 ? `${seconds}s ago` : `${Math.round(seconds / 60)} min ago`;
 };
 
-// The same result in several leagues reads as one line.
-interface PointsLine {
-  key: string;
-  names: string;
-  role: LiveEventLeague['role'];
-  points: number | null;
-}
+const pointsText = (points: number) => `${points > 0 ? '+' : points < 0 ? '−' : ''}${Math.abs(points).toFixed(1)}`;
+const tone = (points: number) => (points > 0 ? 'text-emerald-300' : points < 0 ? 'text-rose-300' : 'text-slate-400');
 
-function pointsLines(leagues: LiveEventLeague[]): PointsLine[] {
-  const lines = new Map<string, PointsLine>();
-  for (const l of leagues) {
-    const key = `${l.role}:${l.points}`;
-    const line = lines.get(key);
-    if (line) line.names += `, ${l.leagueName}`;
-    else lines.set(key, { key, names: l.leagueName, role: l.role, points: l.points });
-  }
-  return [...lines.values()];
-}
-
-const pointsText = (points: number | null) => (points == null ? 'pending' : `${points > 0 ? '+' : points < 0 ? '−' : ''}${Math.abs(points).toFixed(1)}`);
-
-// What a play does for you: a starter's points help, an opponent's hurt, and a
-// negative flips either one. The bench and pending points do nothing yet.
-const effect = ({ role, points }: PointsLine) => (role === 'bench' || !points ? 0 : role === 'starter' ? Math.sign(points) : -Math.sign(points));
-const effectColor = (line: PointsLine) => ['text-rose-300', 'text-slate-400', 'text-emerald-300'][effect(line) + 1]!;
-const roleNote = (role: PointsLine['role']) => (role === 'opponent' ? 'vs you' : role === 'bench' ? 'bench' : null);
-
-// Spelled out for tooltips and screen readers, where a quiet row has no room.
-const lineDetail = (line: PointsLine) => {
-  const note = roleNote(line.role);
-  return `${line.names}${note ? ` · ${note}` : ''}${line.points == null ? ': site hasn’t updated yet' : ''}`;
-};
-
-// The stats worth noticing mid-scroll, like the "1 rec TD" in "1 catch, 1 rec TD, 24 rec yds".
-// A negative one is a correction, not a scoring play.
-const BIG_STAT = /\bTDs?\b|\bINTs?\b|fumble|2-pt|safet|FGs? made/;
-const isBigStat = (stat: string) => BIG_STAT.test(stat) && !stat.startsWith('−');
-const QUIET_UNDER = 1; // worth fewer points than this everywhere: one quiet line
-
-type FeedRow = LiveEvent & { calledBack?: boolean };
-
-// A play and the correction that exactly undoes it ("1 pass TD, 6 pass yds", then
-// "−1 pass TD, −6 pass yds") add up to nothing, so they share one line. Negative
-// yards alone don't count: a run for a loss is a real play.
-function collapseCalledBack(newestFirst: LiveEvent[]): FeedRow[] {
-  const undone = new Set<number>();
-  const rows: FeedRow[] = [];
-  newestFirst.forEach((e, i) => {
-    if (undone.has(e.id)) return;
-    const stats = e.description.split(', ');
-    const isCorrection = stats.some((s) => s.startsWith('−') && !/\byds?$/.test(s));
-    const undoes = stats.map((s) => (s.startsWith('−') ? s.slice(1) : `−${s}`)).join(', ');
-    const play = isCorrection ? newestFirst.slice(i + 1).find((o) => !undone.has(o.id) && o.player.name === e.player.name && o.description === undoes) : undefined;
-    if (play) undone.add(play.id);
-    rows.push(play ? { ...e, description: play.description, calledBack: true } : e);
-  });
-  return rows;
-}
-
-export function EventRow({ e }: { e: FeedRow }) {
-  const lines = pointsLines(e.leagues);
-  const bigStat = e.description.split(', ').some(isBigStat);
-  const time = (
-    <time dateTime={e.at} title={fullTime(e.at)} className="pt-0.5 text-xs tabular-nums text-slate-400">
-      {clock(e.at)}
-    </time>
-  );
-
-  if (e.calledBack || (!bigStat && lines.every((l) => Math.abs(l.points ?? 0) < QUIET_UNDER))) {
-    return (
-      <li className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-x-2 py-1.5">
-        {time}
-        <div className="flex min-w-0 items-baseline justify-between gap-3">
-          <p className="min-w-0 text-xs text-slate-400">
-            <span className="text-sm text-slate-300">{e.player.name}</span> {e.calledBack ? <s>{e.description}</s> : e.description}
-          </p>
-          {e.calledBack ? (
-            <span title={lines.map(lineDetail).join('\n')} className="shrink-0 text-xs text-slate-400">
-              called back
-            </span>
-          ) : (
-            <ul aria-label="Points by league" className="flex shrink-0 gap-2 text-xs tabular-nums">
-              {lines.map((l) => (
-                <li key={l.key} title={lineDetail(l)} className={effectColor(l)}>
-                  <span className="sr-only">{lineDetail(l)}: </span>
-                  {pointsText(l.points)}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </li>
-    );
-  }
-
-  // A scoring play you have a stake in is tinted by which way it went.
-  const effects = new Set(lines.map(effect).filter((n) => n !== 0));
-  const tint = !bigStat || effects.size !== 1 ? '' : effects.has(1) ? 'bg-emerald-950/50' : 'bg-rose-950/50';
+function LeagueLines({ lines }: { lines: BoardLine[] }) {
   return (
-    <li className={`-mx-2 grid grid-cols-[2.25rem_minmax(0,1fr)] gap-x-2 rounded-md px-2 py-2.5 ${tint}`}>
-      {time}
-      <div className="min-w-0">
-        <p>
-          <span className="font-medium">{e.player.name}</span>{' '}
-          <span className="text-xs text-slate-400">
-            {e.player.position} · {e.player.nflTeam ?? 'FA'}
-          </span>
-        </p>
-        <p className="text-sm text-slate-300">
-          {e.description.split(', ').map((stat, i) => (
-            <span key={i} className={isBigStat(stat) ? 'font-semibold text-white' : undefined}>
-              {i > 0 && ', '}
-              {stat}
+    <ul aria-label="Points by league" className="mb-2 flex flex-col gap-1 rounded-md bg-slate-800 px-2.5 py-2">
+      {lines.map((l) => {
+        const waiting = l.pending && l.points === 0;
+        return (
+          <li key={l.leagueKey} className="flex items-baseline gap-1 text-xs text-slate-300">
+            <span className="min-w-0">{l.leagueName}</span> {l.role !== 'starter' && <span className="shrink-0">· {l.role === 'opponent' ? 'vs you' : 'bench'}</span>}{' '}
+            <span title={l.pending ? 'Site hasn’t updated yet' : undefined} className={`ml-auto shrink-0 pl-2 tabular-nums ${waiting ? 'text-slate-400' : `font-semibold ${l.role === 'bench' ? 'text-slate-400' : tone(marginChange(l))}`}`}>
+              {waiting ? 'pending' : pointsText(marginChange(l))}
+              {l.pending && !waiting && ' + pending'}
             </span>
-          ))}
-        </p>
-        <ul aria-label="Points by league" className="mt-1 flex flex-col gap-0.5">
-          {lines.map((l) => (
-            <li key={l.key} className="flex items-baseline gap-1 text-xs text-slate-400">
-              <span title={l.names} className="min-w-0 truncate">
-                {l.names}
-              </span>{' '}
-              {roleNote(l.role) && <span className="shrink-0">· {roleNote(l.role)}</span>}{' '}
-              <span title={l.points == null ? 'Site hasn’t updated yet' : undefined} className={`ml-auto shrink-0 pl-2 tabular-nums ${l.points == null ? '' : 'text-sm font-semibold'} ${effectColor(l)}`}>
-                {pointsText(l.points)}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+// A row reads the same anywhere on the board: who, what they did, where it landed,
+// and what it did to your margin. Clicking it lists the leagues.
+function PlayerRow({ row, tint = '' }: { row: BoardRow; tint?: string }) {
+  const [open, setOpen] = useState(false);
+  const net = row.net == null ? (row.benchOnly ? 'bench' : 'pending') : pointsText(row.net);
+  return (
+    <li className={tint}>
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="grid min-h-11 w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 py-2 text-left">
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="font-semibold">
+            {row.player.name}{' '}
+            <span className="text-xs font-normal text-slate-400">
+              {row.player.position} · {row.player.nflTeam ?? 'FA'}
+            </span>
+          </span>
+          <span className="text-sm text-slate-300">
+            {row.stats.split(', ').map((stat, i) => (
+              <span key={i} className={row.kind === 'scoring' && isBigStat(stat) ? 'font-semibold text-white' : undefined}>
+                {i > 0 && ', '}
+                {stat}
               </span>
-            </li>
-          ))}
-        </ul>
-      </div>
+            ))}
+          </span>
+          <span className="text-xs text-slate-400">
+            <time dateTime={row.at} title={fullTime(row.at)} className="tabular-nums">
+              {clock(row.at)}
+            </time>{' '}
+            · {rowWhere(row)}
+          </span>
+        </span>
+        <span className={`tabular-nums ${row.net == null ? 'text-sm text-slate-400' : `text-lg font-bold ${tone(row.net)}`}`}>{net}</span>
+      </button>
+      {open && <LeagueLines lines={row.lines} />}
     </li>
+  );
+}
+
+function CalledBackRow({ row }: { row: BoardRow }) {
+  return (
+    <li className="flex items-baseline justify-between gap-3 py-1.5">
+      <p className="min-w-0 text-xs text-slate-400">
+        <span className="text-sm text-slate-300">{row.player.name}</span> <s>{row.stats}</s>
+      </p>
+      <span className="shrink-0 text-xs text-slate-400">called back</span>
+    </li>
+  );
+}
+
+// A scoring play you have a stake in is tinted by which way it went.
+function scoringTint(row: BoardRow) {
+  const ways = new Set(row.lines.filter((l) => l.role !== 'bench' && l.points !== 0).map((l) => Math.sign(marginChange(l))));
+  if (row.kind !== 'scoring' || ways.size !== 1) return '';
+  return `-mx-2 rounded-md px-2 ${ways.has(1) ? 'bg-emerald-950/50' : 'bg-rose-950/50'}`;
+}
+
+// Plays on your bench change nothing, so those players share a line under the rows that do.
+function Runs({ rows }: { rows: BoardRow[] }) {
+  const bench = rows.filter((r) => r.benchOnly);
+  return (
+    <>
+      <ol className="divide-y divide-slate-800">
+        {rows
+          .filter((r) => !r.benchOnly)
+          .map((r) => (
+            <PlayerRow key={r.key} row={r} />
+          ))}
+      </ol>
+      {bench.length > 0 && <p className="text-xs text-slate-400">On your bench, not counted: {bench.map((r) => `${r.player.name}, ${r.stats}`).join(' · ')}</p>}
+    </>
   );
 }
 
 type Filter = 'all' | 'mine' | string; // a league key
 
-// The live scoring feed, as a column beside the matchups: newest first,
-// filterable, and checked every 30 seconds by the server while games are on.
+// The live scoring feed, as a column beside the matchups: a board of who's doing
+// what, filterable, and checked every 30 seconds by the server while games are on.
 export function LiveFeed() {
   const { data, error, isPending } = useLive();
   const queryClient = useQueryClient();
@@ -170,15 +133,8 @@ export function LiveFeed() {
 
   // A filter also narrows each play to the leagues it asked for.
   const keep = (l: LiveEventLeague) => (filter === 'all' ? true : filter === 'mine' ? l.role === 'starter' : l.leagueKey === filter);
-  const events = collapseCalledBack(data?.events ?? []).map((e) => ({ ...e, leagues: e.leagues.filter(keep) })).filter((e) => e.leagues.length > 0);
-
-  // A week's feed runs Thursday to Monday, so a clock time alone is ambiguous.
-  const days: { day: string; events: FeedRow[] }[] = [];
-  for (const e of events) {
-    const last = days[days.length - 1];
-    if (last?.day === day(e.at)) last.events.push(e);
-    else days.push({ day: day(e.at), events: [e] });
-  }
+  const events = (data?.events ?? []).map((e) => ({ ...e, leagues: e.leagues.filter(keep) })).filter((e) => e.leagues.length > 0);
+  const board = buildBoard(events, Date.now());
 
   return (
     <section aria-labelledby="live-title" className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
@@ -226,35 +182,35 @@ export function LiveFeed() {
             </label>
           )}
 
-          {data.events.length > 0 && (
-            <p className="flex gap-3 text-xs text-slate-400">
-              <span className="flex items-center gap-1">
-                <span aria-hidden="true" className="h-2 w-2 rounded-full bg-emerald-300" /> Helps you
-              </span>
-              <span className="flex items-center gap-1">
-                <span aria-hidden="true" className="h-2 w-2 rounded-full bg-rose-300" /> Hurts you
-              </span>
-              <span className="flex items-center gap-1">
-                <span aria-hidden="true" className="h-2 w-2 rounded-full bg-slate-400" /> No effect
-              </span>
+          {board.recentNet != null && (
+            <p className="flex items-baseline justify-between gap-2 border-b border-slate-800 pb-2.5 text-sm text-slate-300">
+              Last {RECENT_MINUTES} minutes
+              <span className={`text-2xl font-bold tabular-nums ${tone(board.recentNet)}`}>{pointsText(board.recentNet)}</span>
             </p>
           )}
 
           {events.length === 0 ? (
             <p className="py-4 text-center text-sm text-slate-400">{data.events.length === 0 ? 'No scoring yet this week.' : 'Nothing for this filter yet.'}</p>
           ) : (
-            days.map((d) => (
-              <div key={d.day}>
-                <h3 className="sticky top-0 z-10 bg-slate-900 py-1 text-xs font-semibold text-slate-300">{d.day}</h3>
-                <ol className="divide-y divide-slate-800">
-                  {d.events.map((e) => (
-                    <EventRow key={e.id} e={e} />
-                  ))}
-                </ol>
-              </div>
-            ))
+            <>
+              <Runs rows={board.active} />
+              {board.scoring.length > 0 && (
+                <div>
+                  <h3 className="py-1 text-xs font-semibold text-slate-300">Scoring plays</h3>
+                  <ol className="flex flex-col gap-1">
+                    {board.scoring.map((r) => (r.kind === 'calledBack' ? <CalledBackRow key={r.key} row={r} /> : <PlayerRow key={r.key} row={r} tint={scoringTint(r)} />))}
+                  </ol>
+                </div>
+              )}
+              {board.earlier.length > 0 && (
+                <details>
+                  <summary className="cursor-pointer py-1 text-xs font-semibold text-slate-300">Earlier ({board.earlier.length})</summary>
+                  <Runs rows={board.earlier} />
+                </details>
+              )}
+            </>
           )}
-          <p className="text-xs text-slate-400">Scored by each league's own rules. Pending means that league's site hasn't updated yet.</p>
+          <p className="text-xs text-slate-400">Each number is the change in your margin, scored by each league's own rules. Pending means that league's site hasn't updated yet.</p>
         </>
       )}
     </section>
