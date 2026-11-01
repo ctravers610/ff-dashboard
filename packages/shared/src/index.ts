@@ -589,7 +589,7 @@ export interface TradeFinderResponse {
 
 export interface TradesResponse {
   leagueKey: string;
-  supported: boolean; // false where the platform's trades can't be read (ESPN, FFPC)
+  supported: boolean; // false where the platform's trades can't be read (FFPC)
   trades: TradeReport[]; // newest first
 }
 

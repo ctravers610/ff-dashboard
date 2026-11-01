@@ -5,7 +5,7 @@
 // points scored, so a backup who happened to outscore the starter counts for
 // nothing, in hindsight, on either side. Ahead, both lineups are chosen and
 // scored on projections. A flipped game is one that would have gone the other way.
-// Pure functions: the loaders in index.ts and yahoo.ts gather the weeks.
+// Pure functions: the loaders in index.ts, yahoo.ts and espn.ts gather the weeks.
 
 import type { TradeFlip, TradeReport, TradeSide, TradedPlayer } from '@ffd/shared';
 import { bestLineup } from '../recap/lineup.js';

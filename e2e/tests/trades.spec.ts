@@ -1,7 +1,9 @@
-import { ESPN_MY_TEAM } from '@ffd/demo/fixtures/espn';
+import { ESPN_MY_TEAM, ESPN_OPP_TEAM } from '@ffd/demo/fixtures/espn';
+import { FFPC_TEAM } from '@ffd/demo/fixtures/ffpc';
 import { SLEEPER_MY_TEAM } from '@ffd/demo/fixtures/sleeper';
 import { expect, test } from './fixtures.js';
 import { openDashboard, openTab, showLeague } from './helpers.js';
+import { seedFfpcLeague } from './seed.js';
 
 // The fixture trade (fixtures/waivers.ts): week 5, Najee Harris and $10 of FAAB
 // to you for Tee Higgins and a 2027 2nd. Week 5 is the only finished week since.
@@ -26,9 +28,23 @@ test.describe('Trades', () => {
     await expect(trades).toContainText("against the ones it would have had without it");
   });
 
-  test('says when a league’s trades can’t be read', async ({ page }) => {
+  // The ESPN fixture trade (fixtures/espn.ts): week 5, Mike Evans to you for Jaylen Waddle.
+  test('reads an ESPN league’s trades from its activity feed', async ({ page }) => {
     await showLeague(page, ESPN_MY_TEAM);
-    await expect(page.getByRole('region', { name: 'Trades' })).toContainText('Trades can only be read from Sleeper and Yahoo leagues for now.');
+    const trade = page.getByRole('region', { name: 'Trades' }).getByRole('listitem').first();
+    await expect(trade).toContainText('Week 5');
+    await expect(trade).toContainText('Mike Evans WR12.0 pts · started 0 of 1 week');
+    await expect(trade).toContainText('(you)');
+    await expect(trade).toContainText(ESPN_OPP_TEAM);
+    await expect(trade).toContainText('Jaylen Waddle WR9.0 pts · started 1 of 1 week');
+  });
+
+  test('says when a league’s trades can’t be read', async ({ page, request }) => {
+    await seedFfpcLeague(request);
+    await openDashboard(page);
+    await openTab(page, 'History');
+    await showLeague(page, FFPC_TEAM);
+    await expect(page.getByRole('region', { name: 'Trades' })).toContainText('Trades can only be read from Sleeper, Yahoo and ESPN leagues for now.');
   });
 
   test('the trade finder looks for deals in Sleeper and ESPN leagues', async ({ page }) => {

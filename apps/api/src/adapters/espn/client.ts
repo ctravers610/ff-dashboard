@@ -1,7 +1,7 @@
 import { cached, MINUTE } from '../../cache.js';
 import { config } from '../../config.js';
 import type { SourceError } from '@ffd/shared';
-import type { EspnFreeAgents, EspnLeague, EspnTransaction } from './types.js';
+import type { EspnActivity, EspnFreeAgents, EspnLeague, EspnTransaction } from './types.js';
 
 const VIEWS = ['mSettings', 'mTeam', 'mRoster', 'mMatchupScore', 'mScoreboard', 'mStatus'];
 
@@ -28,8 +28,9 @@ async function get<T>(
   auth: EspnAuth | null,
   params: URLSearchParams,
   extraHeaders: Record<string, string> = {},
+  path = '',
 ): Promise<T> {
-  const url = `${config.upstream.espnFantasy}/${season}/segments/0/leagues/${leagueId}?${params}`;
+  const url = `${config.upstream.espnFantasy}/${season}/segments/0/leagues/${leagueId}${path}?${params}`;
   const headers: Record<string, string> = { Accept: 'application/json', ...extraHeaders };
   if (auth) headers.Cookie = `espn_s2=${auth.espnS2}; SWID=${auth.swid}`;
 
@@ -51,6 +52,20 @@ const FREE_AGENT_FILTER = {
     filterStatus: { value: ['FREEAGENT', 'WAIVERS'] },
     limit: 200,
     sortPercOwned: { sortPriority: 1, sortAsc: false },
+  },
+};
+
+export const ESPN_TRADE_MESSAGE = 244;
+
+const TRADE_ACTIVITY_FILTER = {
+  topics: {
+    filterType: { value: ['ACTIVITY_TRANSACTIONS'] },
+    filterIncludeMessageTypeIds: { value: [ESPN_TRADE_MESSAGE] },
+    limit: 200,
+    limitPerMessageSet: { value: 200 },
+    offset: 0,
+    sortMessageDate: { sortPriority: 1, sortAsc: false },
+    sortFor: { sortPriority: 2, sortAsc: false },
   },
 };
 
@@ -79,11 +94,18 @@ export const espnClient = {
       params.set('scoringPeriodId', String(week));
       return get<{ transactions?: EspnTransaction[] }>(leagueId, season, auth, params);
     }),
+  // Every completed trade this season, whoever made it. mTransactions2 has the
+  // players in your own trades only, and this feed doesn't answer for past seasons.
+  tradeActivity: (leagueId: string, season: string, auth: EspnAuth | null) =>
+    cached(`espn:trade-activity:${leagueId}:${season}`, 5 * MINUTE, () =>
+      get<EspnActivity>(leagueId, season, auth, views('kona_league_communication'), { 'X-Fantasy-Filter': JSON.stringify(TRADE_ACTIVITY_FILTER) }, '/communication/'),
+    ),
   // Specific players by id, with stats for the week, e.g. the ones in your claims.
+  // ESPN refuses a limit that comes without a sort.
   players: (leagueId: string, season: string, week: number, ids: number[], auth: EspnAuth | null) => {
     const params = views('kona_player_info');
     params.set('scoringPeriodId', String(week));
-    const filter = { players: { filterIds: { value: ids }, limit: ids.length } };
+    const filter = { players: { filterIds: { value: ids } } };
     return get<EspnFreeAgents>(leagueId, season, auth, params, { 'X-Fantasy-Filter': JSON.stringify(filter) });
   },
   freeAgents: (leagueId: string, season: string, week: number, auth: EspnAuth | null) =>

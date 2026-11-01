@@ -1,7 +1,7 @@
 // What ESPN's unofficial league API would return, using ESPN's numeric ids for
 // positions, teams and lineup slots. Checked against the API's ESPN types.
 
-import type { EspnLeague, EspnRosterEntry } from '../../../../apps/api/src/adapters/espn/types.js';
+import type { EspnActivity, EspnLeague, EspnRosterEntry, EspnStat } from '../../../../apps/api/src/adapters/espn/types.js';
 import { ALL_PLAYERS, PLAYERS as P, SEASON, WEEK, type FxPlayer } from './players.js';
 import { ESPN_FAAB, espnFreeAgents as FREE_AGENTS, espnWaiverStats } from './waivers.js';
 
@@ -21,6 +21,33 @@ const TEAM_ID: Record<string, number> = {
 // ESPN lineup slot ids
 const SLOT = { QB: 0, RB: 2, WR: 4, TE: 6, FLEX: 23, K: 17, DST: 16, BN: 20, IR: 21 } as const;
 
+// One trade, in week 5: you get Mike Evans from Sunday Scaries, who get Jaylen
+// Waddle. Evans scored 12 on your bench that week; Waddle 9 in their lineup.
+const TRADE_WEEK = 5;
+const TRADE_WEEK_POINTS = new Map<FxPlayer, number>([[P.evans, 12], [P.waddle, 9]]);
+const tradeWeekStats = (p: FxPlayer): EspnStat[] => {
+  const points = TRADE_WEEK_POINTS.get(p);
+  if (points == null) return [];
+  return [
+    { seasonId: Number(SEASON), scoringPeriodId: TRADE_WEEK, statSourceId: 0, statSplitTypeId: 1, appliedTotal: points },
+    { seasonId: Number(SEASON), scoringPeriodId: TRADE_WEEK, statSourceId: 1, statSplitTypeId: 1, appliedTotal: 10 },
+  ];
+};
+
+export function tradeActivity(): EspnActivity {
+  return {
+    topics: [
+      {
+        date: Date.parse(`${SEASON}-10-08T17:00:00Z`),
+        messages: [
+          { messageTypeId: 244, from: 2, to: 1, targetId: P.evans.espnId },
+          { messageTypeId: 244, from: 1, to: 2, targetId: P.waddle.espnId },
+        ],
+      },
+    ],
+  };
+}
+
 const entry = (p: FxPlayer, slot: number, actual: number, projected: number): EspnRosterEntry => ({
   playerId: p.espnId,
   lineupSlotId: slot,
@@ -35,6 +62,7 @@ const entry = (p: FxPlayer, slot: number, actual: number, projected: number): Es
         { scoringPeriodId: WEEK, statSourceId: 0, appliedTotal: actual },
         { scoringPeriodId: WEEK, statSourceId: 1, appliedTotal: projected },
         ...espnWaiverStats(p),
+        ...tradeWeekStats(p),
       ],
     },
   },
@@ -156,7 +184,7 @@ const poolPlayer = (p: FxPlayer) => ({
   defaultPositionId: POSITION_ID[p.position],
   proTeamId: TEAM_ID[p.team] ?? 0,
   injuryStatus: p.injury ? 'QUESTIONABLE' : 'ACTIVE',
-  stats: espnWaiverStats(p),
+  stats: [...espnWaiverStats(p), ...tradeWeekStats(p)],
 });
 
 export function freeAgents() {
