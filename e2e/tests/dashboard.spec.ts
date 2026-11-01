@@ -24,10 +24,27 @@ test.describe('Matchups', () => {
   });
 
   test('sums up the week at the top', async ({ page }) => {
-    const hero = page.getByRole('region', { name: 'This week' });
-    await expect(hero).toContainText('2 of 2 winning');
-    await expect(hero).toContainText('Season 6-4'); // 3-2 in Sleeper + 3-2 in ESPN
-    await expect(hero).toContainText('projected 2 of 2');
+    const week = page.getByRole('region', { name: 'This week' });
+    await expect(week).toContainText('2.0 wins expected'); // 99% + 100%
+    await expect(week).toContainText('2 leading right now');
+    await expect(week).toContainText('Season 6-4'); // 3-2 in Sleeper + 3-2 in ESPN
+  });
+
+  test('once every game is over, says how the week went', async ({ page }) => {
+    await page.route('**/api/dashboard', async (route) => {
+      const res = await route.fetch();
+      const body = await res.json();
+      for (const l of body.leagues) {
+        for (const side of [l.matchup?.me, l.matchup?.opponent]) {
+          for (const s of side?.starters ?? []) if (s.game) s.game.state = 'final';
+          if (side) side.projected = side.points;
+        }
+      }
+      await route.fulfill({ response: res, json: body });
+    });
+    await page.reload();
+    await expect(page.getByRole('region', { name: 'This week' })).toContainText('2 of 2 won');
+    await expect(leagueCard(page, ESPN_MY_TEAM)).toContainText('Won');
   });
 
   test('before the week’s first game, sums it up by projection instead', async ({ page }) => {
@@ -42,41 +59,104 @@ test.describe('Matchups', () => {
       await route.fulfill({ response: res, json: body });
     });
     await page.reload();
-    const hero = page.getByRole('region', { name: 'This week' });
-    await expect(hero).toContainText('Projected to win 2 of 2');
-    await expect(hero).toContainText('no games played yet this week');
-    await expect(hero).not.toContainText('winning');
-    // The table shows projected scores, not 0.00 vs 0.00.
+    const week = page.getByRole('region', { name: 'This week' });
+    await expect(week).toContainText('wins expected');
+    await expect(week).toContainText('no games played yet this week');
+    await expect(week).not.toContainText('leading');
+    // The card shows projected scores, not 0.00 vs 0.00.
     const espn = leagueCard(page, ESPN_MY_TEAM);
-    await expect(espn).toContainText(`${pts(ESPN_ME_PROJECTED)}proj.${pts(ESPN_OPP_PROJECTED)}`);
-    await expect(espn).toContainText(`+${(ESPN_ME_PROJECTED - ESPN_OPP_PROJECTED).toFixed(1)}`);
+    await expect(espn).toContainText(pts(ESPN_ME_PROJECTED));
+    await expect(espn).toContainText(pts(ESPN_OPP_PROJECTED));
+    await expect(espn).toContainText('Projected: no one has played yet');
   });
 
-  test('lists every league with scores, margin and chance to win, the most uncertain first', async ({ page }) => {
-    const rows = page.getByRole('region', { name: 'Matchups' }).getByRole('article');
-    await expect(rows).toHaveCount(2);
+  test('has a card for every league with scores, projections and chance to win, in a fixed order', async ({ page }) => {
+    const cards = page.getByRole('region', { name: 'Your teams' }).getByRole('article');
+    await expect(cards).toHaveCount(2);
     // Sleeper's games are all final (decided: 100%); ESPN still has projected
-    // points to come, so its 15.5-point projected lead is 99%, the less certain.
-    await expect(rows.nth(0)).toHaveAccessibleName(ESPN_MY_TEAM);
-    await expect(rows.nth(0)).toContainText('99%');
-    await expect(rows.nth(1)).toContainText('100%');
-    await expect(rows.nth(0)).toContainText(`+${(ESPN_ME_POINTS - ESPN_OPP_POINTS).toFixed(1)}`);
-    await expect(rows.nth(1)).toHaveAccessibleName(SLEEPER_MY_TEAM);
+    // points to come, so its 15.5-point projected lead is 99%.
+    const sleeper = leagueCard(page, SLEEPER_MY_TEAM);
+    const espn = leagueCard(page, ESPN_MY_TEAM);
+    await expect(cards.nth(0)).toHaveAccessibleName(SLEEPER_MY_TEAM);
+    await expect(cards.nth(1)).toHaveAccessibleName(ESPN_MY_TEAM);
+    await expect(sleeper).toContainText('100%');
+    await expect(sleeper).toContainText('Won');
+    await expect(espn).toContainText('99%');
+    await expect(espn).toContainText('Cruising');
+    await expect(espn).toContainText(`proj ${pts(ESPN_ME_PROJECTED)}`);
+    await expect(espn).toContainText(pts(ESPN_ME_POINTS));
+    await expect(espn).toContainText(pts(ESPN_OPP_POINTS));
     // Named by your team, with the league's own name beneath it.
-    await expect(rows.nth(1)).toContainText(`${SLEEPER_MY_TEAM}${SLEEPER_LEAGUE_NAME} · Sleeper`);
-    await expect(rows.nth(1)).toContainText(pts(SLEEPER_ME_POINTS));
-    await expect(rows.nth(1)).toContainText(pts(SLEEPER_OPP_POINTS));
-    await expect(rows.nth(1)).toContainText(`+${(SLEEPER_ME_POINTS - SLEEPER_OPP_POINTS).toFixed(1)}`);
+    await expect(sleeper).toContainText(`${SLEEPER_MY_TEAM}${SLEEPER_LEAGUE_NAME} · Sleeper`);
+    await expect(sleeper).toContainText(pts(SLEEPER_ME_POINTS));
+    await expect(sleeper).toContainText(pts(SLEEPER_OPP_POINTS));
   });
 
-  test('shows PMR for both sides of each matchup', async ({ page }) => {
-    // The default test window is 1280 wide, where the PMR columns appear.
-    const rows = page.getByRole('region', { name: 'Matchups' }).getByRole('article');
-    const espn = rows.filter({ has: page.getByText(ESPN_MY_TEAM, { exact: true }) });
-    const sleeper = rows.filter({ has: page.getByText(SLEEPER_MY_TEAM, { exact: true }) });
-    // Player minutes remaining: Jayden Reed's GB game hasn't started (60); every other game is final.
-    await expect(espn).toContainText('60 player minutes remaining for you0 for your opponent');
-    await expect(sleeper).toContainText('0 player minutes remaining for you0 for your opponent');
+  test('keeps a card in its spot when the odds change', async ({ page }) => {
+    await page.route('**/api/dashboard', async (route) => {
+      const res = await route.fetch();
+      const body = await res.json();
+      // Sleeper's matchup becomes the closer one, which would once have moved it.
+      const m = body.leagues[0].matchup;
+      m.me.projected = 100;
+      m.opponent.projected = 100;
+      await route.fulfill({ response: res, json: body });
+    });
+    await page.reload();
+    await expect(page.getByRole('region', { name: 'Your teams' }).getByRole('article').first()).toHaveAccessibleName(SLEEPER_MY_TEAM);
+  });
+
+  test('says who is left to play on each side', async ({ page }) => {
+    // Jayden Reed's GB game hasn't started; every other game is final.
+    const espn = leagueCard(page, ESPN_MY_TEAM);
+    await expect(espn).toContainText('You');
+    await expect(espn).toContainText('0 live, 1 to come');
+    await expect(espn).toContainText('Them');
+    await expect(espn).toContainText('all done');
+    await expect(leagueCard(page, SLEEPER_MY_TEAM)).not.toContainText('to come');
+  });
+
+  test('shows the latest play that counted in a league on its card', async ({ page }) => {
+    const at = new Date().toISOString();
+    const player = { playerId: '1', name: 'Amon-Ra St. Brown', position: 'WR', nflTeam: 'DET', injuryStatus: null };
+    await page.route('**/api/live', async (route) => {
+      const res = await route.fetch();
+      const body = await res.json();
+      body.events = [{ id: 1, at, week: 6, player, description: '1 catch, 28 rec yds', leagues: [{ leagueKey: `espn:${ESPN_LEAGUE_ID}`, leagueName: ESPN_LEAGUE_NAME, platform: 'espn', role: 'opponent', points: 3.8 }] }];
+      await route.fulfill({ response: res, json: body });
+    });
+    await page.reload();
+    const espn = leagueCard(page, ESPN_MY_TEAM);
+    await expect(espn).toContainText('St. Brown −3.8'); // his points hurt you: he's starting against you
+    await expect(espn).toContainText('1 catch, 28 rec yds');
+    await expect(leagueCard(page, SLEEPER_MY_TEAM)).not.toContainText('St. Brown');
+  });
+
+  test('draws win chance over the week once there’s some to draw', async ({ page }) => {
+    const line = leagueCard(page, ESPN_MY_TEAM).locator('svg');
+    await expect(line).toHaveCount(0); // nothing has been recorded: no game is on
+
+    await page.route('**/api/live/win-chance', (route) =>
+      route.fulfill({
+        json: {
+          week: 6,
+          leagues: {
+            [`espn:${ESPN_LEAGUE_ID}`]: [
+              { at: '2026-11-01T18:00:00Z', chance: 0.4 },
+              { at: '2026-11-01T18:01:00Z', chance: 0.6 },
+            ],
+          },
+        },
+      }),
+    );
+    await page.reload();
+    await expect(line).toHaveCount(1);
+    await expect(leagueCard(page, SLEEPER_MY_TEAM).locator('svg')).toHaveCount(0);
+  });
+
+  test('opening the details shows PMR for both sides', async ({ page }) => {
+    const details = await openLeague(page, ESPN_MY_TEAM);
+    await expect(details).toContainText('PMR 60 · 0');
   });
 
   test('opening the Sleeper league shows team, rank and projections', async ({ page }) => {
@@ -96,11 +176,19 @@ test.describe('Matchups', () => {
     await expect(card).toContainText(`Projected to win by ${pts(ESPN_ME_PROJECTED - ESPN_OPP_PROJECTED)}`);
   });
 
-  test('a row closes again, hiding its details', async ({ page }) => {
-    const card = await openLeague(page, SLEEPER_MY_TEAM);
-    await expect(card.getByRole('button', { name: 'Standings' })).toBeVisible();
-    await card.locator('button[aria-expanded]').click();
-    await expect(card.getByRole('button', { name: 'Standings' })).toHaveCount(0);
+  test('details close with the button or Escape, and opening another league swaps them', async ({ page }) => {
+    const details = await openLeague(page, SLEEPER_MY_TEAM);
+    await expect(details.getByRole('button', { name: 'Standings' })).toBeVisible();
+    await page.getByRole('button', { name: 'Close' }).click();
+    await expect(details).toHaveCount(0);
+    await expect(leagueCard(page, SLEEPER_MY_TEAM).locator('button[aria-expanded]')).toBeFocused();
+
+    await openLeague(page, SLEEPER_MY_TEAM);
+    const espn = await openLeague(page, ESPN_MY_TEAM);
+    await expect(details).toHaveCount(0);
+    await expect(espn).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(espn).toHaveCount(0);
   });
 
   test('opening a league shows lineups side by side, with a projection under each score', async ({ page }) => {
@@ -172,7 +260,7 @@ test.describe('Lineup status', () => {
 
   const lineup = (page: import('@playwright/test').Page, name: string) => leagueCard(page, name).getAttribute('data-lineup');
 
-  test('a questionable starter with a healthy bench swap turns the row yellow, with the fix inside', async ({ page }) => {
+  test('a questionable starter with a healthy bench swap flags the card yellow, with the fix inside', async ({ page }) => {
     expect(await lineup(page, ESPN_MY_TEAM)).toBe('yellow');
     await expect(leagueCard(page, ESPN_MY_TEAM)).toContainText('Jayden Reed questionable');
     const issues = (await openLeague(page, ESPN_MY_TEAM)).getByRole('region', { name: 'Lineup issues' });
@@ -181,7 +269,7 @@ test.describe('Lineup status', () => {
     await expect(issues.getByRole('link', { name: /Fix it on ESPN/ })).toHaveAttribute('href', new RegExp(`leagueId=${ESPN_LEAGUE_ID}&teamId=1`));
   });
 
-  test('a questionable warning can be cleared, which turns the row green, and undone', async ({ page }) => {
+  test('a questionable warning can be cleared, which turns the card green, and undone', async ({ page }) => {
     const issues = (await openLeague(page, ESPN_MY_TEAM)).getByRole('region', { name: 'Lineup issues' });
     await issues.getByRole('button', { name: 'Clear the warning for Jayden Reed' }).click();
     await expect.poll(() => lineup(page, ESPN_MY_TEAM)).toBe('green');
@@ -247,11 +335,21 @@ test.describe('On a phone', () => {
     await expect(nav.getByRole('button', { name: 'Players' })).toHaveAttribute('aria-current', 'page');
   });
 
-  test('every league row still fits, with its score', async ({ page }) => {
+  test('every league card still fits, with its score', async ({ page }) => {
     await openDashboard(page);
-    const row = leagueCard(page, SLEEPER_MY_TEAM);
-    await expect(row).toContainText(pts(SLEEPER_ME_POINTS));
-    const box = await row.boundingBox();
+    const card = leagueCard(page, SLEEPER_MY_TEAM);
+    await expect(card).toContainText(pts(SLEEPER_ME_POINTS));
+    const box = await card.boundingBox();
     expect(box!.x + box!.width).toBeLessThanOrEqual(375);
+  });
+
+  test('a league’s details cover the screen, and close back to the wall', async ({ page }) => {
+    await openDashboard(page);
+    const details = await openLeague(page, SLEEPER_MY_TEAM);
+    const box = await details.boundingBox();
+    expect(box!.x).toBeLessThan(5);
+    expect(box!.width).toBeGreaterThan(360);
+    await page.getByRole('button', { name: 'Close' }).click();
+    await expect(leagueCard(page, ESPN_MY_TEAM)).toBeVisible();
   });
 });

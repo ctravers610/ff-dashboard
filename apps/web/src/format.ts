@@ -1,4 +1,4 @@
-import type { AllPlay, LeagueSummary, Matchup, TeamStanding } from '@ffd/shared';
+import type { AllPlay, LeagueSummary, Matchup, MatchupSide, StarterGame, TeamStanding } from '@ffd/shared';
 
 // Whether you're winning this week, now and by projection. In an all-play week
 // that means being inside the top-N win line; otherwise beating your opponent.
@@ -45,8 +45,50 @@ export function matchupMargin(m: Matchup | null): number | null {
   return m.me.points - m.opponent.points;
 }
 
-// A margin this small could flip on one play, so it's flagged as close.
-export const CLOSE_MARGIN = 10;
+/** How a side's starters stand, or null when the schedule is unknown. A bye counts as done: nothing is to come. */
+export function gamesLeft(side: MatchupSide): { done: number; live: number; pre: number } | null {
+  const games = side.starters.filter((s) => s.player).map((s) => s.game);
+  if (games.length === 0 || games.some((g) => !g)) return null;
+  const count = (states: StarterGame['state'][]) => games.filter((g) => states.includes(g!.state)).length;
+  return { done: count(['final', 'bye']), live: count(['live']), pre: count(['pre']) };
+}
+
+/** Whether every game that matters to this matchup is over, so the result is in. */
+export function matchupOver(m: Matchup | null): boolean {
+  if (!m) return false;
+  const sides = m.opponent ? [m.me, m.opponent] : [m.me];
+  return sides.every((s) => {
+    const left = gamesLeft(s);
+    return left != null && left.live + left.pre === 0;
+  });
+}
+
+export type Tone = 'win' | 'toss' | 'lose' | 'none';
+
+// One color job on the home page: your chance to win, always with a word beside it.
+export function verdict(chance: number | null, over: boolean): { word: string; tone: Tone } {
+  if (chance == null) return { word: 'No matchup', tone: 'none' };
+  if (over) return chance > 0.5 ? { word: 'Won', tone: 'win' } : chance < 0.5 ? { word: 'Lost', tone: 'lose' } : { word: 'Tied', tone: 'toss' };
+  if (chance >= 0.9) return { word: 'Cruising', tone: 'win' };
+  if (chance >= 0.6) return { word: 'Favored', tone: 'win' };
+  if (chance >= 0.4) return { word: 'Toss-up', tone: 'toss' };
+  if (chance >= 0.1) return { word: 'Underdog', tone: 'lose' };
+  return { word: 'Long shot', tone: 'lose' };
+}
+
+/** What to call a player where there's little room: "Freiermuth", "St. Brown", "Thomas" for Brian Thomas Jr., "Bills" for a defense. */
+export function shortName(name: string): string {
+  const parts = name.replace(/\s+(Jr\.?|Sr\.?|II|III|IV)$/, '').split(' ');
+  const last = parts.pop() ?? name;
+  return parts.at(-1) === 'St.' ? `St. ${last}` : last;
+}
+
+/** A time for a live play: "2:35", with the day when it wasn't today (a week's plays run Thursday to Monday). */
+export function clockTime(iso: string): string {
+  const at = new Date(iso);
+  const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M$/i, '');
+  return at.toDateString() === new Date().toDateString() ? time : `${at.toLocaleDateString([], { weekday: 'short' })} ${time}`;
+}
 
 export const signed = (n: number, digits = 1) => `${n >= 0 ? '+' : '−'}${Math.abs(n).toFixed(digits)}`;
 

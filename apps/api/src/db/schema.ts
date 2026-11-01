@@ -9,6 +9,7 @@ import {
   jsonb,
   pgTable,
   primaryKey,
+  real,
   serial,
   text,
   timestamp,
@@ -194,6 +195,19 @@ export const liveEvents = pgTable(
     event: jsonb('event').notNull(), // player, description and per-league points
   },
   (t) => [index('live_events_week').on(t.season, t.week, t.id)],
+);
+
+// Your chance of winning each matchup, about once a minute while games are on.
+export const winChances = pgTable(
+  'win_chances',
+  {
+    season: text('season').notNull(),
+    week: integer('week').notNull(),
+    leagueKey: text('league_key').notNull(), // "sleeper:123"
+    at: timestamp('at', { withTimezone: true }).notNull(),
+    chance: real('chance').notNull(), // 0-1
+  },
+  (t) => [primaryKey({ columns: [t.season, t.week, t.leagueKey, t.at] })],
 );
 
 // One row per notification sent for something that should only be sent once

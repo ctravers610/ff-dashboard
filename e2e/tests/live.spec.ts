@@ -8,10 +8,10 @@ import { expect, test } from './fixtures.js';
 import { openDashboard } from './helpers.js';
 import { seedFfpcLeague } from './seed.js';
 
-// The live feed, beside the matchups on the main page, compares snapshots of
-// the week's stat lines. No fixture game is live, so the automatic 30-second
-// check is idle; these tests look with "Check now" and add plays to the fake
-// stats feed in between.
+// The live feed, opened beside the team cards on the main page, compares
+// snapshots of the week's stat lines. No fixture game is live, so the automatic
+// 30-second check is idle; these tests look with "Check now" and add plays to the
+// fake stats feed in between.
 const upstream = (path: string) => fetch(`http://127.0.0.1:${UPSTREAM_PORT}${path}`, { method: 'POST' });
 const feed = (page: Page) => page.getByRole('region', { name: 'Live scoring' });
 
@@ -27,6 +27,7 @@ test.describe('Live feed', () => {
     await upstream('/_live/reset');
     await seedFfpcLeague(request);
     await openDashboard(page);
+    await page.getByRole('button', { name: 'All plays' }).click();
   });
   test.afterEach(async ({ request }) => {
     await upstream('/_live/reset'); // other tests score the real fixture stats
@@ -97,11 +98,11 @@ test.describe('Live feed', () => {
     await expect(feed(page)).not.toContainText('called back');
   });
 
-  test('sits beside the matchups, and filters to your starters or one league', async ({ page, request }) => {
+  test('opens beside the team cards and stays open, and filters to your starters or one league', async ({ page, request }) => {
     await mayeThrowsATouchdown(request);
     await request.post('/api/live/poll');
-    await page.reload();
-    await expect(page.getByRole('region', { name: 'Matchups' })).toBeVisible(); // same page
+    await page.reload(); // still open: it's remembered
+    await expect(page.getByRole('region', { name: 'Your teams' })).toBeVisible(); // same page
     await expect(feed(page)).toContainText('Drake Maye');
 
     const show = feed(page).getByLabel('Show');
@@ -113,5 +114,14 @@ test.describe('Live feed', () => {
     await show.selectOption({ label: FFPC_TEAM });
     await expect(feed(page)).toContainText('Drake Maye');
     await expect(lines).not.toContainText(ESPN_LEAGUE_NAME);
+  });
+
+  test('closes, and stays closed', async ({ page }) => {
+    await expect(feed(page)).toBeVisible();
+    await page.getByRole('button', { name: 'Close' }).click();
+    await expect(feed(page)).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByRole('region', { name: 'Your teams' })).toBeVisible();
+    await expect(feed(page)).toHaveCount(0);
   });
 });

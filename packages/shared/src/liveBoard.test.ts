@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LiveEvent, LiveEventLeague } from './index';
-import { buildBoard, describeStats, rowWhere } from './liveBoard';
+import { buildBoard, describeStats, latestPlay, rowWhere } from './liveBoard';
 
 const NOW = new Date('2026-11-01T18:00:00Z').getTime();
 const minutesAgo = (m: number) => new Date(NOW - m * 60_000).toISOString();
@@ -20,6 +20,31 @@ const play = (minutes: number, name: string, description: string, ...leagues: Li
   leagues,
 });
 const board = (...oldestFirst: LiveEvent[]) => buildBoard([...oldestFirst].reverse(), NOW);
+
+describe('latestPlay', () => {
+  const latest = (league: string, ...oldestFirst: LiveEvent[]) => latestPlay([...oldestFirst].reverse(), league, NOW);
+
+  it('is the newest play in that league, with what it did to your margin there', () => {
+    const row = latest('A', play(30, 'Gibbs', '20 rush yds', starter('A', 2)), play(2, 'St. Brown', '1 catch, 10 rec yds', opponent('A', 2), starter('B', 2.5)), play(1, 'Allen', '10 pass yds', starter('B', 0.4)));
+    expect(row?.player.name).toBe('St. Brown');
+    expect(row?.net).toBe(-2);
+  });
+
+  it('skips the bench and a play that got called back', () => {
+    const row = latest(
+      'A',
+      play(9, 'Gibbs', '20 rush yds', starter('A', 2)),
+      play(5, 'Love', '1 pass TD', starter('A', 4)),
+      play(4, 'Love', '−1 pass TD', starter('A', -4)),
+      play(1, 'Benchwarmer', '5 rush yds', bench('A', 0.5)),
+    );
+    expect(row?.player.name).toBe('Gibbs');
+  });
+
+  it('is nothing when the league has had no plays', () => {
+    expect(latest('A', play(1, 'Allen', '10 pass yds', starter('B', 0.4)))).toBeNull();
+  });
+});
 
 describe('the live board', () => {
   it('adds a player’s small plays up into one row, in each league', () => {

@@ -1,4 +1,4 @@
-import type { AllSeasonsResponse, ByeWeeksResponse, DashboardResponse, DefenseResponse, TradeFinderResponse, HistoryResponse, OutlookResponse, TradesResponse, RecapResponse, RecapSeasonResponse, LiveFeedResponse, WaiversResponse } from '@ffd/shared';
+import type { AllSeasonsResponse, ByeWeeksResponse, DashboardResponse, DefenseResponse, TradeFinderResponse, HistoryResponse, OutlookResponse, TradesResponse, RecapResponse, RecapSeasonResponse, LiveFeedResponse, WaiversResponse, WinChanceResponse } from '@ffd/shared';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 /** A 401 from the API: the session is missing or expired. The app answers it with the sign-in screen. */
@@ -32,12 +32,13 @@ export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api<Me>('
 export const useDemo = () => useMe().data?.demo === true;
 
 // A custom hook: any component can call useDashboard() to get the data,
-// loading state and error, and it refreshes every 60 seconds on its own.
+// loading state and error, and it refreshes every 30 seconds on its own (the
+// API caches the platforms' scores for a minute, so this just catches them sooner).
 export function useDashboard() {
   return useQuery({
     queryKey: ['dashboard'],
     queryFn: () => api<DashboardResponse>('/api/dashboard'),
-    refetchInterval: 60_000,
+    refetchInterval: 30_000,
   });
 }
 
@@ -123,6 +124,15 @@ export function useLive() {
     queryKey: ['live'],
     queryFn: () => api<LiveFeedResponse>('/api/live'),
     refetchInterval: 15_000,
+  });
+}
+
+// Win chance over the week, recorded about once a minute while games are on.
+export function useWinChance() {
+  return useQuery({
+    queryKey: ['win-chance'],
+    queryFn: () => api<WinChanceResponse>('/api/live/win-chance'),
+    refetchInterval: 60_000,
   });
 }
 

@@ -1,13 +1,25 @@
 import type { Matchup, StarterSlot } from '@ffd/shared';
 import { pts } from '../format';
+import { kickoffLabel } from './players/games';
+
+/** Where his game stands, in as few words as fit beside the name. */
+function gameText(game: StarterSlot['game']): string | null {
+  if (!game) return null;
+  if (game.state === 'live') return game.clock;
+  if (game.state === 'final') return 'Final';
+  if (game.state === 'bye') return 'Bye';
+  return kickoffLabel(game.kickoff);
+}
 
 function PlayerCell({ starter, align }: { starter: StarterSlot | undefined; align: 'left' | 'right' }) {
   const p = starter?.player;
+  const game = gameText(starter?.game);
   return (
     <div className={`min-w-0 ${align === 'right' ? 'text-right' : ''}`}>
       <div className={`truncate ${p ? '' : 'italic text-rose-400'}`}>{p?.name ?? 'Empty'}</div>
       <div className="truncate text-xs text-slate-400">
         {p ? `${p.position} · ${p.nflTeam ?? 'FA'}` : ''}
+        {game && ` · ${game}`}
         {p?.injuryStatus && <span className="ml-1 font-medium text-amber-400">{p.injuryStatus}</span>}
       </div>
     </div>

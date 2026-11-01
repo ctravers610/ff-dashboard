@@ -20,6 +20,7 @@ export interface GameScore {
   started: boolean;
   progress: number; // 0 = not started, 1 = final
   kickoff: string | null; // ISO time the game starts
+  clock?: string | null; // "Q3 6:12" while it's being played
 }
 
 // ESPN and Sleeper disagree on a couple of team codes.
@@ -32,6 +33,14 @@ export function gameProgress(state: 'pre' | 'in' | 'post', period = 0, clockSeco
   if (period > 4) return 0.98;
   const played = (period - 1) * 15 * 60 + (15 * 60 - clockSeconds);
   return Math.min(0.98, Math.max(0, played / 3600));
+}
+
+/** "Q3 6:12" for a game being played; null before and after it. */
+export function gameClock(state: 'pre' | 'in' | 'post', period = 0, clockSeconds = 0): string | null {
+  if (state !== 'in') return null;
+  if (period > 4) return 'OT';
+  const seconds = Math.floor(clockSeconds % 60);
+  return `Q${period} ${Math.floor(clockSeconds / 60)}:${seconds < 10 ? '0' : ''}${seconds}`;
 }
 
 async function fetchGames(season: string, week: number): Promise<Map<string, GameScore>> {
@@ -50,8 +59,9 @@ async function fetchGames(season: string, week: number): Promise<Map<string, Gam
     const code = (abbr: string) => ESPN_TO_SLEEPER[abbr] ?? abbr;
     const started = state !== 'pre';
     const kickoff = event.date ?? null;
-    games.set(code(a.team.abbreviation), { opponent: code(b.team.abbreviation), opponentScore: Number(b.score), started, progress, kickoff });
-    games.set(code(b.team.abbreviation), { opponent: code(a.team.abbreviation), opponentScore: Number(a.score), started, progress, kickoff });
+    const clock = gameClock(state, game.status.period, game.status.clock);
+    games.set(code(a.team.abbreviation), { opponent: code(b.team.abbreviation), opponentScore: Number(b.score), started, progress, kickoff, clock });
+    games.set(code(b.team.abbreviation), { opponent: code(a.team.abbreviation), opponentScore: Number(a.score), started, progress, kickoff, clock });
   }
   return games;
 }

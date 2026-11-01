@@ -24,11 +24,19 @@ export interface Player {
   injuryStatus: InjuryStatus;
 }
 
+// Where a starter's NFL game stands this week.
+export interface StarterGame {
+  state: 'pre' | 'live' | 'final' | 'bye';
+  clock: string | null; // "Q3 6:12" while it's being played
+  kickoff: string | null; // ISO
+}
+
 export interface StarterSlot {
   slot: string; // roster position, e.g. "QB", "FLEX"
   player: Player | null; // null = empty slot
   points: number;
   projected?: number | null; // live projection: actual so far + projection for time remaining
+  game?: StarterGame | null; // null for an empty slot; absent when the schedule is unknown
 }
 
 export interface TeamStanding {
@@ -441,6 +449,17 @@ export interface LiveFeedResponse {
   live: boolean; // games are being played and the feed is watching
   lastCheckedAt: string | null;
   events: LiveEvent[]; // newest first
+}
+
+// Your chance of winning each matchup, recorded about once a minute while games are on.
+export interface WinChancePoint {
+  at: string;
+  chance: number; // 0-1
+}
+
+export interface WinChanceResponse {
+  week: number;
+  leagues: Record<string, WinChancePoint[]>; // by league key ("sleeper:123"), oldest first
 }
 
 // ── Bye weeks ──────────────────────────────────────────────────────────
