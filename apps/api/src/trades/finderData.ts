@@ -2,7 +2,7 @@
 // lineup and a leaguemate's (see finder.ts). Each player is valued at his
 // projected points per week for the rest of the regular season, in the league's
 // own scoring: Sleeper's projections run through the league's settings, or
-// ESPN's own rest-of-season projection. FFPC has no other rosters to look at.
+// ESPN's own weekly projections. FFPC has no other rosters to look at.
 
 import type { TradeFinderResponse } from '@ffd/shared';
 import { espnClient } from '../adapters/espn/client.js';
@@ -72,10 +72,21 @@ async function espnIdeas(leagueKey: string, leagueId: string): Promise<TradeFind
   const league = await espnClient.rostersForWeek(leagueId, state.season, state.week, auth);
   const myTeamId = findMyTeamId(league, auth.swid);
   const lastWeek = league.settings?.scheduleSettings?.matchupPeriodCount ?? 14;
-  const weeksLeft = Math.max(0, lastWeek - (await firstWeekLeft(state.season, state.week)) + 1);
-  if (myTeamId == null || weeksLeft === 0) return { leagueKey, supported: true, weeksLeft, ideas: [] };
+  const from = await firstWeekLeft(state.season, state.week);
+  const weeks = Array.from({ length: Math.max(0, lastWeek - from + 1) }, (_, i) => from + i);
+  if (myTeamId == null || weeks.length === 0) return { leagueKey, supported: true, weeksLeft: weeks.length, ideas: [] };
 
   const season = Number(state.season);
+  // ESPN's rest-of-season row runs past the fantasy regular season, so it can't
+  // be split over these weeks. Asked for a week, the rosters carry its projection
+  // instead; a player on bye or hurt that week projects 0, or has no row.
+  const projections = await Promise.all(
+    weeks.map(async (w) => {
+      const rosters = await espnClient.rostersForWeek(leagueId, state.season, w, auth).catch(() => null);
+      const players = (rosters?.teams ?? []).flatMap((t) => t.roster?.entries ?? []).flatMap((e) => e.playerPoolEntry?.player ?? []);
+      return new Map(players.map((p) => [p.id, projection(p, season, w).week ?? 0]));
+    }),
+  );
   const teams = (league.teams ?? []).map((t): Team & { mine: boolean } => ({
     teamName: espnTeamName(t),
     mine: t.id === myTeamId,
@@ -83,8 +94,7 @@ async function espnIdeas(leagueKey: string, leagueId: string): Promise<TradeFind
       .filter((e) => e.playerPoolEntry?.player && e.lineupSlotId !== IR_SLOT)
       .map((e) => {
         const p = e.playerPoolEntry!.player;
-        // ESPN's season projection covers the games still to play.
-        return { player: toEspnPlayer(p), perWeek: (projection(p, season, state.week).restOfSeason ?? 0) / weeksLeft };
+        return { player: toEspnPlayer(p), perWeek: projections.reduce((n, week) => n + (week.get(p.id) ?? 0), 0) / weeks.length };
       }),
   }));
   const counts = league.settings?.rosterSettings?.lineupSlotCounts ?? {};
@@ -92,7 +102,7 @@ async function espnIdeas(leagueKey: string, leagueId: string): Promise<TradeFind
     Array<string>(counts[id] ?? 0).fill(SLOT_NAMES[id] ?? String(id)),
   );
   const me = teams.find((t) => t.mine)!;
-  return { leagueKey, supported: true, weeksLeft, ideas: findTrades(slots, me, teams.filter((t) => !t.mine)) };
+  return { leagueKey, supported: true, weeksLeft: weeks.length, ideas: findTrades(slots, me, teams.filter((t) => !t.mine)) };
 }
 
 export async function getTradeIdeas(leagueKey: string): Promise<TradeFinderResponse> {
