@@ -20,11 +20,11 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
  * player left who can play there. With nested slot rules like these, that
  * greedy order finds the true best lineup.
  */
-export function bestLineup(slots: string[], players: RosteredPlayer[]): { slot: string; pick: RosteredPlayer | null }[] {
+export function bestLineup<T extends { player: { position: string }; points: number }>(slots: string[], players: T[]): { slot: string; pick: T | null }[] {
   const breadth = (slot: string) => POSITIONS.filter((p) => canPlay(slot, p)).length;
   const order = slots.map((slot, i) => ({ slot, i })).sort((a, b) => breadth(a.slot) - breadth(b.slot) || a.i - b.i);
-  const used = new Set<RosteredPlayer>();
-  const picks = new Array<{ slot: string; pick: RosteredPlayer | null }>(slots.length);
+  const used = new Set<T>();
+  const picks = new Array<{ slot: string; pick: T | null }>(slots.length);
   for (const { slot, i } of order) {
     const pick = players.filter((p) => !used.has(p) && canPlay(slot, p.player.position)).sort((a, b) => b.points - a.points)[0] ?? null;
     if (pick) used.add(pick);

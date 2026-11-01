@@ -45,7 +45,7 @@ describe('seasonAwards', () => {
     expect(by('Heartbreaker')).toMatchObject({ teamName: 'Team B', detail: 'lost to Team D by 1.0 in week 2' });
     expect(by('Benchwarmer')).toMatchObject({ teamName: 'Team D', detail: '40.5 points left on the bench' });
     expect(by('Best pickup')).toMatchObject({ teamName: 'Team B', detail: 'Waiver Hero: 55.0 started points since the claim' });
-    expect(by('Worst trade')).toMatchObject({ teamName: 'Team D', detail: 'down 91 points over replacement to Team A (about 1.0 win)' });
+    expect(by('Worst trade')).toMatchObject({ teamName: 'Team D', detail: 'down 91 lineup points to Team A (1.0 win swung)' });
   });
 
   it('waits for two finished weeks', () => {

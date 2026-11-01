@@ -110,7 +110,7 @@ export function seasonAwards(teams: Named[], games: PlayedGame[], luck: LuckRow[
   if (extras.bestPickup) out.push(award('Best pickup', extras.bestPickup.teamId, `${extras.bestPickup.player}: ${extras.bestPickup.points.toFixed(1)} started points since the claim`));
   if (extras.worstTrade) {
     const t = extras.worstTrade;
-    out.push(byName('Worst trade', t.loser, `down ${t.margin.toFixed(0)} points over replacement to ${t.winner} (about ${wins(t.wins)})`));
+    out.push(byName('Worst trade', t.loser, `down ${t.margin.toFixed(0)} lineup points to ${t.winner}${t.wins > 0 ? ` (${wins(t.wins)} swung)` : ''}`));
   }
   return out;
 }

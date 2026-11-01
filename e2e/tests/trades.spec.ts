@@ -22,11 +22,13 @@ test.describe('Trades', () => {
     await expect(trade).toContainText('2027 round 2');
     await expect(trade).toContainText('(you)');
     await expect(trade).toContainText('Even so far.');
+    await expect(trade).toContainText('lineup points projected rest of season');
+    await expect(trades).toContainText("against the ones it would have had without it");
   });
 
   test('says when a league’s trades can’t be read', async ({ page }) => {
     await showLeague(page, ESPN_MY_TEAM);
-    await expect(page.getByRole('region', { name: 'Trades' })).toContainText('Trades can only be read from Sleeper leagues for now.');
+    await expect(page.getByRole('region', { name: 'Trades' })).toContainText('Trades can only be read from Sleeper and Yahoo leagues for now.');
   });
 
   test('the trade finder looks for deals in Sleeper and ESPN leagues', async ({ page }) => {

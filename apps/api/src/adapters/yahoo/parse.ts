@@ -168,7 +168,7 @@ export function parseMatchup(json: Json, myTeamKey: string): YahooMatchup | null
 // Yahoo's status codes for NFL players.
 const INJURY: Record<string, InjuryStatus> = { Q: 'Questionable', D: 'Doubtful', O: 'Out', IR: 'IR', 'IR-R': 'IR', 'PUP-P': 'PUP', 'PUP-R': 'PUP', SUSP: 'Suspended', NFI: 'Out', 'NFI-R': 'Out', NA: 'Out' };
 const TEAM: Record<string, string> = { WSH: 'WAS' };
-const NOT_STARTING = new Set(['BN', 'IR']);
+export const NOT_STARTING = new Set(['BN', 'IR']);
 
 export interface YahooRosterSpot {
   player: Player;
@@ -252,7 +252,7 @@ export interface YahooAdd {
   teamKey: string; // the team that added him
 }
 
-/** Every player added, with when and how (league/{key}/transactions;types=add). Drops and trades are left out. */
+/** Every player added, with when and how (league/{key}/transactions;types=add). Drops are left out, and trades are parseTrades'. */
 export function parseAdds(json: Json): YahooAdd[] {
   return items(leagueResource(json).transactions, 'transaction').flatMap((t): YahooAdd[] => {
     const p = flat(t);
@@ -268,6 +268,25 @@ export function parseAdds(json: Json): YahooAdd[] {
         teamKey: str(data.destination_team_key),
       }];
     });
+  });
+}
+
+export interface YahooTrade {
+  at: Date; // when it went through
+  teams: [{ key: string; name: string }, { key: string; name: string }];
+  moves: { player: Player; toTeamKey: string }[];
+}
+
+/** Every completed trade, with who got which players (league/{key}/transactions;types=trade). Draft picks aren't read: no trade we've seen has any, so their shape is unknown. */
+export function parseTrades(json: Json): YahooTrade[] {
+  return items(leagueResource(json).transactions, 'transaction').flatMap((t): YahooTrade[] => {
+    const p = flat(t);
+    if (str(p.type) !== 'trade' || str(p.status) !== 'successful') return [];
+    return [{
+      at: new Date(num(p.timestamp) * 1000),
+      teams: [{ key: str(p.trader_team_key), name: str(p.trader_team_name) }, { key: str(p.tradee_team_key), name: str(p.tradee_team_name) }],
+      moves: items(p.players, 'player').map((raw) => ({ player: playerSpot(raw).player, toTeamKey: str(flat(flat(raw).transaction_data).destination_team_key) })),
+    }];
   });
 }
 
