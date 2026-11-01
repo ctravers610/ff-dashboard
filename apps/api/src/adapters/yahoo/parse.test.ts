@@ -1,6 +1,6 @@
 import * as fx from '@ffd/demo/fixtures/yahoo';
 import { describe, expect, it } from 'vitest';
-import { flat, items, parseAdds, parseGameWeeks, parseLeagues, weekOn, parseMatchup, parseMyTeams, parseRoster, parseStandings, startersOf, toYahooSummary } from './parse.js';
+import { flat, items, parseAdds, parseGameWeeks, parseLeagues, weekOn, parseMatchup, parseMyTeams, parseRoster, parseStandings, parseTrades, startersOf, toYahooSummary } from './parse.js';
 
 // Made-up responses only (packages/demo/src/fixtures/yahoo.ts).
 describe('Yahoo JSON helpers', () => {
@@ -95,6 +95,45 @@ describe('Yahoo transactions', () => {
       { at: new Date(1793261400 * 1000), fromWaivers: true, bid: 13, player: expect.objectContaining({ name: 'Claimed Receiver', nflTeam: 'BUF' }), teamKey: '461.l.777001.t.4' },
       { at: new Date(1793290000 * 1000), fromWaivers: false, bid: null, player: expect.objectContaining({ name: 'Picked Up' }), teamKey: '461.l.777001.t.9' },
     ]);
+  });
+});
+
+describe('Yahoo trades', () => {
+  // A made-up trade in Yahoo's shape: two players one way, one the other.
+  const moved = (id: string, name: string, position: string, to: string) => [[{ player_key: `461.p.${id}` }, { player_id: id }, { name: { full: name } }, { editorial_team_abbr: 'Car' }, { display_position: position }], { transaction_data: [{ type: 'trade', source_type: 'team', destination_type: 'team', destination_team_key: to }] }];
+  const players = (list: unknown[]) => ({ ...Object.fromEntries(list.map((pl, i) => [String(i), { player: pl }])), count: list.length });
+  const trade = (status: string, list: unknown[]) => [{ type: 'trade', status, timestamp: '1793261400', trader_team_key: '461.l.777001.t.1', trader_team_name: 'One', tradee_team_key: '461.l.777001.t.2', tradee_team_name: 'Two' }, { players: players(list) }];
+  const json = {
+    fantasy_content: {
+      league: [
+        { league_key: fx.YAHOO_LEAGUE_KEY },
+        {
+          transactions: {
+            '0': { transaction: trade('successful', [moved('1', 'Going Over', 'QB', '461.l.777001.t.2'), moved('2', 'Also Going', 'RB,WR', '461.l.777001.t.2'), moved('3', 'Coming Back', 'WR', '461.l.777001.t.1')]) },
+            '1': { transaction: trade('failed', []) },
+            '2': { transaction: [{ type: 'add/drop', status: 'successful', timestamp: '1793261400' }, { players: {} }] },
+            count: 3,
+          },
+        },
+      ],
+    },
+  };
+
+  it('lists completed trades with both teams and who got whom', () => {
+    expect(parseTrades(json)).toEqual([{
+      at: new Date(1793261400 * 1000),
+      teams: [{ key: '461.l.777001.t.1', name: 'One' }, { key: '461.l.777001.t.2', name: 'Two' }],
+      moves: [
+        { player: expect.objectContaining({ playerId: 'yahoo:1', name: 'Going Over', position: 'QB' }), toTeamKey: '461.l.777001.t.2' },
+        { player: expect.objectContaining({ playerId: 'yahoo:2', name: 'Also Going', position: 'RB' }), toTeamKey: '461.l.777001.t.2' },
+        { player: expect.objectContaining({ playerId: 'yahoo:3', name: 'Coming Back', position: 'WR' }), toTeamKey: '461.l.777001.t.1' },
+      ],
+    }]);
+  });
+
+  it('copes with a league that has no trades', () => {
+    expect(parseTrades({ fantasy_content: { league: [{}, { transactions: { count: 0 } }] } })).toEqual([]);
+    expect(parseTrades({})).toEqual([]);
   });
 });
 

@@ -1,21 +1,18 @@
 // GET /api/trades?league=sleeper:123: every completed trade in a league this
-// season, scored (see analyze.ts). Sleeper only for now: its transactions say
-// exactly who got what. ESPN's feed shows accepted trades without the players
-// in them, and FFPC has no feed at all.
+// season, scored (see analyze.ts). Sleeper and Yahoo (yahoo.ts): their
+// transactions say exactly who got what. ESPN's feed shows accepted trades
+// without the players in them, and FFPC has no feed at all.
 
 import type { TradesResponse } from '@ffd/shared';
 import { sleeperClient } from '../adapters/sleeper/client.js';
 import { NON_STARTER_SLOTS, toPlayer } from '../adapters/sleeper/mapper.js';
 import type { SleeperLeague, SleeperTransaction } from '../adapters/sleeper/types.js';
-import { cached, HOUR } from '../cache.js';
-import { nflGames } from '../scoring/games.js';
-import { fetchStats } from '../scoring/live.js';
+import { HOUR } from '../cache.js';
 import { scoreWithSettings, weeklyProjections } from '../scoring/projection.js';
 import { activeSources } from '../sources/store.js';
 import { analyzeTrade, replacementLevel, type Acquired, type SideInput } from './analyze.js';
-
-// A finished week's stats don't change.
-const pastStats = (season: string, week: number) => cached(`trades:stats:${season}:${week}`, 6 * HOUR, () => fetchStats(season, week));
+import { lastFinishedWeek, pastStats } from './weeks.js';
+import { yahooTrades } from './yahoo.js';
 
 export async function findSleeperLeague(leagueId: string, season: string): Promise<{ league: SleeperLeague; myUserId: string } | null> {
   for (const username of (await activeSources()).sleeperUsernames) {
@@ -29,6 +26,7 @@ export async function findSleeperLeague(leagueId: string, season: string): Promi
 
 export async function getTrades(leagueKey: string): Promise<TradesResponse> {
   const [platform, leagueId] = leagueKey.split(':');
+  if (platform === 'yahoo' && leagueId) return yahooTrades(leagueId);
   if (platform !== 'sleeper' || !leagueId) return { leagueKey, supported: false, trades: [] };
 
   const state = await sleeperClient.state();
@@ -37,10 +35,7 @@ export async function getTrades(leagueKey: string): Promise<TradesResponse> {
   const { league, myUserId } = found;
 
   const lastWeek = (league.settings?.playoff_week_start ?? 15) - 1;
-  // The latest week whose games are all over.
-  const games = await nflGames(state.season, state.week).catch(() => null);
-  const currentDone = games != null && games.size > 0 && [...games.values()].every((g) => g.progress >= 1);
-  const lastDone = Math.min(lastWeek, currentDone ? state.week : state.week - 1);
+  const lastDone = await lastFinishedWeek(state.season, state.week, lastWeek);
   const final = state.week > lastWeek;
 
   const weeksSoFar = Array.from({ length: Math.min(state.week, lastWeek) }, (_, i) => i + 1);

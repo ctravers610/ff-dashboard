@@ -63,7 +63,7 @@ export function TradesPanel({ leagueKey }: { leagueKey: string }) {
   let body;
   if (isPending) body = <p className="text-sm text-slate-400">Loading trades…</p>;
   else if (error) body = <p role="alert" className="text-sm text-rose-300">Couldn't load trades: {error.message}</p>;
-  else if (!data.supported) body = <p className="text-sm text-slate-400">Trades can only be read from Sleeper leagues for now.</p>;
+  else if (!data.supported) body = <p className="text-sm text-slate-400">Trades can only be read from Sleeper and Yahoo leagues for now.</p>;
   else if (data.trades.length === 0) body = <p className="text-sm text-slate-400">No trades in this league yet.</p>;
   else
     body = (

@@ -212,7 +212,7 @@ Create an app at [developer.yahoo.com/apps](https://developer.yahoo.com/apps/cre
 
 This cookie is a login to your whole Yahoo account, far more than the read-only Fantasy access **Connect Yahoo** grants, and reading the site this way is unofficial, so it could stop working if Yahoo changes the page. Keep it in `.env` and your host's secret settings only. The app sends it only to `football.fantasysports.yahoo.com`, only to read that page, at most once every 30 minutes per league. It expires when Yahoo ends the session, and signing out of Yahoo ends it too; Waivers says so when that happens, and the rest of Yahoo keeps working.
 
-Yahoo has no projections, so Waivers uses Sleeper's, matched to Yahoo's players by position and name and scored with each Yahoo league's own scoring (yardage bonuses aren't counted). Trades and the trade finder are Sleeper-only (the finder also covers ESPN), and History's **All seasons** panel is Sleeper-only.
+Yahoo has no projections, so Waivers and Trades use Sleeper's, matched to Yahoo's players by position and name and scored with each Yahoo league's own scoring (yardage bonuses aren't counted). Trades also uses Sleeper's stats, scored the same way, for each week's replacement level, and it shows the players in a Yahoo trade but not any draft picks. Trades covers Sleeper and Yahoo, the trade finder Sleeper and ESPN, and History's **All seasons** panel is Sleeper-only.
 
 ## Analytics
 
