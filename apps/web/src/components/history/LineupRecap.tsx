@@ -72,7 +72,7 @@ function RecapBody({ r }: { r: Recap }) {
  * `week` null means the latest finished week.
  */
 export function RecapPanel({ leagueKey, week, onWeek }: { leagueKey: string; week: number | null; onWeek: (w: number) => void }) {
-  const { data, error, isPending } = useRecap(week);
+  const { data, error, isPending, isPlaceholderData } = useRecap(week);
 
   let body;
   if (isPending) body = <p className="text-sm text-slate-400">Loading…</p>;
@@ -96,7 +96,7 @@ export function RecapPanel({ leagueKey, week, onWeek }: { leagueKey: string; wee
         {data && data.weeks.length > 0 && (
           <label className="flex items-center gap-2 text-sm text-slate-300">
             Week
-            <select value={data.week} onChange={(e) => onWeek(Number(e.target.value))} className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100">
+            <select value={week ?? data.week} onChange={(e) => onWeek(Number(e.target.value))} className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100">
               {data.weeks.map((w) => (
                 <option key={w} value={w}>
                   {w}
@@ -106,7 +106,10 @@ export function RecapPanel({ leagueKey, week, onWeek }: { leagueKey: string; wee
           </label>
         )}
       </header>
-      {body}
+      {/* While the picked week loads, the last one stays up, dimmed: no spinner, no layout jump. */}
+      <div aria-busy={isPlaceholderData} className={`transition-opacity ${isPlaceholderData ? 'opacity-50' : ''}`}>
+        {body}
+      </div>
       <p className="text-xs text-slate-400">
         "Best" is the highest-scoring legal lineup from your roster that week. Available players may not have been easy to get: someone could have outbid
         you, or they were on waivers.

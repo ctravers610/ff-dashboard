@@ -1,5 +1,5 @@
 import type { AllSeasonsResponse, ByeWeeksResponse, DashboardResponse, DefenseResponse, TradeFinderResponse, HistoryResponse, OutlookResponse, TradesResponse, RecapResponse, RecapSeasonResponse, LiveFeedResponse, WaiversResponse } from '@ffd/shared';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 /** A 401 from the API: the session is missing or expired. The app answers it with the sign-in screen. */
 export class UnauthorizedError extends Error {
@@ -80,8 +80,14 @@ export function useByeWeeks() {
 }
 
 // One finished week's lineup recap for every league; null asks for the latest.
+// The week on screen stays up while the next one loads, and weeks already seen come straight back.
 export const useRecap = (week: number | null) =>
-  useQuery({ queryKey: ['recap', week], queryFn: () => api<RecapResponse>(`/api/recap${week ? `?week=${week}` : ''}`) });
+  useQuery({
+    queryKey: ['recap', week],
+    queryFn: () => api<RecapResponse>(`/api/recap${week ? `?week=${week}` : ''}`),
+    staleTime: 10 * 60_000,
+    placeholderData: keepPreviousData,
+  });
 
 // The season so far, per league: losses a better lineup would have won.
 export const useRecapSeason = () =>
