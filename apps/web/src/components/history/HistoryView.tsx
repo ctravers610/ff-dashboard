@@ -94,7 +94,7 @@ export function HistoryView({ leagues }: { leagues?: LeagueSummary[] }) {
             onMode={setMode}
             season={season?.leagues.find((l) => keyOf(l) === keyOf(league)) ?? null}
             outlook={oddsFor(league)}
-            recap={recap ? { week: recap.week, weeks: recap.weeks } : null}
+            recap={recap ? { week: week ?? recap.week, weeks: recap.weeks } : null}
             onPickWeek={setWeek}
           />
           {league.platform === 'ffpc' && <FfpcWeekPaste key={league.leagueId} leagueId={league.leagueId} />}

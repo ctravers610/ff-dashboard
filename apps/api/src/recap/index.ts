@@ -29,6 +29,11 @@ const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e)
 // A finished week's stats don't change, so they can be kept for hours.
 const pastStats = (season: string, week: number) => cached(`recap:stats:${season}:${week}`, 6 * HOUR, () => fetchStats(season, week));
 
+// A finished week's recap barely changes, and building one takes a stack of calls
+// to the platforms, so each is kept a while. Picking a week and the season view
+// share them, and a league that fails isn't kept, so it's tried again next time.
+const RECAP_TTL = 30 * MINUTE;
+
 function outcome(points: number, opponent: number | null): LineupRecap['result'] {
   if (opponent == null) return null;
   return points > opponent ? 'win' : points < opponent ? 'loss' : 'tie';
@@ -55,6 +60,10 @@ function recap(base: Pick<LineupRecap, 'platform' | 'leagueId' | 'leagueName' | 
 
 async function sleeperRecaps(season: string, week: number): Promise<LineupRecap[]> {
   const { sleeperUsernames } = await activeSources();
+  return cached(`recap:sleeper:${season}:${week}:${sleeperUsernames.join()}`, RECAP_TTL, () => loadSleeperRecaps(sleeperUsernames, season, week));
+}
+
+async function loadSleeperRecaps(sleeperUsernames: string[], season: string, week: number): Promise<LineupRecap[]> {
   // Without that week's stats there's just no waiver comparison; the rest still works.
   const [players, stats] = await Promise.all([sleeperClient.players(), pastStats(season, week).catch(() => null)]);
   const out: LineupRecap[] = [];
@@ -119,7 +128,7 @@ async function espnRecaps(season: string, week: number, auth: EspnAuth | null, e
   // One league failing (expired access, a deleted league) mustn't hide the others.
   for (const leagueId of espnLeagueIds) {
     try {
-      const r = await espnRecap(leagueId, season, week, auth);
+      const r = await cached(`recap:espn:${leagueId}:${season}:${week}`, RECAP_TTL, () => espnRecap(leagueId, season, week, auth));
       if (r) out.push(r);
     } catch (e) {
       errors.push(espnSourceError(leagueId, e));
@@ -175,32 +184,34 @@ async function yahooRecaps(week: number, errors: SourceError[]): Promise<LineupR
   const out: LineupRecap[] = [];
   for (const { team, league } of await myYahooTeams()) {
     try {
-      const positions = [...startablePositions(league.slots)];
-      const [roster, matchup, ...available] = await Promise.all([
-        yahooGet(`team/${team.teamKey}/roster;week=${week}/players/stats;type=week;week=${week}`),
-        yahooGet(`team/${team.teamKey}/matchups;weeks=${week}`),
-        ...positions.map((pos) =>
-          yahooGet(`league/${league.leagueKey}/players;status=A;position=${pos};sort=PTS;sort_type=week;sort_week=${week};count=10/stats;type=week;week=${week}`),
-        ),
-      ]);
-      const rostered: RosteredPlayer[] = parseRoster(roster)
-        .filter((r) => r.slot !== 'IR')
-        .map((r) => ({ player: r.player, points: r.points, startedAt: r.slot === 'BN' ? null : r.slot }));
-      const freeAgents: RosteredPlayer[] = available
-        .flatMap(parseLeaguePlayers)
-        .filter((fa) => fa.points > 0)
-        .map((fa) => ({ player: fa.player, points: fa.points, startedAt: null }));
-      const game = parseMatchup(matchup, team.teamKey);
       out.push(
-        recap(
-          { platform: 'yahoo', leagueId: league.leagueKey, leagueName: league.name, week },
-          league.slots,
-          rostered,
-          game?.me.points ?? null,
-          game?.opponent?.points ?? null,
-          missedPickups(league.slots, rostered, freeAgents),
-          "Based on Yahoo's current free agents; anyone picked up since isn't counted.",
-        ),
+        await cached(`recap:yahoo:${team.teamKey}:${week}`, RECAP_TTL, async () => {
+          const positions = [...startablePositions(league.slots)];
+          const [roster, matchup, ...available] = await Promise.all([
+            yahooGet(`team/${team.teamKey}/roster;week=${week}/players/stats;type=week;week=${week}`),
+            yahooGet(`team/${team.teamKey}/matchups;weeks=${week}`),
+            ...positions.map((pos) =>
+              yahooGet(`league/${league.leagueKey}/players;status=A;position=${pos};sort=PTS;sort_type=week;sort_week=${week};count=10/stats;type=week;week=${week}`),
+            ),
+          ]);
+          const rostered: RosteredPlayer[] = parseRoster(roster)
+            .filter((r) => r.slot !== 'IR')
+            .map((r) => ({ player: r.player, points: r.points, startedAt: r.slot === 'BN' ? null : r.slot }));
+          const freeAgents: RosteredPlayer[] = available
+            .flatMap(parseLeaguePlayers)
+            .filter((fa) => fa.points > 0)
+            .map((fa) => ({ player: fa.player, points: fa.points, startedAt: null }));
+          const game = parseMatchup(matchup, team.teamKey);
+          return recap(
+            { platform: 'yahoo', leagueId: league.leagueKey, leagueName: league.name, week },
+            league.slots,
+            rostered,
+            game?.me.points ?? null,
+            game?.opponent?.points ?? null,
+            missedPickups(league.slots, rostered, freeAgents),
+            "Based on Yahoo's current free agents; anyone picked up since isn't counted.",
+          );
+        }),
       );
     } catch (e) {
       errors.push({ source: `yahoo:${league.leagueKey}`, message: errorMessage(e) });
@@ -210,6 +221,7 @@ async function yahooRecaps(week: number, errors: SourceError[]): Promise<LineupR
 }
 
 // FFPC: only the week whose Live Scoring page was pasted, scored with FFPC's rules.
+// Not kept like the others: it's built from what's saved here, and a new paste should show at once.
 async function ffpcRecaps(season: string, week: number): Promise<LineupRecap[]> {
   const leagues = (await manualLeagueRepo.list()).filter((l) => l.matchup?.week === week);
   if (leagues.length === 0) return [];
@@ -265,10 +277,6 @@ export async function getRecap(requested?: number): Promise<RecapResponse> {
   return { season: state.season, week, weeks, leagues: results.flat(), errors };
 }
 
-// A finished week's recap barely changes (an FFPC paste is the exception), so
-// the season view reuses each week's for a while instead of rebuilding them all.
-const weekRecap = (season: string, week: number) => cached(`recap:week:${season}:${week}`, 30 * MINUTE, () => getRecap(week));
-
 /** Every finished week's recap, boiled down per league. Weeks load one at a time to go easy on the platforms. */
 export async function getRecapSeason(): Promise<RecapSeasonResponse> {
   const state = await sleeperClient.state();
@@ -276,7 +284,7 @@ export async function getRecapSeason(): Promise<RecapSeasonResponse> {
   const byLeague = new Map<string, RecapSeasonLeague>();
   const errors = new Map<string, SourceError>();
   for (const week of [...weeks].reverse()) {
-    const r = await weekRecap(state.season, week);
+    const r = await getRecap(week);
     for (const e of r.errors) errors.set(e.source, e);
     for (const l of r.leagues) {
       const key = `${l.platform}:${l.leagueId}`;
