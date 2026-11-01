@@ -5,17 +5,19 @@
 // with FFPC's rules like FFPC live scoring, and injury tags are Sleeper's too.
 // FFPC's own numbers only fill in for players Sleeper doesn't know.
 
-import { FFPC_STANDARD_RUNS, parseFfpcBidSchedule, parseFfpcWaivers, type FfpcWaiverPlayer, type InjuryStatus, type ManualLeague, type Player, type SourceError, type WaiverLeague, type WaiverPlayer } from '@ffd/shared';
+import { FFPC_FAAB_BUDGET, FFPC_STANDARD_RUNS, parseFfpcBidSchedule, parseFfpcWaivers, type FfpcWaiverPlayer, type InjuryStatus, type ManualLeague, type Player, type SourceError, type WaiverPlayer } from '@ffd/shared';
 import { buildPlayerIndex, parseRosterText, resolvePlayer, statusForSlot, type PlayerIndex } from '../adapters/manual/parse.js';
 import { manualLeagueRepo } from '../adapters/manual/store.js';
 import { sleeperClient } from '../adapters/sleeper/client.js';
 import { HOUR } from '../cache.js';
+import type { ManualFaabClaimRow } from '../db/schema.js';
 import { normalizeName } from '../exposure.js';
 import { weeklyProjections } from '../scoring/projection.js';
 import { FFPC_RULES } from '../scoring/rules.js';
 import { scoreStats } from '../scoring/score.js';
-import { waiverPlayer, type WaiverContext } from './context.js';
+import { waiverPlayer, type WaiverContext, type WaiverLeagueWithBids, type WinningBid } from './context.js';
 import { pickAvailable, startablePositions, suggestMoves } from './moves.js';
+import { summarizeBids } from './schedule.js';
 
 type Projections = Map<string, Record<string, number>>;
 
@@ -29,16 +31,31 @@ export interface FfpcPaste {
   capturedAt: Date;
 }
 
-/** One FFPC league's waiver view from its roster and its pasted add/drop page. */
+// FFPC's player, matched to Sleeper's so projections and trends line up across the
+// app. FFPC and Sleeper can disagree on a position, so a name alone is the fallback.
+function toPlayer(fp: Pick<FfpcWaiverPlayer, 'name' | 'nflTeam' | 'position'> & { injury?: string | null }, index: PlayerIndex): Player {
+  const team = TEAM[fp.nflTeam] ?? fp.nflTeam;
+  const name = fp.position === 'DEF' ? `${team} DST` : fp.name;
+  const matched = resolvePlayer({ slot: fp.position, name }, index) ?? resolvePlayer({ slot: null, name }, index);
+  // Sleeper's injury tag is live, while the paste's is frozen at the time it was
+  // copied, so Sleeper's wins; the paste's only fills in for a player Sleeper doesn't know.
+  if (matched) return matched;
+  const injuryStatus = (fp.injury && INJURY[fp.injury]) || null;
+  return { playerId: `ffpc:${fp.position}:${normalizeName(fp.name)}`, name: fp.name, position: fp.position, nflTeam: team, injuryStatus };
+}
+
+/** One FFPC league's waiver view from its roster, its pasted add/drop page and its pasted FAAB Reports. */
 export function ffpcWaiverLeague(
   league: ManualLeague,
   paste: FfpcPaste | null,
   index: PlayerIndex,
   weeks: Projections[], // claim week first, then each later week of the regular season
   ctx: WaiverContext,
-): WaiverLeague {
+  claims: ManualFaabClaimRow[] = [],
+): WaiverLeagueWithBids {
+  const winningBids = claims.map((c): WinningBid => ({ player: toPlayer({ name: c.player, nflTeam: c.nflTeam, position: c.position }, index), bid: c.bid, week: c.week, losers: c.losers }));
   // Named by your team, as everywhere else in the app (see adapters/manual).
-  const base = { leagueId: league.id, platform: 'ffpc' as const, name: league.teamName || league.name, moves: [], available: [], openRosterSpots: 0 };
+  const base = { leagueId: league.id, platform: 'ffpc' as const, name: league.teamName || league.name, moves: [], available: [], openRosterSpots: 0, winningBids, bids: summarizeBids(winningBids) };
   // Bids run at the same times in every FFPC league, so the schedule is known before any paste.
   const standard = { runs: FFPC_STANDARD_RUNS, runsSource: 'ffpc-standard' as const };
   if (!paste) return { ...base, rules: null, pastedAt: null, ...standard, claims: null };
@@ -53,19 +70,8 @@ export function ffpcWaiverLeague(
   // The claim week: Sleeper's projection when there is one, else FFPC's from the page.
   const thisWeek = (p: Player, pasted: number | null | undefined) => (matched(p) && weeks[0]?.has(p.playerId) ? score(p, weeks[0]) : (pasted ?? null));
 
-  // FFPC's player, matched to Sleeper's so projections and trends line up across the app.
-  const toPlayer = (fp: FfpcWaiverPlayer): Player => {
-    const team = TEAM[fp.nflTeam] ?? fp.nflTeam;
-    const name = fp.position === 'DEF' ? `${team} DST` : fp.name;
-    const matched = resolvePlayer({ slot: fp.position, name }, index);
-    // Sleeper's injury tag is live, while the paste's is frozen at the time it was
-    // copied, so Sleeper's wins; the paste's only fills in for a player Sleeper doesn't know.
-    if (matched) return matched;
-    const injuryStatus = (fp.injury && INJURY[fp.injury]) || null;
-    return { playerId: `ffpc:${fp.position}:${normalizeName(fp.name)}`, name: fp.name, position: fp.position, nflTeam: team, injuryStatus };
-  };
   const toWaiver = (fp: FfpcWaiverPlayer) => {
-    const player = toPlayer(fp);
+    const player = toPlayer(fp, index);
     return waiverPlayer(player, thisWeek(player, fp.projected), restOfSeason(player), ctx);
   };
 
@@ -87,10 +93,12 @@ export function ffpcWaiverLeague(
 
   return {
     ...base,
-    rules: { type: 'faab', faabLeft: page.faabLeft, faabTotal: null, priority: null, teams: page.teams ?? 0, schedule: page.bidSchedule },
+    rules: { type: 'faab', faabLeft: page.faabLeft, faabTotal: FFPC_FAAB_BUDGET, priority: null, teams: page.teams ?? 0, schedule: page.bidSchedule },
     available: pickAvailable(available, startablePositions(starters.map((s) => s.slot))),
     // FFPC rosters are a fixed size and always full, so every add needs a drop.
     moves: suggestMoves({ starters, bench, available, openRosterSpots: 0, byeTeams: ctx.byeTeams }),
+    rivalBalances: page.rivalFaab,
+    lineup: { starters, bench },
     pastedAt: paste.capturedAt.toISOString(),
     // FFPC says when bids process right on the page; otherwise its standard times.
     ...(page.bidSchedule && parseFfpcBidSchedule(page.bidSchedule).length
@@ -100,9 +108,9 @@ export function ffpcWaiverLeague(
   };
 }
 
-export async function fetchFfpcWaivers(ctx: WaiverContext): Promise<{ leagues: WaiverLeague[]; errors: SourceError[] }> {
+export async function fetchFfpcWaivers(ctx: WaiverContext): Promise<{ leagues: WaiverLeagueWithBids[]; errors: SourceError[] }> {
   try {
-    const [leagues, pastes] = await Promise.all([manualLeagueRepo.list(), manualLeagueRepo.waiverPastes()]);
+    const [leagues, pastes, claims] = await Promise.all([manualLeagueRepo.list(), manualLeagueRepo.waiverPastes(), manualLeagueRepo.faabClaims(ctx.season)]);
     if (leagues.length === 0) return { leagues: [], errors: [] };
 
     const weekNumbers = Array.from({ length: Math.max(0, ctx.lastWeek - ctx.week + 1) }, (_, i) => ctx.week + i);
@@ -112,7 +120,7 @@ export async function fetchFfpcWaivers(ctx: WaiverContext): Promise<{ leagues: W
     ]);
     const index = buildPlayerIndex(players);
     const byId = new Map(pastes.map((p) => [p.id, p]));
-    return { leagues: leagues.map((l) => ffpcWaiverLeague(l, byId.get(l.id) ?? null, index, weeks, ctx)), errors: [] };
+    return { leagues: leagues.map((l) => ffpcWaiverLeague(l, byId.get(l.id) ?? null, index, weeks, ctx, claims.filter((c) => c.leagueId === l.id))), errors: [] };
   } catch (e) {
     return { leagues: [], errors: [{ source: 'ffpc', message: e instanceof Error ? e.message : String(e) }] };
   }

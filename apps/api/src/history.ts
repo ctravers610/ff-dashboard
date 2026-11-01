@@ -13,6 +13,13 @@ export function weekEndsAt(season: string, week: number): Date {
   return easternTime(tuesday.getUTCFullYear(), tuesday.getUTCMonth() + 1, tuesday.getUTCDate(), 9, 0);
 }
 
+// The NFL week a date falls in ("2026-09-09"), counting anything before the season as week 1.
+export function weekOnDate(season: string, date: string): number {
+  const at = new Date(`${date}T16:00:00Z`);
+  for (let week = 1; week < 18; week++) if (at < weekEndsAt(season, week)) return week;
+  return 18;
+}
+
 // Whether a finished week's row can be graded. A row captured before the week
 // ended holds whatever the score was then (0-0 before kickoff, Sunday night's
 // partial total); backfill.ts refetches Sleeper and ESPN weeks and re-scores

@@ -10,6 +10,7 @@ import { pool } from '../db/client.js';
 import { activeSources } from '../sources/store.js';
 import type { WaiverLeagueWithBids } from '../waivers/context.js';
 import { fetchEspnWaivers } from '../waivers/espn.js';
+import { fetchFfpcWaivers } from '../waivers/ffpc.js';
 import { LAST_REGULAR_WEEK } from '../waivers/moves.js';
 import { allClaims } from '../waivers/prices.js';
 import { backtest, bidsFaced, calibrate, estimateShare, knownBefore, type PastClaim } from '../waivers/pricing.js';
@@ -45,6 +46,7 @@ async function main() {
   const results = await Promise.all([
     fetchSleeperWaivers(sources.sleeperUsernames, ctx),
     fetchEspnWaivers(sources.espnLeagueIds, config.espnAuth, ctx),
+    fetchFfpcWaivers(ctx),
     fetchYahooWaivers(ctx),
   ]);
   const leagues: WaiverLeagueWithBids[] = results.flatMap((r) => r.leagues);
@@ -72,6 +74,16 @@ async function main() {
 
   // The odds, on the same claims: a bid meant to win 75% of the time should.
   for (const { level, tried, won } of calibrate(claims, later)) {
+    if (tried > 0) console.log(`  bids meant to win ${pct(level)}: won ${pct(won / tried)} of ${tried}`);
+  }
+
+  // FFPC bids on their own: does what the model knows hold for them too?
+  const ffpc = (c: Pick<PastClaim, 'league'>) => c.league.startsWith('ffpc:');
+  const f = backtest(claims, (known, c) => (ffpc(c) ? estimateShare(known, c) : null));
+  if (f.priced === 0) return;
+  console.log(`  FFPC only: ${claims.filter(ffpc).length} claims, ${f.priced} bids faced priced`);
+  console.log(`  real bid inside the range: ${pct(f.inRange)} (aim: 50%), median miss ${pct(f.medianMiss)} of the budget`);
+  for (const { level, tried, won } of calibrate(claims, ffpc)) {
     if (tried > 0) console.log(`  bids meant to win ${pct(level)}: won ${pct(won / tried)} of ${tried}`);
   }
 }

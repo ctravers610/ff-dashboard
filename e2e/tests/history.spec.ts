@@ -1,10 +1,10 @@
 import { expect, test } from './fixtures.js';
 import type { Page } from '@playwright/test';
 import { ESPN_MY_TEAM, ESPN_PAST } from '@ffd/demo/fixtures/espn';
-import { FFPC_LEAGUE, FFPC_TEAM } from '@ffd/demo/fixtures/ffpc';
+import { FFPC_LEAGUE, FFPC_TEAM, livePage } from '@ffd/demo/fixtures/ffpc';
 import { SLEEPER_LEAGUE_NAME, SLEEPER_MY_TEAM, SLEEPER_PAST } from '@ffd/demo/fixtures/sleeper';
 import { withDb } from '../support/database.js';
-import { leagueCard, openDashboard, openTab, pts, showLeague, sideListEntry } from './helpers.js';
+import { leagueCard, openDashboard, openTab, paste, pts, showLeague, sideListEntry } from './helpers.js';
 import { seedFfpcLeague, waitForHistory } from './seed.js';
 
 // Weeks 1-5 of the Sleeper and ESPN leagues are rebuilt from their own history the
@@ -126,6 +126,23 @@ test.describe('History tab', () => {
     await expect(card.getByRole('img', { name: /your points/ })).toBeVisible();
   });
 
+  test("a finished FFPC week pasted here joins History, leaving the league's roster alone", async ({ page, request }) => {
+    const before = (await findSeededLeagueRow(request)).rosterText;
+    await openHistory(page);
+    const card = await showLeague(page, FFPC_TEAM);
+    await page.getByRole('button', { name: 'Paste an old week' }).click();
+    const box = page.getByPlaceholder("Paste a finished week's Live Scoring page here");
+
+    await paste(box, livePage().replace('Week 6 (Current)', 'Week 1'));
+    await expect(page.getByText(/^Week 1 is in History/)).toBeVisible();
+    await expect(card.locator('[aria-label="Weekly results"] [title^="Week 1: "]')).toBeVisible();
+    await expect(page.getByText('Weeks pasted so far: 1, 6.')).toBeVisible();
+    expect((await findSeededLeagueRow(request)).rosterText).toBe(before);
+
+    await paste(box, 'Free Agent Auction Bidding (FAAB)\nBid Date');
+    await expect(page.getByRole('alert')).toContainText('paste it in the Waivers tab');
+  });
+
   test('deleting an FFPC league removes it from history', async ({ page, request }) => {
     const { id } = await findSeededLeague(request);
     await openHistory(page);
@@ -138,6 +155,11 @@ test.describe('History tab', () => {
     await expect(sideListEntry(page, FFPC_TEAM)).toHaveCount(0);
   });
 });
+
+async function findSeededLeagueRow(request: import('@playwright/test').APIRequestContext) {
+  const leagues = (await (await request.get('/api/manual-leagues')).json()) as { name: string; rosterText: string }[];
+  return leagues.find((l) => l.name === FFPC_LEAGUE)!;
+}
 
 // The beforeEach already seeded one league; look it up rather than creating a duplicate.
 async function findSeededLeague(request: import('@playwright/test').APIRequestContext) {

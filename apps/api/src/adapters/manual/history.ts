@@ -8,11 +8,11 @@ import { weekEndsAt } from '../../history.js';
 import { nflGames, type GameScore } from '../../scoring/games.js';
 import { liveScorer, type LiveScorer } from '../../scoring/live.js';
 import { FFPC_RULES } from '../../scoring/rules.js';
-import { toSnapshot } from '../../snapshots.js';
+import { snapshotRepo, toSnapshot } from '../../snapshots.js';
 import { sleeperClient } from '../sleeper/client.js';
 import { toManualSummary } from './index.js';
 import { buildPlayerIndex, type PlayerIndex } from './parse.js';
-import { manualLeagueRepo } from './store.js';
+import { manualLeagueRepo, matchupSeason } from './store.js';
 
 // Pastes worth re-scoring: finished weeks without a final score (`stale`, from
 // weeksToFetch), and ones pasted again since their row was written, such as a
@@ -65,6 +65,21 @@ export function rescoreWeek(
     }),
   );
   return { ...row, estimated: !locked || (m.allPlay != null && !weekOver) };
+}
+
+// A finished week's page pasted just now: scored and into History straight away,
+// rather than whenever the next backfill gets to it. Null for a week still being played.
+export async function rescorePastedWeek(league: ManualLeague, paste: ManualMatchup): Promise<NewSnapshot | null> {
+  const season = matchupSeason(paste);
+  if (new Date(paste.capturedAt) < weekEndsAt(season, paste.week)) return null;
+  const [players, scorer, games] = await Promise.all([
+    sleeperClient.players(),
+    liveScorer(season, paste.week, FFPC_RULES),
+    nflGames(season, paste.week),
+  ]);
+  const row = rescoreWeek(league, paste, season, buildPlayerIndex(players), scorer, games);
+  if (row) await snapshotRepo.saveFinal([row]);
+  return row;
 }
 
 export async function ffpcPastWeeks(

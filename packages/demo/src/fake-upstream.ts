@@ -74,6 +74,7 @@ function route(url: URL, headers: http.IncomingHttpHeaders): Reply | null {
 
   // ── Sleeper stats and projections ────────────────────────────────────
   if (p === `/sleeper-stats/stats/nfl/${SEASON}/${WEEK}`) return { body: withPlays(ffpc.statsRows()) };
+  if (p === `/sleeper-stats/stats/nfl/${SEASON}/1`) return { body: ffpc.statsRows() }; // a finished week, for FFPC's past-week paste
   if (p === `/sleeper-stats/projections/nfl/${SEASON}/${WEEK}`) return { body: projectionRows() };
   // Later weeks, for waivers: the claim week and the rest of the season.
   if (p.startsWith(`/sleeper-stats/projections/nfl/${SEASON}/`)) return { body: waivers.sleeperProjectionRows(ALL_PLAYERS) };

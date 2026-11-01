@@ -1,12 +1,12 @@
 // Hand-entered leagues (FFPC), stored in Postgres.
 
-import type { ManualLeague, ManualLeagueInput, ManualMatchup } from '@ffd/shared';
-import { and, eq, sql } from 'drizzle-orm';
+import type { FfpcFaabClaim, ManualLeague, ManualLeagueInput, ManualMatchup } from '@ffd/shared';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../../config.js';
 import { db as appDb, type Db } from '../../db/client.js';
-import { leagueSnapshots, manualLeagues, manualMatchupWeeks, type ManualLeagueRow } from '../../db/schema.js';
+import { leagueSnapshots, manualFaabClaims, manualLeagues, manualMatchupWeeks, type ManualFaabClaimRow, type ManualLeagueRow } from '../../db/schema.js';
 
 const toLeague = (row: ManualLeagueRow): ManualLeague => ({
   id: row.id,
@@ -22,7 +22,7 @@ const toLeague = (row: ManualLeagueRow): ManualLeague => ({
 // The NFL season a matchup was pasted in: the year, except that January's last
 // weeks (and anything before August) belong to the season that started the year
 // before. The migration that created manual_matchup_weeks uses the same rule.
-export function matchupSeason(matchup: ManualMatchup): string {
+export function matchupSeason(matchup: Pick<ManualMatchup, 'capturedAt'>): string {
   const at = new Date(matchup.capturedAt);
   return String(at.getUTCFullYear() - (at.getUTCMonth() < 7 ? 1 : 0));
 }
@@ -90,6 +90,43 @@ export function manualLeagueStore(db: Db) {
         .where(and(eq(manualMatchupWeeks.leagueId, leagueId), eq(manualMatchupWeeks.season, season)))
         .orderBy(manualMatchupWeeks.week);
       return rows.map((r) => r.matchup);
+    },
+
+    // A week's page pasted after the fact: goes into History's copy of the week,
+    // leaving the league's roster and current matchup as they are.
+    async archiveWeek(leagueId: string, matchup: ManualMatchup): Promise<void> {
+      await archiveMatchup(db, leagueId, matchup);
+    },
+
+    // Claims from a FAAB Report. Adds new ones and refreshes any already here, so
+    // reports can overlap. Answers how many were new.
+    async saveFaabClaims(leagueId: string, season: string, claims: (FfpcFaabClaim & { week: number })[]): Promise<number> {
+      if (claims.length === 0) return 0;
+      const rows = await db
+        .insert(manualFaabClaims)
+        .values(claims.map((c) => ({ leagueId, season, ...c })))
+        .onConflictDoUpdate({
+          target: [manualFaabClaims.leagueId, manualFaabClaims.season, manualFaabClaims.runOn, manualFaabClaims.player, manualFaabClaims.position],
+          set: {
+            week: sql`excluded.week`,
+            nflTeam: sql`excluded.nfl_team`,
+            team: sql`excluded.team`,
+            bid: sql`excluded.bid`,
+            losers: sql`excluded.losers`,
+            capturedAt: sql`now()`,
+          },
+        })
+        // Postgres sets xmax only on a row that already existed and was updated.
+        .returning({ isNew: sql<boolean>`xmax = 0` });
+      return rows.filter((r) => r.isNew).length;
+    },
+
+    async faabClaims(season: string): Promise<ManualFaabClaimRow[]> {
+      return db
+        .select()
+        .from(manualFaabClaims)
+        .where(eq(manualFaabClaims.season, season))
+        .orderBy(asc(manualFaabClaims.runOn), asc(manualFaabClaims.player));
     },
 
     // The add/drop page for the Waivers tab. Kept apart from update(), so editing

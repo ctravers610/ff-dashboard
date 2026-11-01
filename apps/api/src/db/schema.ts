@@ -49,6 +49,28 @@ export const manualMatchupWeeks = pgTable(
   (t) => [primaryKey({ columns: [t.leagueId, t.season, t.week] })],
 );
 
+// Every claim from FFPC's pasted FAAB Reports, for the bid model (waivers/pricing.ts).
+// One row per player per bid run, so pasting a report again changes nothing new.
+export const manualFaabClaims = pgTable(
+  'manual_faab_claims',
+  {
+    leagueId: uuid('league_id')
+      .notNull()
+      .references(() => manualLeagues.id, { onDelete: 'cascade' }),
+    season: text('season').notNull(),
+    runOn: date('run_on', { mode: 'string' }).notNull(),
+    week: integer('week').notNull(),
+    player: text('player').notNull(),
+    position: text('position').notNull(),
+    nflTeam: text('nfl_team').notNull(),
+    team: text('team').notNull(),
+    bid: doublePrecision('bid').notNull(),
+    losers: jsonb('losers').$type<number[]>().notNull(),
+    capturedAt: timestamp('captured_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.leagueId, t.season, t.runOn, t.player, t.position] })],
+);
+
 // One row per league per week, overwritten as the week plays out, so after the
 // week ends it holds the last values we saw. This is what the History tab reads.
 export const leagueSnapshots = pgTable(
@@ -118,6 +140,7 @@ export const oauthTokens = pgTable('oauth_tokens', {
 });
 
 export type ManualLeagueRow = typeof manualLeagues.$inferSelect;
+export type ManualFaabClaimRow = typeof manualFaabClaims.$inferSelect;
 export type ManualMatchupWeekRow = typeof manualMatchupWeeks.$inferSelect;
 export type SessionRow = typeof sessions.$inferSelect;
 export type NewSnapshot = typeof leagueSnapshots.$inferInsert;

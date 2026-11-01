@@ -21,12 +21,17 @@ export interface FfpcWaiverPlayer {
   percentOwned: number | null;
 }
 
+// Every FFPC league starts each team with this much FAAB. The page only says what's left.
+export const FFPC_FAAB_BUDGET = 1000;
+export const FFPC_MIN_BID = 1;
+
 export interface FfpcWaiverPage {
   leagueNumber: string | null; // "#104790"
   teamName: string | null;
   faabLeft: number | null;
   bidSchedule: string | null; // "Wednesdays at 11 pm ET and Sundays at 10 am ET"
   teams: number | null;
+  rivalFaab: number[]; // what each other team has left
   available: FfpcWaiverPlayer[];
   roster: FfpcWaiverPlayer[];
 }
@@ -63,12 +68,12 @@ export function parseFfpcWaivers(text: string): FfpcWaiverPage {
     faabLeft: null,
     bidSchedule: null,
     teams: null,
+    rivalFaab: [],
     available: [],
     roster: [],
   };
 
   let section: 'top' | 'budgets' | 'available' | 'roster' | 'done' = 'top';
-  let budgets = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
     if (!page.leagueNumber) {
@@ -92,7 +97,8 @@ export function parseFfpcWaivers(text: string): FfpcWaiverPage {
     else if (/^Team Roster/.test(line)) section = 'roster';
     else if (/^©/.test(line)) section = 'done';
 
-    if (section === 'budgets' && MONEY.test(line)) budgets++;
+    const rival = section === 'budgets' ? MONEY.exec(line) : null;
+    if (rival) page.rivalFaab.push(num(rival[1])!);
     if (section !== 'available' && section !== 'roster') continue;
 
     const cell = playerCell(line);
@@ -107,6 +113,6 @@ export function parseFfpcWaivers(text: string): FfpcWaiverPage {
     }
     i++; // the stats line is consumed
   }
-  if (budgets > 0) page.teams = budgets + 1; // the list shows everyone but you
+  if (page.rivalFaab.length > 0) page.teams = page.rivalFaab.length + 1; // the list shows everyone but you
   return page;
 }

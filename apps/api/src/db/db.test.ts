@@ -1,6 +1,7 @@
 // Integration tests against a real Postgres (see db/testing.ts). They are skipped
 // when no database is reachable, except in CI, where a missing database is a failure.
 
+import { FFPC_TEAM, livePage } from '@ffd/demo/fixtures/ffpc';
 import type { LeagueSummary, ManualLeague, ManualLeagueInput, ManualMatchup } from '@ffd/shared';
 import { sql } from 'drizzle-orm';
 import Fastify from 'fastify';
@@ -217,6 +218,96 @@ describe.skipIf(!enabled)('Postgres', () => {
 
       const { id } = (await app.inject({ method: 'POST', url: '/api/manual-leagues', payload: input })).json();
       expect((await app.inject({ method: 'DELETE', url: `/api/manual-leagues/${id}` })).statusCode).toBe(204);
+    });
+
+    describe('pasting past pages', () => {
+      const scored = { points: 132.95, opponentPoints: 118.2 } as NewSnapshot;
+      const buildWith = async (rescore: () => Promise<NewSnapshot | null> = async () => scored) => {
+        const store = manualLeagueStore(testDb.db);
+        const app = Fastify();
+        await app.register(manualLeagueRoutes(store, rescore));
+        const league = await store.create({ name: 'Gorilla Tourney #12345', teamName: FFPC_TEAM, rosterText: 'QB Josh Allen', matchup: null });
+        const week = (text: string) => app.inject({ method: 'PUT', url: `/api/manual-leagues/${league.id}/history`, payload: { text } });
+        const faab = (text: string) => app.inject({ method: 'PUT', url: `/api/manual-leagues/${league.id}/faab`, payload: { text } });
+        return { app, store, league, week, faab };
+      };
+      const season = () => matchupSeason({ capturedAt: new Date().toISOString() });
+      const FINISHED_WEEK = livePage().replace('Week 6 (Current)', 'Week 1');
+      const faabReport = (...rows: string[]) =>
+        [
+          'Gorilla Tourney (Aug 5 9:00 PM) #12345 - Sample (4-3)',
+          'Free Agent Auction Bidding (FAAB)',
+          'Week 1',
+          'Bid Date',
+          '(Processed)\tTeam\tAdded Player\tDropped Player\tBid\tResult',
+          ...rows,
+        ].join('\n');
+      const BELL = '09/08 08:58 PM (WED)\tTeam D\tChris Bell, WR (MIA)\tEli Stowers TE PHI\t$185.00\tPlayer Added';
+      const BELL_RIVAL = '09/08 08:30 PM (WED)\tNext Highest Bid\tChris Bell, WR (MIA)\t\t$75.00\t';
+      const LOOP = '09/12 09:21 AM (SUN)\tTeam C\tTyler Loop, PK (BAL)\tEvan Engram TE DEN\t$3.00\tPlayer Added';
+
+      it("saves a finished week to History without touching the league's roster or matchup", async () => {
+        const { app, store, league, week } = await buildWith();
+        const res = await week(FINISHED_WEEK);
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toMatchObject({ week: 1, teamName: FFPC_TEAM, points: 132.95, opponentPoints: 118.2 });
+
+        expect((await app.inject({ method: 'GET', url: `/api/manual-leagues/${league.id}/history` })).json()).toEqual({ weeks: [1] });
+        expect((await store.list()).find((l) => l.id === league.id)).toMatchObject({ rosterText: 'QB Josh Allen', matchup: null });
+      });
+
+      it('keeps the paste when it cannot be scored yet', async () => {
+        const { week } = await buildWith(async () => {
+          throw new Error('stats are down');
+        });
+        const res = await week(FINISHED_WEEK);
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toMatchObject({ week: 1, points: null });
+      });
+
+      it("adds a FAAB Report's claims, and only counts new ones when reports overlap", async () => {
+        const { app, store, league, faab } = await buildWith();
+        expect((await faab(faabReport(BELL, BELL_RIVAL))).json()).toEqual({ claims: 1, added: 1, weeks: [1] });
+        expect((await faab(faabReport(BELL, BELL_RIVAL, LOOP))).json()).toEqual({ claims: 2, added: 1, weeks: [1] });
+
+        const claims = (await store.faabClaims(season())).filter((c) => c.leagueId === league.id);
+        expect(claims.find((c) => c.player === 'Chris Bell')).toMatchObject({ week: 1, bid: 185, losers: [75], position: 'WR', nflTeam: 'MIA' });
+        expect(claims).toHaveLength(2);
+        expect((await app.inject({ method: 'GET', url: `/api/manual-leagues/${league.id}/faab` })).json()).toEqual({ weeks: [{ week: 1, claims: 2 }] });
+      });
+
+      it("takes a deleted league's claims with it", async () => {
+        const { app, store, league, faab } = await buildWith();
+        await faab(faabReport(BELL));
+        await app.inject({ method: 'DELETE', url: `/api/manual-leagues/${league.id}` });
+        expect((await store.faabClaims(season())).filter((c) => c.leagueId === league.id)).toEqual([]);
+      });
+
+      it('sends a page pasted in the wrong tab to the right one', async () => {
+        const { week, faab } = await buildWith();
+        const report = await week(faabReport(BELL));
+        expect(report.statusCode).toBe(400);
+        expect(report.json().message).toContain('Waivers tab');
+        const scores = await faab(FINISHED_WEEK);
+        expect(scores.statusCode).toBe(400);
+        expect(scores.json().message).toContain('History tab');
+      });
+
+      it("refuses another league's page, someone else's matchup, an empty report and other pages", async () => {
+        const { week, faab } = await buildWith();
+        const other = await faab(faabReport(BELL).replace('#12345', '#99999'));
+        expect(other.statusCode).toBe(400);
+        expect(other.json().message).toContain('#99999');
+        expect((await week(FINISHED_WEEK.replace('#12345', '#99999'))).statusCode).toBe(400);
+
+        const theirs = await week(FINISHED_WEEK.replace(`#12345 - ${FFPC_TEAM} (2-3)`, '#12345 - Someone Else (2-3)'));
+        expect(theirs.statusCode).toBe(400);
+        expect(theirs.json().message).toContain('not your matchup');
+
+        expect((await faab(faabReport())).statusCode).toBe(400);
+        expect((await faab('QB Josh Allen')).statusCode).toBe(400);
+        expect((await week('QB Josh Allen')).statusCode).toBe(400);
+      });
     });
   });
 
