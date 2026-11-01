@@ -48,34 +48,62 @@ const lineDetail = (line: PointsLine) => {
 };
 
 // The stats worth noticing mid-scroll, like the "1 rec TD" in "1 catch, 1 rec TD, 24 rec yds".
+// A negative one is a correction, not a scoring play.
 const BIG_STAT = /\bTDs?\b|\bINTs?\b|fumble|2-pt|safet|FGs? made/;
+const isBigStat = (stat: string) => BIG_STAT.test(stat) && !stat.startsWith('−');
 const QUIET_UNDER = 1; // worth fewer points than this everywhere: one quiet line
 
-export function EventRow({ e }: { e: LiveEvent }) {
+type FeedRow = LiveEvent & { calledBack?: boolean };
+
+// A play and the correction that exactly undoes it ("1 pass TD, 6 pass yds", then
+// "−1 pass TD, −6 pass yds") add up to nothing, so they share one line. Negative
+// yards alone don't count: a run for a loss is a real play.
+function collapseCalledBack(newestFirst: LiveEvent[]): FeedRow[] {
+  const undone = new Set<number>();
+  const rows: FeedRow[] = [];
+  newestFirst.forEach((e, i) => {
+    if (undone.has(e.id)) return;
+    const stats = e.description.split(', ');
+    const isCorrection = stats.some((s) => s.startsWith('−') && !/\byds?$/.test(s));
+    const undoes = stats.map((s) => (s.startsWith('−') ? s.slice(1) : `−${s}`)).join(', ');
+    const play = isCorrection ? newestFirst.slice(i + 1).find((o) => !undone.has(o.id) && o.player.name === e.player.name && o.description === undoes) : undefined;
+    if (play) undone.add(play.id);
+    rows.push(play ? { ...e, description: play.description, calledBack: true } : e);
+  });
+  return rows;
+}
+
+export function EventRow({ e }: { e: FeedRow }) {
   const lines = pointsLines(e.leagues);
-  const bigStat = BIG_STAT.test(e.description);
+  const bigStat = e.description.split(', ').some(isBigStat);
   const time = (
     <time dateTime={e.at} title={fullTime(e.at)} className="pt-0.5 text-xs tabular-nums text-slate-400">
       {clock(e.at)}
     </time>
   );
 
-  if (!bigStat && lines.every((l) => Math.abs(l.points ?? 0) < QUIET_UNDER)) {
+  if (e.calledBack || (!bigStat && lines.every((l) => Math.abs(l.points ?? 0) < QUIET_UNDER))) {
     return (
       <li className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-x-2 py-1.5">
         {time}
         <div className="flex min-w-0 items-baseline justify-between gap-3">
           <p className="min-w-0 text-xs text-slate-400">
-            <span className="text-sm text-slate-300">{e.player.name}</span> {e.description}
+            <span className="text-sm text-slate-300">{e.player.name}</span> {e.calledBack ? <s>{e.description}</s> : e.description}
           </p>
-          <ul aria-label="Points by league" className="flex shrink-0 gap-2 text-xs tabular-nums">
-            {lines.map((l) => (
-              <li key={l.key} title={lineDetail(l)} className={effectColor(l)}>
-                <span className="sr-only">{lineDetail(l)}: </span>
-                {pointsText(l.points)}
-              </li>
-            ))}
-          </ul>
+          {e.calledBack ? (
+            <span title={lines.map(lineDetail).join('\n')} className="shrink-0 text-xs text-slate-400">
+              called back
+            </span>
+          ) : (
+            <ul aria-label="Points by league" className="flex shrink-0 gap-2 text-xs tabular-nums">
+              {lines.map((l) => (
+                <li key={l.key} title={lineDetail(l)} className={effectColor(l)}>
+                  <span className="sr-only">{lineDetail(l)}: </span>
+                  {pointsText(l.points)}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </li>
     );
@@ -96,7 +124,7 @@ export function EventRow({ e }: { e: LiveEvent }) {
         </p>
         <p className="text-sm text-slate-300">
           {e.description.split(', ').map((stat, i) => (
-            <span key={i} className={BIG_STAT.test(stat) ? 'font-semibold text-white' : undefined}>
+            <span key={i} className={isBigStat(stat) ? 'font-semibold text-white' : undefined}>
               {i > 0 && ', '}
               {stat}
             </span>
@@ -142,10 +170,10 @@ export function LiveFeed() {
 
   // A filter also narrows each play to the leagues it asked for.
   const keep = (l: LiveEventLeague) => (filter === 'all' ? true : filter === 'mine' ? l.role === 'starter' : l.leagueKey === filter);
-  const events = (data?.events ?? []).map((e) => ({ ...e, leagues: e.leagues.filter(keep) })).filter((e) => e.leagues.length > 0);
+  const events = collapseCalledBack(data?.events ?? []).map((e) => ({ ...e, leagues: e.leagues.filter(keep) })).filter((e) => e.leagues.length > 0);
 
   // A week's feed runs Thursday to Monday, so a clock time alone is ambiguous.
-  const days: { day: string; events: LiveEvent[] }[] = [];
+  const days: { day: string; events: FeedRow[] }[] = [];
   for (const e of events) {
     const last = days[days.length - 1];
     if (last?.day === day(e.at)) last.events.push(e);
