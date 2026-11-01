@@ -1,6 +1,6 @@
 import * as fx from '@ffd/demo/fixtures/yahoo';
 import { describe, expect, it } from 'vitest';
-import { flat, items, parseAdds, parseGameWeeks, parseLeagues, weekOn, parseMatchup, parseMyTeams, parseRoster, parseStandings, parseTrades, startersOf, toYahooSummary } from './parse.js';
+import { flat, items, parseAdds, parseGameWeeks, parseLeagues, weekOn, parseMatchup, parseMyTeams, parseRoster, parseStandings, parseTrades, startersOf, toYahooSummary, type Projector } from './parse.js';
 
 // Made-up responses only (packages/demo/src/fixtures/yahoo.ts).
 describe('Yahoo JSON helpers', () => {
@@ -60,6 +60,19 @@ describe('parsing a Yahoo league', () => {
     const summary = toYahooSummary(league!, team!, noFlex, matchup, record, 6);
     expect(summary.alerts.map((a) => a.detail)).toContain('Empty W/R/T slot');
     expect(startersOf(roster, [])).toHaveLength(9); // no settings: the filled slots as Yahoo listed them
+  });
+
+  it('projects each starter live, and a side that can\'t keeps Yahoo\'s pre-game total', () => {
+    const plus2: Projector = (_, actual) => actual + 2;
+    const live = toYahooSummary(league!, team!, roster, matchup, record, 6, roster, plus2).matchup!;
+    expect(live.me.starters[0]).toMatchObject({ slot: 'QB', projected: 23.3 }); // Josh Allen's 21.3 + 2
+    expect(live.me.projected).toBeCloseTo(live.me.starters.reduce((n, s) => n + s.points + 2, 0), 1);
+
+    const unsure: Projector = (p, actual) => (p.name === 'Josh Allen' ? null : actual);
+    const partial = toYahooSummary(league!, team!, roster, matchup, record, 6, roster, unsure).matchup!;
+    expect(partial.me.projected).toBe(matchup?.me.projected);
+    expect(partial.opponent?.projected).toBe(matchup?.opponent?.projected);
+    expect(toYahooSummary(league!, team!, roster, matchup, record, 6).matchup?.me.starters[0]?.projected).toBeUndefined(); // no projector: nothing added
   });
 
   it('copes with an empty or unexpected response', () => {

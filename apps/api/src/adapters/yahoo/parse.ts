@@ -4,7 +4,7 @@
 // "0", "1", ... with a "count". Pure functions, tested on made-up responses.
 
 import type { InjuryStatus, LeagueSummary, Player, RosterEntry, StarterSlot, TeamStanding } from '@ffd/shared';
-import { buildAlerts } from '../common.js';
+import { buildAlerts, totalSide } from '../common.js';
 
 type Json = unknown;
 const isObject = (v: Json): v is Record<string, Json> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -360,8 +360,23 @@ export function startersOf(roster: YahooRosterSpot[], slots: string[]): StarterS
 }
 
 /**
+ * A starter's live projection, from his points so far: null when there's no
+ * projection to go by, so the side keeps Yahoo's own total.
+ */
+export type Projector = (player: Player, actual: number) => number | null;
+
+// An empty slot projects nothing, as Sleeper's starters do.
+const withProjections = (starters: StarterSlot[], project?: Projector): StarterSlot[] =>
+  project ? starters.map((s) => ({ ...s, projected: s.player ? project(s.player, s.points) : 0 })) : starters;
+
+// A side's live total when every starter projects, else Yahoo's pre-game total.
+const sideProjected = (starters: StarterSlot[], yahooTotal: number | null, project?: Projector): number | null =>
+  project && starters.length ? (totalSide(starters).projected ?? yahooTotal) : yahooTotal;
+
+/**
  * One Yahoo league as the dashboard shows it: your team, this week's
- * opponent's starting lineup, and the league's standings.
+ * opponent's starting lineup, and the league's standings. With a projector,
+ * each side's projection is live; otherwise it's Yahoo's pre-game total.
  */
 export function toYahooSummary(
   league: YahooLeagueInfo,
@@ -371,9 +386,12 @@ export function toYahooSummary(
   standings: TeamStanding[],
   week: number,
   opponentRoster: YahooRosterSpot[] = [],
+  project?: Projector,
 ): LeagueSummary {
   const starters = startersOf(roster, league.slots);
   const rosterEntries: RosterEntry[] = roster.map((r) => ({ player: r.player, status: r.slot === 'IR' ? 'ir' : r.slot === 'BN' ? 'bench' : 'starter' }));
+  const mine = withProjections(starters, project);
+  const theirs = opponentRoster.length ? withProjections(startersOf(opponentRoster, league.slots), project) : [];
   return {
     leagueId: league.leagueKey,
     platform: 'yahoo',
@@ -386,9 +404,9 @@ export function toYahooSummary(
     matchup: matchup
       ? {
           week,
-          me: { teamId: team.teamKey, teamName: matchup.me.teamName || team.teamName, points: matchup.me.points, projected: matchup.me.projected, starters },
+          me: { teamId: team.teamKey, teamName: matchup.me.teamName || team.teamName, points: matchup.me.points, projected: sideProjected(mine, matchup.me.projected, project), starters: mine },
           opponent: matchup.opponent
-            ? { teamId: matchup.opponent.teamKey, teamName: matchup.opponent.teamName, points: matchup.opponent.points, projected: matchup.opponent.projected, starters: opponentRoster.length ? startersOf(opponentRoster, league.slots) : [] }
+            ? { teamId: matchup.opponent.teamKey, teamName: matchup.opponent.teamName, points: matchup.opponent.points, projected: sideProjected(theirs, matchup.opponent.projected, project), starters: theirs }
             : null,
         }
       : null,
