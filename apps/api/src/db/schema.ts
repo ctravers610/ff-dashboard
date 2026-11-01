@@ -203,6 +203,19 @@ export const notificationsSent = pgTable('notifications_sent', {
   sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Questionable starters you know are playing: one row per player per week. The
+// warning and its reminder stay quiet for that week in every league he's in.
+export const clearedWarnings = pgTable(
+  'cleared_warnings',
+  {
+    season: text('season').notNull(),
+    week: integer('week').notNull(),
+    playerKey: text('player_key').notNull(),
+    clearedAt: timestamp('cleared_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.season, t.week, t.playerKey] })],
+);
+
 // Sleeper's trending adds, one row per player per day (see waivers/trending.ts).
 // Sleeper only reports the current count, so what isn't saved here is gone.
 export const trendingAddSnapshots = pgTable(

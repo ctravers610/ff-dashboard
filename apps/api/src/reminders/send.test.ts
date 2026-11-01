@@ -120,6 +120,19 @@ describe('reminder routes', () => {
     expect(state.get(reminderKey('sleeper', 'L1', new Date(payload.runAt)))?.claimsSetAt).toBeNull();
   });
 
+  it('clears a Questionable warning for the current week, and can undo it', async () => {
+    const calls: unknown[][] = [];
+    const store = { setWarningCleared: async (...args: unknown[]) => void calls.push(args) } as unknown as ReminderStore;
+    const app = Fastify();
+    await app.register(reminderRoutes({ store, sender: null, publicKey: null, nflState: async () => ({ season: '2026', week: 9 }) }));
+    const put = (payload: object) => app.inject({ method: 'PUT', url: '/api/lineup/cleared-warnings', payload });
+
+    expect((await put({ playerKey: 'WR:georgepickens', cleared: true })).statusCode).toBe(204);
+    expect((await put({ playerKey: 'WR:georgepickens', cleared: false })).statusCode).toBe(204);
+    expect(calls).toEqual([['2026', 9, 'WR:georgepickens', true], ['2026', 9, 'WR:georgepickens', false]]);
+    expect((await put({ playerKey: '', cleared: true })).statusCode).toBe(400);
+  });
+
   it('explains when reminders are not set up on the server', async () => {
     const { app } = await build(null);
     expect((await app.inject({ url: '/api/push/key' })).json()).toEqual({ publicKey: null });

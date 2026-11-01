@@ -2,7 +2,7 @@
 
 import { and, eq, gte, inArray } from 'drizzle-orm';
 import { db as appDb, type Db } from '../db/client.js';
-import { notificationsSent, pushSubscriptions, waiverReminders } from '../db/schema.js';
+import { clearedWarnings, notificationsSent, pushSubscriptions, waiverReminders } from '../db/schema.js';
 import { reminderKey, type ReminderState } from './plan.js';
 
 export interface PushSubscriptionInput {
@@ -58,6 +58,19 @@ export function reminderStore(db: Db) {
     },
     async markSent(keys: string[]) {
       if (keys.length) await db.insert(notificationsSent).values(keys.map((key) => ({ key }))).onConflictDoNothing();
+    },
+
+    /** The players whose Questionable warning you cleared this week. */
+    async clearedWarnings(season: string, week: number): Promise<Set<string>> {
+      const rows = await db
+        .select({ playerKey: clearedWarnings.playerKey })
+        .from(clearedWarnings)
+        .where(and(eq(clearedWarnings.season, season), eq(clearedWarnings.week, week)));
+      return new Set(rows.map((r) => r.playerKey));
+    },
+    async setWarningCleared(season: string, week: number, playerKey: string, cleared: boolean) {
+      if (cleared) await db.insert(clearedWarnings).values({ season, week, playerKey }).onConflictDoNothing();
+      else await db.delete(clearedWarnings).where(and(eq(clearedWarnings.season, season), eq(clearedWarnings.week, week), eq(clearedWarnings.playerKey, playerKey)));
     },
 
     // Subscriptions the push service says are gone (the browser unsubscribed or was reset).

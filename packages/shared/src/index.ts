@@ -94,6 +94,8 @@ export interface LineupAlert {
   reason: AlertReason;
   detail: string;
   suggestion?: BenchSuggestion | null;
+  clearKey?: string; // set when the warning can be cleared (a Questionable starter): the player, across all your leagues
+  cleared?: boolean; // you said he's playing, so it stays quiet for the week
 }
 
 export type RosterStatus = 'starter' | 'bench' | 'ir';

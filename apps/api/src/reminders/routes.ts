@@ -1,7 +1,9 @@
 // Waiver reminders over HTTP: the browser fetches our public key, subscribes,
-// and can ask for a test notification; the Waivers tab marks claims as set.
+// and can ask for a test notification; the Waivers tab marks claims as set, and
+// the Matchups tab clears a Questionable warning.
 
 import type { FastifyInstance } from 'fastify';
+import { sleeperClient } from '../adapters/sleeper/client.js';
 import { config } from '../config.js';
 import { reminderRepo, type ReminderStore } from './store.js';
 import { sendToAll, webPushSender, type Sender } from './send.js';
@@ -38,10 +40,21 @@ const claimsSchema = {
   },
 } as const;
 
-export const reminderRoutes = ({ store = reminderRepo, sender = defaultSender(), publicKey = config.push?.publicKey ?? null }: {
+const clearedWarningSchema = {
+  type: 'object',
+  required: ['playerKey', 'cleared'],
+  additionalProperties: false,
+  properties: {
+    playerKey: { type: 'string', minLength: 1, maxLength: 100 },
+    cleared: { type: 'boolean' },
+  },
+} as const;
+
+export const reminderRoutes = ({ store = reminderRepo, sender = defaultSender(), publicKey = config.push?.publicKey ?? null, nflState = () => sleeperClient.state() }: {
   store?: ReminderStore;
   sender?: Sender | null;
   publicKey?: string | null;
+  nflState?: () => Promise<{ season: string; week: number }>;
 } = {}) =>
   async function (app: FastifyInstance) {
     app.get('/api/push/key', async () => ({ publicKey }));
@@ -80,6 +93,17 @@ export const reminderRoutes = ({ store = reminderRepo, sender = defaultSender(),
       async (req, reply) => {
         const { platform, leagueId, runAt, set } = req.body;
         await store.setClaims(platform, leagueId, new Date(runAt), set);
+        return reply.code(204).send();
+      },
+    );
+
+    // Always this week's, by the same clock the dashboard uses.
+    app.put<{ Body: { playerKey: string; cleared: boolean } }>(
+      '/api/lineup/cleared-warnings',
+      { schema: { body: clearedWarningSchema } },
+      async (req, reply) => {
+        const { season, week } = await nflState();
+        await store.setWarningCleared(season, week, req.body.playerKey, req.body.cleared);
         return reply.code(204).send();
       },
     );
