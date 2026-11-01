@@ -2,16 +2,15 @@ import { expect, type Locator, type Page } from '@playwright/test';
 
 export const pts = (n: number) => n.toFixed(2);
 
-/** A league, found by name: its row on the Matchups tab, or its card on the History tab. */
+/** A league, found by name: its card on the Matchups or History tab. */
 export const leagueCard = (page: Page, name: string): Locator => page.getByRole('article', { name, exact: true });
 
-/** Opens a league's row on the Matchups tab (lineups, standings, roster) and returns it. */
+/** Opens a league's card on the Matchups tab and returns its details (lineups, standings, roster), shown beside the wall. */
 export async function openLeague(page: Page, name: string): Promise<Locator> {
-  const card = leagueCard(page, name);
-  const toggle = card.locator('button[aria-expanded]');
+  const toggle = leagueCard(page, name).locator('button[aria-expanded]');
   if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  return card;
+  return page.getByRole('region', { name: `${name} details`, exact: true });
 }
 
 /** Opens the app and waits until the dashboard data has loaded. */

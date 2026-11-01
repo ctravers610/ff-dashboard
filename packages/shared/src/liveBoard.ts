@@ -218,6 +218,16 @@ export function buildBoard(newestFirst: LiveEvent[], now: number): Board {
   };
 }
 
+/** The latest play that counted in one league, if any: its row on that league's own board. */
+export function latestPlay(newestFirst: LiveEvent[], leagueKey: string, now: number): BoardRow | null {
+  const events = newestFirst
+    .map((e) => ({ ...e, leagues: e.leagues.filter((l) => l.leagueKey === leagueKey && l.role !== 'bench') }))
+    .filter((e) => e.leagues.length > 0);
+  const { active, scoring, earlier } = buildBoard(events, now);
+  const rows = [...active, ...scoring, ...earlier].filter((r) => r.kind !== 'calledBack');
+  return rows.reduce<BoardRow | null>((latest, r) => (!latest || r.at > latest.at ? r : latest), null);
+}
+
 /** Where a row's points landed, short enough for one line. The row expands to list them. */
 export function rowWhere(row: BoardRow): string {
   const { lines } = row;

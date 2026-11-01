@@ -10,6 +10,7 @@ import { nflGames } from '../scoring/games.js';
 import { fetchStats } from '../scoring/live.js';
 import { diffSnapshots, type FeedEvent, type Snapshot } from './feed.js';
 import { failingLeagues, platformPoints, trackedPlayers } from './track.js';
+import { recordWinChances, resetWinChances, winChanceRepo } from './winChance.js';
 
 export function liveEventStore(db: Db) {
   return {
@@ -46,7 +47,7 @@ export async function gamesLive(season: string, week: number): Promise<boolean> 
 }
 
 /** One look at the week: returns the new events (none on the first look of a week). */
-export async function pollLive(store = liveEventRepo): Promise<FeedEvent[]> {
+export async function pollLive(store = liveEventRepo, chances = winChanceRepo): Promise<FeedEvent[]> {
   const dashboard = await getDashboard();
   const { season, week } = dashboard;
   const last = previous?.season === season && previous.week === week ? previous : null;
@@ -54,6 +55,11 @@ export async function pollLive(store = liveEventRepo): Promise<FeedEvent[]> {
   const [tracked, stats, games] = await Promise.all([trackedPlayers(dashboard, failing), fetchStats(season, week), nflGames(season, week)]);
   const snapshot: Snapshot = { stats, games, platformPoints: platformPoints(dashboard) };
   lastCheckedAt = new Date();
+
+  // In the background: the line on a card must never get in the way of the feed.
+  if ([...games.values()].some((g) => g.started && g.progress < 1)) {
+    recordWinChances(dashboard, chances).catch((e) => console.error('Could not save win chances:', e));
+  }
 
   previous = { season, week, snapshot, leagues: [...dashboard.leagues, ...failing] };
   if (!last) return [];
@@ -66,4 +72,5 @@ export async function pollLive(store = liveEventRepo): Promise<FeedEvent[]> {
 export const resetLive = () => {
   previous = null;
   lastCheckedAt = null;
+  resetWinChances();
 };

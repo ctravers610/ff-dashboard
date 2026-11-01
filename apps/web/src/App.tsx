@@ -2,14 +2,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useState, type ComponentType, type SVGProps } from 'react';
 import { signOut, useDashboard, useDemo, useWaivers, type Me } from './api';
 import { AddLeagueDialog } from './components/AddLeagueDialog';
-import { Hero } from './components/Hero';
 import { ChartIcon, FootballIcon, RefreshIcon, ScoreboardIcon, SwapIcon, UsersIcon } from './components/icons';
-import { LiveFeed } from './components/live/LiveFeed';
 import { ManualLeagueEditor } from './components/ManualLeagueEditor';
-import { MatchupTable } from './components/MatchupTable';
 import { PlayersView } from './components/PlayersView';
 import { SourceErrors } from './components/SourceErrors';
-import { DataStatus } from './components/DataStatus';
+import { Wall } from './components/wall/Wall';
 import { WaiversView } from './components/waivers/WaiversView';
 import { YahooConnect } from './components/YahooConnect';
 import { useShortcut } from './shortcuts';
@@ -56,8 +53,8 @@ export default function App({ user }: { user: Me['user'] }) {
   });
 
   return (
-    // Bottom padding on phones leaves room for the tab bar.
-    <div className="mx-auto max-w-7xl px-4 pb-24 pt-4 sm:pb-10 sm:pt-6">
+    // Bottom padding on phones leaves room for the tab bar. The wall takes the whole screen.
+    <div className={`mx-auto flex min-h-dvh flex-col px-4 pb-24 pt-4 sm:pb-4 ${view === 'matchups' ? 'lg:px-6' : 'max-w-7xl sm:pb-10 sm:pt-6'}`}>
       <header className="mb-4 flex items-center justify-between gap-3">
         <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
           <FootballIcon className="text-xl text-emerald-400" />
@@ -141,30 +138,7 @@ export default function App({ user }: { user: Me['user'] }) {
       {isPending && <p className="text-slate-400">Loading your leagues…</p>}
 
       {view === 'matchups' ? (
-        data && (
-          // The live feed on the left, matchups on the right; stacked on a phone,
-          // matchups first (they come first in the page, too).
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start">
-            <main className="lg:order-2">
-              {data.leagues.length > 0 && <Hero data={data} />}
-              {data.leagues.length > 0 && <MatchupTable leagues={data.leagues} onEdit={demo ? undefined : setEditing} />}
-              <DataStatus data={data} />
-              {!demo && (
-              <button
-                type="button"
-                onClick={() => setAdding(true)}
-                className="mt-3 w-full rounded-xl border border-dashed border-slate-700 py-3 text-sm font-medium text-slate-400 hover:border-slate-500 hover:text-slate-200"
-              >
-                + Add league
-              </button>
-              )}
-            </main>
-            {/* Stays in view while the matchups scroll, and scrolls on its own. */}
-            <aside className="lg:sticky lg:top-4 lg:order-1 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
-              <LiveFeed />
-            </aside>
-          </div>
-        )
+        data && <Wall data={data} onEdit={demo ? undefined : setEditing} onAdd={() => setAdding(true)} />
       ) : view === 'waivers' ? (
         <main>
           <WaiversView leagues={data?.leagues} />

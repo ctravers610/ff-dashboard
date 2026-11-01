@@ -1,9 +1,9 @@
 import type { LeagueSummary, MatchupSide, Player } from '@ffd/shared';
 import { describe, expect, it } from 'vitest';
-import { minutesLeft, withMinutesLeft } from './minutesLeft.js';
-import type { GameScore } from './scoring/games.js';
+import { minutesLeft, starterGame, withGameProgress } from './minutesLeft.js';
+import { gameClock, type GameScore } from './scoring/games.js';
 
-const game = (progress: number): GameScore => ({ opponent: 'X', opponentScore: 0, started: progress > 0, progress, kickoff: null });
+const game = (progress: number): GameScore => ({ opponent: 'X', opponentScore: 0, started: progress > 0, progress, kickoff: null, clock: progress > 0 && progress < 1 ? 'Q2 0:00' : null });
 const games = new Map([
   ['KC', game(0)], // not started: 60
   ['BUF', game(0.5)], // halftime: 30
@@ -28,7 +28,30 @@ describe('minutesLeft', () => {
   });
 });
 
-describe('withMinutesLeft', () => {
+describe('starterGame', () => {
+  it('says where his game stands', () => {
+    expect(starterGame(p('KC'), games)).toEqual({ state: 'pre', clock: null, kickoff: null });
+    expect(starterGame(p('BUF'), games)).toEqual({ state: 'live', clock: 'Q2 0:00', kickoff: null });
+    expect(starterGame(p('SF'), games)?.state).toBe('final');
+  });
+
+  it('is a bye for a team not on the schedule, and nothing for an empty slot', () => {
+    expect(starterGame(p('DEN'), games)?.state).toBe('bye');
+    expect(starterGame(null, games)).toBeNull();
+  });
+});
+
+describe('gameClock', () => {
+  it('reads the quarter and clock only while a game is on', () => {
+    expect(gameClock('in', 3, 372)).toBe('Q3 6:12');
+    expect(gameClock('in', 4, 5)).toBe('Q4 0:05');
+    expect(gameClock('in', 5, 300)).toBe('OT');
+    expect(gameClock('pre', 0, 900)).toBeNull();
+    expect(gameClock('post', 4, 0)).toBeNull();
+  });
+});
+
+describe('withGameProgress', () => {
   const league = (week: number): LeagueSummary => ({
     leagueId: 'L',
     platform: 'ffpc',
@@ -44,12 +67,19 @@ describe('withMinutesLeft', () => {
   });
 
   it('adds both sides for this week', () => {
-    const [l] = withMinutesLeft([league(6)], 6, games);
+    const [l] = withGameProgress([league(6)], 6, games);
     expect([l!.matchup!.me.minutesLeft, l!.matchup!.opponent!.minutesLeft]).toEqual([60, 30]);
+    expect([l!.matchup!.me.starters[0]!.game?.state, l!.matchup!.opponent!.starters[0]!.game?.state]).toEqual(['pre', 'live']);
   });
 
   it('leaves a matchup pasted for another week alone', () => {
-    const [l] = withMinutesLeft([league(5)], 6, games);
+    const [l] = withGameProgress([league(5)], 6, games);
     expect(l!.matchup!.me.minutesLeft).toBeUndefined();
+    expect(l!.matchup!.me.starters[0]!.game).toBeUndefined();
+  });
+
+  it('leaves everything alone when the schedule is unknown', () => {
+    const [l] = withGameProgress([league(6)], 6, new Map());
+    expect(l!.matchup!.me.starters[0]!.game).toBeUndefined();
   });
 });

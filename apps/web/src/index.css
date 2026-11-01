@@ -25,8 +25,12 @@
   --color-emerald-900: #0b3a2e;
   --color-emerald-950: #082a22;
 
-  --color-hero: #13213a; /* the week summary banner */
   --color-track: #24324d; /* empty part of a margin bar */
+
+  /* A team card's background, by how its matchup looks. */
+  --color-win-wash: #0d2c2b;
+  --color-toss-wash: #2b2714;
+  --color-lose-wash: #2e1626;
 }
 
 :root {
@@ -35,6 +39,18 @@
 
 body {
   @apply bg-slate-950 text-slate-100 antialiased;
+}
+
+/* A new play on a team card lights up, then fades. */
+@keyframes play-flash {
+  from {
+    background-color: #2f4a78;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .play-flash {
+    animation: play-flash 2.5s ease-out;
+  }
 }
 
 /* Chart colors as roles. The series color and the neutral inks were checked

@@ -12,7 +12,7 @@ import { percent, UpNext, useLeagueOutlook } from './outlook/UpNext';
 
 type Tab = 'allplay' | 'lineup' | 'standings' | 'roster' | null;
 
-// Everything about one league, shown when its row in the matchup table is opened.
+// Everything about one league, shown beside the wall when its card is opened.
 export function LeagueDetails({ league, issues = [], onEdit }: { league: LeagueSummary; issues?: LineupIssue[]; onEdit?: () => void }) {
   // Opening a league shows its lineups straight away.
   const [tab, setTab] = useState<Tab>(league.matchup ? 'lineup' : null);
@@ -33,7 +33,7 @@ export function LeagueDetails({ league, issues = [], onEdit }: { league: LeagueS
   );
 
   return (
-    <div className="flex flex-col gap-4 border-t border-slate-800 px-4 pb-4 pt-3">
+    <div className="flex flex-col gap-4 px-4 pb-4 pt-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 text-sm">
         <p className="text-slate-400">
           {league.manual

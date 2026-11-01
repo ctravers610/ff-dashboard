@@ -2,13 +2,8 @@ import { buildBoard, isBigStat, marginChange, RECENT_MINUTES, rowWhere, type Boa
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { api, useDemo, useLive } from '../../api';
+import { clockTime } from '../../format';
 
-// A week's feed runs Thursday to Monday, so anything older than today says its day.
-const clock = (iso: string) => {
-  const at = new Date(iso);
-  const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M$/i, '');
-  return at.toDateString() === new Date().toDateString() ? time : `${at.toLocaleDateString([], { weekday: 'short' })} ${time}`;
-};
 const fullTime = (iso: string) => new Date(iso).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
 
 const ago = (iso: string | null) => {
@@ -64,7 +59,7 @@ function PlayerRow({ row, tint = '' }: { row: BoardRow; tint?: string }) {
           </span>
           <span className="text-xs text-slate-400">
             <time dateTime={row.at} title={fullTime(row.at)} className="tabular-nums">
-              {clock(row.at)}
+              {clockTime(row.at)}
             </time>{' '}
             · {rowWhere(row)}
           </span>
@@ -113,7 +108,7 @@ function Runs({ rows }: { rows: BoardRow[] }) {
 
 type Filter = 'all' | 'mine' | string; // a league key
 
-// The live scoring feed, as a column beside the matchups: a board of who's doing
+// The live scoring feed, opened beside the team cards: a board of who's doing
 // what, filterable, and checked every 30 seconds by the server while games are on.
 export function LiveFeed() {
   const { data, error, isPending } = useLive();

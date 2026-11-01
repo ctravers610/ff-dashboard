@@ -1,6 +1,7 @@
 import type { DashboardResponse, LeagueSummary, Platform, Player, SourceError } from '@ffd/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getDashboard } from '../dashboard.js';
+import { nflGames } from '../scoring/games.js';
 import { fetchStats } from '../scoring/live.js';
 import { FFPC_RULES } from '../scoring/rules.js';
 import { scoreStats } from '../scoring/score.js';
@@ -69,11 +70,12 @@ const catchFor14 = { rec: 1, rec_yd: 14 };
 
 // One look at the week, with what the dashboard and the stat feed say at that moment.
 const store = { add: vi.fn(async () => {}), recent: vi.fn(async () => []) };
+const chances = { add: vi.fn(async () => {}), series: vi.fn(async () => new Map()) };
 function poll(leagues: LeagueSummary[], stats: Record<string, Record<string, number>> = {}, errors: SourceError[] = [], week = 8) {
   const dashboard: DashboardResponse = { season: '2026', week, updatedAt: '', leagues, players: [], errors };
   vi.mocked(getDashboard).mockResolvedValue(dashboard);
   vi.mocked(fetchStats).mockResolvedValue(new Map(Object.entries(stats)));
-  return pollLive(store);
+  return pollLive(store, chances);
 }
 
 const eventFor = (events: FeedEvent[], name: string) => events.find((e) => e.player.name === name);
@@ -82,6 +84,24 @@ const leaguesOf = (event: FeedEvent | undefined) => event?.leagues.map((l) => [l
 beforeEach(() => {
   resetLive();
   store.add.mockClear();
+  chances.add.mockClear();
+});
+
+describe('pollLive recording win chances', () => {
+  it('records only while a game is being played', async () => {
+    const game = (started: boolean, progress: number) => new Map([['GB', { opponent: 'X', opponentScore: 0, started, progress, kickoff: null }]]);
+    const matchup = { ...annex().matchup!, me: { ...annex().matchup!.me, projected: 20 }, opponent: { ...annex().matchup!.opponent!, projected: 10 } };
+
+    vi.mocked(nflGames).mockResolvedValueOnce(game(false, 0));
+    await poll([{ ...annex(), matchup }]);
+    vi.mocked(nflGames).mockResolvedValueOnce(game(true, 1));
+    await poll([{ ...annex(), matchup }]);
+    expect(chances.add).not.toHaveBeenCalled();
+
+    vi.mocked(nflGames).mockResolvedValueOnce(game(true, 0.5));
+    await poll([{ ...annex(), matchup }]);
+    expect(chances.add).toHaveBeenCalledWith('2026', 8, [expect.objectContaining({ leagueKey: 'yahoo:461.l.99' })]);
+  });
 });
 
 describe('pollLive when a league fails to load', () => {

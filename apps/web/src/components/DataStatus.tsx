@@ -13,7 +13,7 @@ export function DataStatus({ data }: { data: DashboardResponse }) {
   if (platforms.length === 0) return null;
   const at = new Date(data.updatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   return (
-    <p aria-label="Data sources" className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+    <p aria-label="Data sources" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
       {platforms.map((p) => {
         const problems = data.errors.filter((e) => platformOf(e.source) === p);
         const loaded = data.leagues.some((l) => l.platform === p);
