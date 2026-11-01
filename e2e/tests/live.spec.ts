@@ -54,6 +54,34 @@ test.describe('Live feed', () => {
     await expect(feed(page).getByRole('listitem').filter({ hasText: 'Drake Maye' })).toHaveCount(1);
   });
 
+  test('shows a play that gets called back as one crossed-out line', async ({ page, request }) => {
+    await mayeThrowsATouchdown(request);
+    await feed(page).getByRole('button', { name: 'Check now' }).click();
+    await expect(feed(page)).toContainText('1 pass TD, 25 pass yds');
+
+    await upstream(`/_live/play?player=${P.maye.id}&pass_td=-1&pass_yd=-25`);
+    await feed(page).getByRole('button', { name: 'Check now' }).click();
+
+    const event = feed(page).getByRole('listitem').filter({ hasText: 'Drake Maye' });
+    await expect(event).toHaveCount(1);
+    await expect(event).toContainText('called back');
+    await expect(event.locator('s')).toHaveText('1 pass TD, 25 pass yds');
+    await expect(feed(page)).not.toContainText('−1 pass TD');
+  });
+
+  test('keeps a correction that only partly undoes a play as its own row', async ({ page, request }) => {
+    await mayeThrowsATouchdown(request);
+    await feed(page).getByRole('button', { name: 'Check now' }).click();
+    await expect(feed(page)).toContainText('1 pass TD, 25 pass yds');
+
+    await upstream(`/_live/play?player=${P.maye.id}&pass_td=-1&pass_yd=-10`);
+    await feed(page).getByRole('button', { name: 'Check now' }).click();
+
+    await expect(feed(page).getByRole('listitem').filter({ hasText: 'Drake Maye' })).toHaveCount(2);
+    await expect(feed(page)).toContainText('−1 pass TD, −10 pass yds');
+    await expect(feed(page)).not.toContainText('called back');
+  });
+
   test('sits beside the matchups, and filters to your starters or one league', async ({ page, request }) => {
     await mayeThrowsATouchdown(request);
     await request.post('/api/live/poll');
